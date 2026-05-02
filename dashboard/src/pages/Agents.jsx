@@ -7,12 +7,10 @@ import {
 } from "lucide-react";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/card";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "../components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
-import { Separator } from "../components/ui/separator";
 
 const LLM_MODELS = {
   groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"],
@@ -96,107 +94,107 @@ function AgentFormDialog({ open, onOpenChange, agent, onSave }) {
           </TabsList>
 
           <TabsContent value="basic">
-            <div className="space-y-3 text-sm">
+            <div className="space-y-4 text-sm">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Agent Name *</label>
+                <label className="block text-sm text-gray-400 mb-1.5 font-medium">Agent Name *</label>
                 <input value={form.name} onChange={(e) => set("name", e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2" placeholder="Lead Qualifier" />
+                  className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30" placeholder="Lead Qualifier" />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">System Prompt *</label>
+                <label className="block text-sm text-gray-400 mb-1.5 font-medium">System Prompt *</label>
                 <textarea value={form.instructions} onChange={(e) => set("instructions", e.target.value)}
-                  rows={6} className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 resize-none font-mono text-xs"
+                  rows={6} className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30 resize-none font-mono text-xs"
                   placeholder="You are a professional sales agent..." />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Greeting Message</label>
+                <label className="block text-sm text-gray-400 mb-1.5 font-medium">Greeting Message</label>
                 <input value={form.greeting} onChange={(e) => set("greeting", e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2"
+                  className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30"
                   placeholder="Hello! Thanks for calling Cogniflow. How can I help you today?" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">Language</label>
+                  <label className="block text-sm text-gray-400 mb-1.5 font-medium">Language</label>
                   <select value={form.language} onChange={(e) => set("language", e.target.value)}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2">
+                    className="w-full glass-card rounded-xl px-4 py-3 border border-gray-700/30 bg-gray-800/30">
                     {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">Phone Numbers (comma-separated)</label>
+                  <label className="block text-sm text-gray-400 mb-1.5 font-medium">Phone Numbers</label>
                   <input value={form.phone_numbers} onChange={(e) => set("phone_numbers", e.target.value)}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2" placeholder="+1234, +5678" />
+                    className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30 font-mono" placeholder="+1234, +5678" />
                 </div>
               </div>
             </div>
           </TabsContent>
 
           <TabsContent value="llm">
-            <div className="space-y-4 text-sm">
-              <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-5 text-sm">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">LLM Provider</label>
+                  <label className="block text-sm text-gray-400 mb-1.5 font-medium">LLM Provider</label>
                   <select value={form.llm_provider} onChange={(e) => {
                     set("llm_provider", e.target.value);
                     set("llm_model", (LLM_MODELS[e.target.value] || [])[0] || "");
-                  }} className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2">
+                  }} className="w-full glass-card rounded-xl px-4 py-3 border border-gray-700/30 bg-gray-800/30">
                     {Object.keys(LLM_MODELS).map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">Model</label>
+                  <label className="block text-sm text-gray-400 mb-1.5 font-medium">Model</label>
                   <select value={form.llm_model} onChange={(e) => set("llm_model", e.target.value)}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2">
+                    className="w-full glass-card rounded-xl px-4 py-3 border border-gray-700/30 bg-gray-800/30">
                     {(LLM_MODELS[form.llm_provider] || []).map(m => <option key={m} value={m}>{m}</option>)}
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Temperature: {form.temperature}</label>
+                <label className="block text-sm text-gray-400 mb-1.5 font-medium">Temperature: {form.temperature}</label>
                 <input type="range" min="0" max="2" step="0.1" value={form.temperature}
                   onChange={(e) => set("temperature", e.target.value)}
                   className="w-full accent-blue-500" />
-                <div className="flex justify-between text-[10px] text-gray-600">
+                <div className="flex justify-between text-[10px] text-gray-600 mt-1">
                   <span>Precise (0)</span><span>Creative (2)</span>
                 </div>
               </div>
 
-              <Separator />
+              <div className="h-px bg-gradient-to-r from-transparent via-gray-700/50 to-transparent" />
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">TTS Provider</label>
+                  <label className="block text-sm text-gray-400 mb-1.5 font-medium">TTS Provider</label>
                   <select value={form.tts_provider} onChange={(e) => set("tts_provider", e.target.value)}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2">
+                    className="w-full glass-card rounded-xl px-4 py-3 border border-gray-700/30 bg-gray-800/30">
                     {TTS_PROVIDERS.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">Voice ID</label>
+                  <label className="block text-sm text-gray-400 mb-1.5 font-medium">Voice ID</label>
                   <input value={form.voice_id} onChange={(e) => set("voice_id", e.target.value)}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2" placeholder="Voice ID" />
+                    className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30 font-mono" placeholder="Voice ID" />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Max Call Duration (seconds)</label>
+                <label className="block text-sm text-gray-400 mb-1.5 font-medium">Max Call Duration (seconds)</label>
                 <input type="number" value={form.max_call_duration} onChange={(e) => set("max_call_duration", e.target.value)}
-                  className="w-32 bg-gray-800 border border-gray-700 rounded-md px-3 py-2" />
+                  className="w-32 glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30" />
               </div>
             </div>
           </TabsContent>
 
           <TabsContent value="tools">
-            <div className="space-y-2">
-              <p className="text-xs text-gray-500">Enable the tools this agent can use during calls:</p>
-              <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-3">
+              <p className="text-sm text-gray-400">Enable the tools this agent can use during calls:</p>
+              <div className="grid grid-cols-2 gap-3">
                 {AVAILABLE_TOOLS.map(tool => (
                   <button key={tool.id} onClick={() => toggleTool(tool.id)}
-                    className={`flex items-center gap-2 p-3 rounded-lg border text-sm text-left transition-colors ${
+                    className={`flex items-center gap-3 p-4 rounded-xl border text-sm text-left transition-all duration-200 ${
                       form.tools_enabled.includes(tool.id)
-                        ? "border-blue-600 bg-blue-600/10 text-white"
-                        : "border-gray-700 bg-gray-800/50 text-gray-400"
+                        ? "border-blue-500/50 bg-blue-500/10 text-white shadow-md shadow-blue-500/5"
+                        : "border-gray-700/30 bg-gray-800/30 text-gray-400 hover:border-gray-600/50"
                     }`}>
                     <span className="text-lg">{tool.icon}</span>
                     <span>{tool.label}</span>
@@ -208,7 +206,7 @@ function AgentFormDialog({ open, onOpenChange, agent, onSave }) {
 
           <TabsContent value="features">
             <div className="space-y-3">
-              <p className="text-xs text-gray-500">Toggle AI features for this agent:</p>
+              <p className="text-sm text-gray-400">Toggle AI features for this agent:</p>
               {[
                 { key: "enable_memory", label: "Caller Memory", desc: "Remember callers across sessions", icon: Brain },
                 { key: "enable_prediction", label: "Pre-Call Prediction", desc: "Predict caller intent before answering", icon: BarChart3 },
@@ -216,17 +214,19 @@ function AgentFormDialog({ open, onOpenChange, agent, onSave }) {
                 { key: "enable_language_switch", label: "Language Switching", desc: "Auto-detect and switch languages mid-call", icon: Wrench },
                 { key: "enable_rag", label: "Knowledge Base (RAG)", desc: "Use uploaded documents during calls", icon: Shield },
               ].map(({ key, label, desc, icon: Icon }) => (
-                <div key={key} className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                <div key={key} className="flex items-center justify-between p-4 glass-card rounded-xl">
                   <div className="flex items-center gap-3">
-                    <Icon size={16} className="text-gray-400" />
+                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                      <Icon size={15} className="text-blue-400" />
+                    </div>
                     <div>
                       <p className="text-sm font-medium">{label}</p>
                       <p className="text-xs text-gray-500">{desc}</p>
                     </div>
                   </div>
                   <button onClick={() => set(key, !form[key])}
-                    className={`w-10 h-5 rounded-full transition-colors relative ${form[key] ? "bg-blue-600" : "bg-gray-600"}`}>
-                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${form[key] ? "left-5" : "left-0.5"}`} />
+                    className={`w-11 h-6 rounded-full transition-all duration-200 relative ${form[key] ? "bg-blue-500 shadow-md shadow-blue-500/30" : "bg-gray-700"}`}>
+                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${form[key] ? "left-6" : "left-1"}`} />
                   </button>
                 </div>
               ))}
@@ -234,7 +234,7 @@ function AgentFormDialog({ open, onOpenChange, agent, onSave }) {
           </TabsContent>
         </Tabs>
 
-        <div className="flex gap-2 pt-2">
+        <div className="flex gap-3 pt-3">
           <Button onClick={handleSave} disabled={!form.name || !form.instructions}>
             <Save size={14} /> {isEdit ? "Save Changes" : "Create Agent"}
           </Button>
@@ -256,9 +256,9 @@ function TestCallWidget({ agent }) {
   });
 
   return (
-    <div className="flex items-center gap-2 mt-3">
+    <div className="flex items-center gap-3 mt-4 pt-4 border-t border-gray-800/30">
       <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91..."
-        className="flex-1 bg-gray-800 border border-gray-700 rounded-md px-3 py-1.5 text-xs" />
+        className="flex-1 glass-card rounded-xl px-4 py-2.5 text-xs input-glow border border-gray-700/30 bg-gray-800/30 font-mono" />
       <Button size="sm" variant="outline" onClick={() => callMut.mutate()} disabled={!phone || callMut.isPending}>
         <PhoneOutgoing size={12} /> Test
       </Button>
@@ -276,17 +276,20 @@ function AgentPerformance({ agentId }) {
 
   if (!data || data.total_calls === 0) return null;
 
+  const colors = ["text-blue-400", "text-emerald-400", "text-violet-400", "text-amber-400"];
+  const bgs = ["bg-blue-500/10", "bg-emerald-500/10", "bg-violet-500/10", "bg-amber-500/10"];
+
   return (
-    <div className="grid grid-cols-4 gap-2 mt-3">
+    <div className="grid grid-cols-4 gap-3 mt-4 pt-4 border-t border-gray-800/30">
       {[
         { label: "Calls", value: data.total_calls },
         { label: "Avg Duration", value: `${data.avg_duration}s` },
         { label: "Sentiment", value: data.avg_sentiment },
         { label: "Conversion", value: `${data.conversion_rate}%` },
-      ].map(({ label, value }) => (
-        <div key={label} className="bg-gray-800/50 rounded p-2 text-center">
-          <p className="text-[10px] text-gray-500 uppercase">{label}</p>
-          <p className="text-sm font-bold">{value}</p>
+      ].map(({ label, value }, i) => (
+        <div key={label} className="rounded-xl bg-gray-800/30 p-3 text-center">
+          <p className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">{label}</p>
+          <p className={`text-sm font-bold ${colors[i]}`}>{value}</p>
         </div>
       ))}
     </div>
@@ -297,49 +300,53 @@ function AgentCard({ agent, onEdit, onDelete, onClone }) {
   const [showTest, setShowTest] = useState(false);
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <div className="flex justify-between items-start">
-          <div className="flex items-center gap-2">
+    <div className="glass-card rounded-xl p-5 transition-all duration-200">
+      <div className="flex justify-between items-start mb-3">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center">
             <Bot size={16} className="text-blue-400" />
-            <CardTitle className="text-base">{agent.name}</CardTitle>
           </div>
-          <div className="flex items-center gap-2">
-            <Badge variant={agent.is_active ? "success" : "secondary"}>
-              {agent.is_active ? "Active" : "Inactive"}
-            </Badge>
-            <div className="flex gap-1">
-              <Button variant="ghost" size="sm" onClick={() => onEdit(agent)}>Edit</Button>
-              <Button variant="ghost" size="sm" onClick={() => onClone(agent)}><Copy size={12} /></Button>
-              <Button variant="ghost" size="sm" onClick={() => setShowTest(!showTest)}>
-                <PhoneOutgoing size={12} />
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => { if (confirm("Delete this agent?")) onDelete(agent.id); }}>
-                <Trash2 size={12} />
-              </Button>
+          <div>
+            <h3 className="text-base font-semibold text-white">{agent.name}</h3>
+            <div className="flex gap-2 mt-1">
+              <Badge variant={agent.is_active ? "success" : "secondary"}>
+                {agent.is_active ? "Active" : "Inactive"}
+              </Badge>
             </div>
           </div>
         </div>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-gray-400 line-clamp-2 mb-2">{agent.instructions}</p>
-        <div className="flex gap-3 text-xs text-gray-500 flex-wrap">
-          <span>{agent.llm_provider || "groq"} / {agent.llm_model || "llama-3.3-70b"}</span>
-          <span>TTS: {agent.tts_provider || "cartesia"}</span>
-          <span>Lang: {agent.language || "en"}</span>
-          <span>Numbers: {(agent.phone_numbers || []).length}</span>
+        <div className="flex gap-1">
+          <Button variant="ghost" size="sm" onClick={() => onEdit(agent)}>Edit</Button>
+          <Button variant="ghost" size="sm" onClick={() => onClone(agent)}><Copy size={12} /></Button>
+          <Button variant="ghost" size="sm" onClick={() => setShowTest(!showTest)}>
+            <PhoneOutgoing size={12} />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => { if (confirm("Delete this agent?")) onDelete(agent.id); }}>
+            <Trash2 size={12} />
+          </Button>
         </div>
-        <div className="flex gap-1 mt-2 flex-wrap">
-          {agent.enable_memory && <Badge variant="outline" className="text-[10px]">Memory</Badge>}
-          {agent.enable_prediction && <Badge variant="outline" className="text-[10px]">Prediction</Badge>}
-          {agent.enable_emotion && <Badge variant="outline" className="text-[10px]">Emotion</Badge>}
-          {agent.enable_language_switch && <Badge variant="outline" className="text-[10px]">Lang Switch</Badge>}
-          {agent.enable_rag && <Badge variant="outline" className="text-[10px]">RAG</Badge>}
-        </div>
-        <AgentPerformance agentId={agent.id} />
-        {showTest && <TestCallWidget agent={agent} />}
-      </CardContent>
-    </Card>
+      </div>
+
+      <p className="text-sm text-gray-400 line-clamp-2 mb-3">{agent.instructions}</p>
+
+      <div className="flex gap-3 text-xs text-gray-500 flex-wrap mb-3">
+        <span className="px-2 py-1 rounded-lg bg-gray-800/50">{agent.llm_provider || "groq"} / {agent.llm_model || "llama-3.3-70b"}</span>
+        <span className="px-2 py-1 rounded-lg bg-gray-800/50">TTS: {agent.tts_provider || "cartesia"}</span>
+        <span className="px-2 py-1 rounded-lg bg-gray-800/50">Lang: {agent.language || "en"}</span>
+        <span className="px-2 py-1 rounded-lg bg-gray-800/50">Numbers: {(agent.phone_numbers || []).length}</span>
+      </div>
+
+      <div className="flex gap-1.5 flex-wrap">
+        {agent.enable_memory && <Badge variant="outline" className="text-[10px]">Memory</Badge>}
+        {agent.enable_prediction && <Badge variant="outline" className="text-[10px]">Prediction</Badge>}
+        {agent.enable_emotion && <Badge variant="outline" className="text-[10px]">Emotion</Badge>}
+        {agent.enable_language_switch && <Badge variant="outline" className="text-[10px]">Lang Switch</Badge>}
+        {agent.enable_rag && <Badge variant="outline" className="text-[10px]">RAG</Badge>}
+      </div>
+
+      <AgentPerformance agentId={agent.id} />
+      {showTest && <TestCallWidget agent={agent} />}
+    </div>
   );
 }
 
@@ -371,9 +378,9 @@ function CloneDialog({ open, onOpenChange, sourceAgent }) {
           <DialogDescription>Upload call recordings to generate a new agent that mimics the style.</DialogDescription>
         </DialogHeader>
         {cloneResult ? (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <Badge variant="success">Clone Generated</Badge>
-            <div className="bg-gray-800 rounded-md p-3 text-sm text-gray-300 max-h-48 overflow-auto whitespace-pre-wrap">
+            <div className="glass-card rounded-xl p-4 text-sm text-gray-300 max-h-48 overflow-auto whitespace-pre-wrap">
               {cloneResult.instructions || "Agent cloned successfully"}
             </div>
             <Button onClick={handleClose} className="w-full">Done</Button>
@@ -381,16 +388,16 @@ function CloneDialog({ open, onOpenChange, sourceAgent }) {
         ) : (
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium mb-1 block">New Agent Name</label>
+              <label className="block text-sm text-gray-400 mb-1.5 font-medium">New Agent Name</label>
               <input value={agentName} onChange={(e) => setAgentName(e.target.value)}
                 placeholder={`Clone of ${sourceAgent?.name || "Agent"}`}
-                className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm" />
+                className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30 text-sm" />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Recording URLs (one per line)</label>
+              <label className="block text-sm text-gray-400 mb-1.5 font-medium">Recording URLs (one per line)</label>
               <textarea value={recordings} onChange={(e) => setRecordings(e.target.value)}
                 rows={4} placeholder="https://storage.example.com/call-1.mp3"
-                className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm resize-none font-mono" />
+                className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30 text-sm resize-none font-mono" />
             </div>
             <Button onClick={handleClone} disabled={cloneMut.isPending || !recordings.trim()} className="w-full">
               {cloneMut.isPending ? <><Loader2 size={14} className="animate-spin" /> Analyzing...</> : <><Upload size={14} /> Clone Agent</>}
@@ -435,9 +442,12 @@ export default function Agents() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Agents</h2>
-        <div className="flex gap-2">
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h2 className="text-2xl font-bold gradient-text">Agents</h2>
+          <p className="text-sm text-gray-500 mt-1">Configure and manage your AI voice agents</p>
+        </div>
+        <div className="flex gap-3">
           <Button variant="outline" size="sm" onClick={() => setCloneDialog({ open: true, source: null })}>
             <Copy size={14} /> Clone from Recordings
           </Button>
@@ -447,7 +457,7 @@ export default function Agents() {
         </div>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         {agents.map((a) => (
           <AgentCard key={a.id} agent={a}
             onEdit={(agent) => setFormDialog({ open: true, agent })}
@@ -455,10 +465,13 @@ export default function Agents() {
             onClone={(agent) => setCloneDialog({ open: true, source: agent })} />
         ))}
         {agents.length === 0 && (
-          <div className="text-center py-12">
-            <Bot size={32} className="mx-auto mb-3 text-gray-600" />
-            <p className="text-gray-500">No agents configured. Using default agent.</p>
-            <Button size="sm" className="mt-3" onClick={() => setFormDialog({ open: true, agent: null })}>
+          <div className="text-center py-16 glass-card rounded-xl">
+            <div className="w-14 h-14 rounded-2xl bg-blue-500/10 flex items-center justify-center mx-auto mb-4">
+              <Bot size={24} className="text-blue-400" />
+            </div>
+            <p className="text-gray-400 mb-1">No agents configured</p>
+            <p className="text-gray-600 text-sm mb-4">Using default agent. Create one to get started.</p>
+            <Button size="sm" onClick={() => setFormDialog({ open: true, agent: null })}>
               <Plus size={14} /> Create Your First Agent
             </Button>
           </div>

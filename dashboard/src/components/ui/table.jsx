@@ -9,7 +9,7 @@ const Table = forwardRef(({ className, ...props }, ref) => (
 Table.displayName = "Table";
 
 const TableHeader = forwardRef(({ className, ...props }, ref) => (
-  <thead ref={ref} className={cn("[&_tr]:border-b [&_tr]:border-gray-800", className)} {...props} />
+  <thead ref={ref} className={cn("[&_tr]:border-b [&_tr]:border-gray-800/50", className)} {...props} />
 ));
 TableHeader.displayName = "TableHeader";
 
@@ -19,12 +19,12 @@ const TableBody = forwardRef(({ className, ...props }, ref) => (
 TableBody.displayName = "TableBody";
 
 const TableRow = forwardRef(({ className, ...props }, ref) => (
-  <tr ref={ref} className={cn("border-b border-gray-800 transition-colors hover:bg-gray-800/50", className)} {...props} />
+  <tr ref={ref} className={cn("border-b border-gray-800/30 transition-all duration-200 table-row-hover", className)} {...props} />
 ));
 TableRow.displayName = "TableRow";
 
 const TableHead = forwardRef(({ className, ...props }, ref) => (
-  <th ref={ref} className={cn("h-10 px-3 text-left align-middle font-medium text-gray-400 [&:has([role=checkbox])]:pr-0", className)} {...props} />
+  <th ref={ref} className={cn("h-10 px-3 text-left align-middle font-medium text-gray-500 text-xs uppercase tracking-wider [&:has([role=checkbox])]:pr-0", className)} {...props} />
 ));
 TableHead.displayName = "TableHead";
 
