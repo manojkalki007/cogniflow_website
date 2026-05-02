@@ -18,16 +18,25 @@ SMALLEST_API_URL = "https://waves-api.smallest.ai/api/v1/lightning/get_speech"
 
 
 class SmallestTTS:
-    def __init__(self, voice_id: str = "", language: str = "en", sample_rate: int = 8000):
-        self.voice_id = voice_id or "emily"
+    VALID_VOICES = {
+        "emily", "jasmine", "arman", "james", "mithali", "aravind",
+        "raman", "diya", "ananya", "chetan", "deepika", "nisha", "raj",
+        "arnav", "george", "judi", "aarav", "raghav", "kajal", "mansi",
+        "saurabh", "pooja", "saina", "sanya", "ankur", "enola", "rebecca",
+        "abhinav", "sushma", "ashish", "shweta", "karen", "pragya",
+    }
+
+    def __init__(self, voice_id: str = "", language: str = "en", sample_rate: int = 8000, raw_pcm: bool = False):
+        self.voice_id = voice_id if voice_id in self.VALID_VOICES else "emily"
         self.language = language
         self.sample_rate = sample_rate
+        self.raw_pcm = raw_pcm
         self._client = httpx.AsyncClient(timeout=15.0)
 
     async def connect(self):
-        logger.info(f"Smallest AI TTS ready (voice={self.voice_id})")
+        logger.info(f"Smallest AI TTS ready (voice={self.voice_id}, rate={self.sample_rate}, pcm={self.raw_pcm})")
 
-    async def synthesize(self, text: str) -> AsyncIterator[bytes]:
+    async def synthesize(self, text: str, speed: float = 0.0) -> AsyncIterator[bytes]:
         if not text.strip():
             return
 
@@ -39,11 +48,12 @@ class SmallestTTS:
             "text": text,
             "voice_id": self.voice_id,
             "sample_rate": self.sample_rate,
-            "speed": 1.0,
+            "speed": speed if speed > 0 else 1.0,
             "add_wav_header": False,
         }
 
         try:
+            chunk_bytes = 8192 if self.raw_pcm else 640
             async with self._client.stream(
                 "POST", SMALLEST_API_URL, json=body, headers=headers
             ) as resp:
@@ -54,9 +64,9 @@ class SmallestTTS:
                     )
                     return
 
-                async for chunk in resp.aiter_bytes(640):
+                async for chunk in resp.aiter_bytes(chunk_bytes):
                     if chunk:
-                        yield pcm16_to_mulaw(chunk)
+                        yield chunk if self.raw_pcm else pcm16_to_mulaw(chunk)
 
         except Exception:
             logger.exception("Smallest AI TTS request failed")

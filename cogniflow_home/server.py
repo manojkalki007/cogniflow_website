@@ -35,11 +35,10 @@ import uuid as _uuid
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Header, Request
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Depends, FastAPI, HTTPException, Header, Request, WebSocket
 from fastapi.responses import JSONResponse, Response
-from starlette.middleware.base import BaseHTTPMiddleware
-from cogniflow_home.agents import create_agent, get_agent_for_number, list_agents, update_agent
+from starlette.types import ASGIApp, Receive, Scope, Send
+from cogniflow_home.agents import create_agent, get_agent_by_id, get_agent_for_number, list_agents, update_agent
 from cogniflow_home.campaigns.manager import (
     create_campaign,
     get_campaign,
@@ -59,6 +58,8 @@ from cogniflow_home.telephony.registry import get_provider
 logger = logging.getLogger("cogniflow_home")
 
 active_calls: dict[str, VoicePipeline] = {}
+# call_sid → agent_id override for test calls
+_pending_agent_overrides: dict[str, str] = {}
 
 _UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', re.I)
 
@@ -121,9 +122,13 @@ async def lifespan(app):
 
     from cogniflow_home.memory import register as register_memory
     from cogniflow_home.integrations import salesforce
+    from cogniflow_home.analysis import behaviour as behaviour_analysis
+    from cogniflow_home.notifications import confirmations
 
     call_logger.register()
     post_call.register()
+    behaviour_analysis.register()
+    confirmations.register()
     hubspot.register()
     dispatcher.register()
     dnc.register()
@@ -160,24 +165,46 @@ async def lifespan(app):
 app = FastAPI(title="Cogniflow Home Voice Agent", version="2.0.0", lifespan=lifespan)
 
 
-class RequestIDMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        request_id = request.headers.get("X-Request-ID", str(_uuid.uuid4())[:8])
-        request.state.request_id = request_id
-        response = await call_next(request)
-        response.headers["X-Request-ID"] = request_id
-        return response
+class CORSAndRequestIDMiddleware:
+    def __init__(self, app: ASGIApp):
+        self.app = app
 
+    async def __call__(self, scope: Scope, receive: Receive, send: Send):
+        if scope["type"] == "websocket":
+            await self.app(scope, receive, send)
+            return
 
-app.add_middleware(RequestIDMiddleware)
+        if scope["type"] == "http":
+            headers = dict(scope.get("headers", []))
+            request_id = headers.get(b"x-request-id", str(_uuid.uuid4())[:8].encode()).decode()
+            scope.setdefault("state", {})["request_id"] = request_id
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=False,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "X-Api-Key", "X-Request-ID"],
-)
+            method = scope.get("method", "GET")
+            if method == "OPTIONS":
+                response_headers = [
+                    (b"access-control-allow-origin", b"*"),
+                    (b"access-control-allow-methods", b"GET, POST, PATCH, DELETE, OPTIONS"),
+                    (b"access-control-allow-headers", b"Content-Type, X-Api-Key, X-Request-ID"),
+                    (b"access-control-max-age", b"86400"),
+                ]
+                await send({"type": "http.response.start", "status": 204, "headers": response_headers})
+                await send({"type": "http.response.body", "body": b""})
+                return
+
+            async def send_with_cors(message):
+                if message["type"] == "http.response.start":
+                    h = list(message.get("headers", []))
+                    h.append((b"access-control-allow-origin", b"*"))
+                    h.append((b"x-request-id", request_id.encode()))
+                    message["headers"] = h
+                await send(message)
+
+            await self.app(scope, receive, send_with_cors)
+            return
+
+        await self.app(scope, receive, send)
+
+app.add_middleware(CORSAndRequestIDMiddleware)
 
 
 # ─── Health ───
@@ -289,7 +316,7 @@ async def generic_inbound(provider_name: str):
 # ─── Universal WebSocket ───
 
 @app.websocket("/voice/{provider_name}/ws")
-async def voice_ws(websocket, provider_name: str):
+async def voice_ws(websocket: WebSocket, provider_name: str):
     if len(active_calls) >= settings.max_concurrent_calls:
         await websocket.close(code=1013, reason="Server at capacity")
         return
@@ -304,7 +331,13 @@ async def voice_ws(websocket, provider_name: str):
     async def on_call_start(call_info: CallInfo):
         nonlocal pipeline
 
-        agent_config = await get_agent_for_number(call_info.called_number)
+        override_id = _pending_agent_overrides.pop(call_info.call_sid, None)
+        if override_id:
+            agent_config = await get_agent_by_id(override_id)
+            if not agent_config:
+                agent_config = await get_agent_for_number(call_info.called_number)
+        else:
+            agent_config = await get_agent_for_number(call_info.called_number)
         pipeline = VoicePipeline(
             call_info, provider,
             instructions_override=agent_config.instructions,
@@ -331,6 +364,64 @@ async def voice_ws(websocket, provider_name: str):
     await provider.handle_websocket(websocket, on_audio, on_call_start, on_call_end)
 
 
+@app.websocket("/voice/browser/test")
+async def browser_voice_test(websocket: WebSocket):
+    """Browser-based voice test — pass agent_id as query param."""
+    if len(active_calls) >= settings.max_concurrent_calls:
+        await websocket.close(code=1013, reason="Server at capacity")
+        return
+
+    agent_id = websocket.query_params.get("agent_id", "")
+
+    if not settings.groq_api_key and not settings.openai_api_key:
+        await websocket.accept()
+        import json as _json
+        await websocket.send_text(_json.dumps({"event": "error", "message": "No LLM provider configured. Add GROQ_API_KEY or OPENAI_API_KEY to .env"}))
+        await websocket.close()
+        return
+
+    provider = get_provider("browser")
+    pipeline: Optional[VoicePipeline] = None
+
+    async def on_audio(audio_bytes: bytes):
+        if pipeline:
+            await pipeline.handle_audio(audio_bytes)
+
+    async def on_call_start(call_info: CallInfo):
+        nonlocal pipeline
+        if agent_id:
+            agent_config = await get_agent_by_id(agent_id)
+            if not agent_config:
+                agent_config = await get_agent_for_number("")
+        else:
+            agent_config = await get_agent_for_number("")
+        pipeline = VoicePipeline(
+            call_info, provider,
+            instructions_override=agent_config.instructions,
+            greeting_override=agent_config.greeting,
+            language=agent_config.language,
+            voice_id=agent_config.voice_id,
+            sample_rate=16000,
+        )
+
+        async def _send_transcript(role: str, text: str):
+            await provider.send_event("transcript", {"role": role, "text": text})
+
+        pipeline.on_transcript = _send_transcript
+        active_calls[call_info.call_sid] = pipeline
+        await pipeline.start()
+
+    async def on_call_end():
+        nonlocal pipeline
+        if pipeline:
+            call_sid = pipeline.state.call_sid
+            await pipeline.stop()
+            active_calls.pop(call_sid, None)
+            pipeline = None
+
+    await provider.handle_websocket(websocket, on_audio, on_call_start, on_call_end)
+
+
 # ─── Outbound Calls ───
 
 @app.post("/api/call", dependencies=[Depends(verify_api_key)])
@@ -338,6 +429,7 @@ async def make_outbound_call(request: Request):
     body = await request.json()
     to_number = body.get("to_number")
     provider_name = body.get("provider", "twilio")
+    agent_id = body.get("agent_id")
 
     if not to_number:
         return {"error": "to_number is required"}
@@ -350,6 +442,8 @@ async def make_outbound_call(request: Request):
         webhook_url = f"{settings.public_url}/voice/{provider_name}/outbound"
         status_url = f"{settings.public_url}/api/call-status"
         result = await provider.initiate_outbound_call(to_number, webhook_url, status_url)
+        if agent_id and result.call_sid:
+            _pending_agent_overrides[result.call_sid] = agent_id
         return {"call_sid": result.call_sid, "status": result.status, "to": to_number, "provider": provider_name}
     except NotImplementedError:
         return {"error": f"Outbound not implemented for {provider_name}"}
@@ -1311,3 +1405,243 @@ async def api_deploy_template(template_id: str, request: Request):
         "providers": {"llm": llm_provider, "tts": tts_provider},
         "status": "deployed",
     }
+
+
+# ─── Benchmarks API ───
+
+@app.post("/api/benchmarks/run", dependencies=[Depends(verify_api_key)])
+async def api_run_benchmarks():
+    from cogniflow_home.monitoring.voice_quality import VoiceQualityEvaluator
+    from cogniflow_home.monitoring.scorecard import ScorecardGenerator
+
+    voice_eval = VoiceQualityEvaluator()
+    voice_data = {}
+
+    try:
+        from cogniflow_home.providers.smallest_tts import SmallestTTS
+        tts = SmallestTTS(voice_id="emily", language="en", sample_rate=16000, raw_pcm=True)
+        await tts.connect()
+        ttfb = await voice_eval.measure_tts_ttfb(tts)
+        emotion_results = await voice_eval.evaluate_tts_emotions(tts)
+        await tts.close()
+
+        all_scores = [r["avg_score"] for r in emotion_results.values() if r["avg_score"] > 0]
+        voice_data = {
+            "ttfb_ms": ttfb,
+            "avg_emotion_score": round(sum(all_scores) / len(all_scores), 1) if all_scores else 0,
+            "emotions": emotion_results,
+        }
+    except Exception:
+        logger.exception("Voice benchmark failed")
+
+    turn_data = None
+    barge_data = None
+    for pipeline in active_calls.values():
+        ts = pipeline.turn_quality.get_summary()
+        if ts:
+            turn_data = ts
+        bs = pipeline.barge_in_tracker.get_summary()
+        if bs and bs.get("total_barge_ins", 0) > 0:
+            barge_data = bs
+        break
+
+    intel_data = None
+    try:
+        from tests.intelligence.runner import run_all_tests
+        intel_data = await run_all_tests()
+    except Exception:
+        logger.debug("Intelligence tests not available", exc_info=True)
+
+    behaviour_data = None
+    try:
+        from tests.intelligence.runner import run_behaviour_tests
+        from cogniflow_home.monitoring.discipline import DisciplineAnalyzer
+        from cogniflow_home.monitoring.pacing import PacingAnalyzer
+        from cogniflow_home.monitoring.boundaries import BoundaryDetector
+
+        beh_results = await run_behaviour_tests()
+        beh_pass_rate = beh_results.get("pass_rate", 0)
+
+        persona_sc = min(beh_pass_rate / 20, 5.0)
+        disc_sc = 5.0 - len(beh_results.get("failed_tests", [])) * 0.5
+        disc_sc = max(disc_sc, 0)
+
+        by_cat = beh_results.get("by_category", {})
+        persona_rate = by_cat.get("persona", {}).get("pass_rate", 0)
+        discipline_rate = by_cat.get("discipline", {}).get("pass_rate", 0)
+        boundary_rate = by_cat.get("boundaries", {}).get("pass_rate", 0)
+        adaptation_rate = by_cat.get("adaptation", {}).get("pass_rate", 0)
+        escalation_rate = by_cat.get("escalation", {}).get("pass_rate", 0)
+
+        behaviour_data = {
+            "persona_consistency": round(persona_rate / 20, 2),
+            "conversational_discipline": round(discipline_rate / 20, 2),
+            "pacing_quality": round(by_cat.get("pacing", {}).get("pass_rate", 0) / 20, 2),
+            "boundary_compliance": round(boundary_rate / 20, 2),
+            "adaptation_score": round(adaptation_rate / 20, 2),
+            "test_results": beh_results,
+        }
+    except Exception:
+        logger.debug("Behaviour tests not available", exc_info=True)
+
+    scorecard = ScorecardGenerator().generate(
+        turn_quality=turn_data,
+        barge_in=barge_data,
+        voice_quality=voice_data or None,
+        intelligence=intel_data,
+        behaviour=behaviour_data,
+    )
+
+    try:
+        await db.insert("benchmarks", {
+            "scorecard": scorecard,
+            "overall_score": scorecard["overall_score"],
+            "grade": scorecard["grade"],
+        })
+    except Exception:
+        pass
+
+    return scorecard
+
+
+@app.get("/api/benchmarks/latest", dependencies=[Depends(verify_api_key)])
+async def api_latest_benchmark():
+    try:
+        results = await db.select("benchmarks", order="created_at.desc", limit=1)
+        if results:
+            return results[0]
+    except Exception:
+        pass
+    return {"error": "No benchmark results yet. Run POST /api/benchmarks/run first."}
+
+
+@app.get("/api/benchmarks/pipeline", dependencies=[Depends(verify_api_key)])
+async def api_pipeline_metrics():
+    from cogniflow_home.monitoring.pipeline_integrity import PipelineIntegrityChecker
+    checker = PipelineIntegrityChecker()
+    memory = await checker.check_memory_usage(active_calls)
+    isolation = checker.check_state_isolation(active_calls)
+
+    call_metrics = {}
+    for call_id, pipeline in active_calls.items():
+        call_metrics[call_id] = {
+            "turns": pipeline.turn_quality.get_summary(),
+            "barge_ins": pipeline.barge_in_tracker.get_summary(),
+            "emotion_state": pipeline.emotional_mirror.current_state,
+            "duration": int(time.time() - pipeline.state.started_at),
+        }
+
+    return {
+        "memory": memory,
+        "state_isolation": isolation,
+        "active_calls": call_metrics,
+    }
+
+
+@app.get("/api/benchmarks/drift", dependencies=[Depends(verify_api_key)])
+async def api_behaviour_drift():
+    from cogniflow_home.monitoring.drift import BehaviourDriftDetector
+    detector = BehaviourDriftDetector()
+    try:
+        return await detector.check_drift()
+    except Exception:
+        logger.debug("Drift check failed", exc_info=True)
+        return {"status": "insufficient_data"}
+
+
+# ─── Multi-Tenant / Organizations ───
+
+@app.post("/api/organizations", dependencies=[Depends(verify_api_key)])
+async def api_create_organization(request: Request):
+    from cogniflow_home.db.tenant import create_organization
+    body = await request.json()
+    name = body.get("name", "").strip()
+    slug = body.get("slug", "").strip().lower()
+    owner_email = body.get("owner_email", "").strip()
+    plan = body.get("plan", "starter")
+
+    if not name or not slug or not owner_email:
+        raise HTTPException(400, "name, slug, and owner_email are required")
+
+    import re
+    if not re.match(r'^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$', slug):
+        raise HTTPException(400, "slug must be 3-50 lowercase alphanumeric with hyphens")
+
+    from cogniflow_home.db.tenant import get_organization_by_slug
+    existing = await get_organization_by_slug(slug)
+    if existing:
+        raise HTTPException(409, "Organization slug already exists")
+
+    org = await create_organization(name, slug, owner_email, plan)
+    if not org:
+        raise HTTPException(500, "Failed to create organization")
+    return org
+
+
+@app.get("/api/organizations", dependencies=[Depends(verify_api_key)])
+async def api_list_organizations(email: str = ""):
+    from cogniflow_home.db.tenant import list_organizations
+    return await list_organizations(email or None)
+
+
+@app.get("/api/organizations/{org_id}", dependencies=[Depends(verify_api_key)])
+async def api_get_organization(org_id: str):
+    from cogniflow_home.db.tenant import get_organization
+    if not _valid_uuid(org_id):
+        raise HTTPException(400, "Invalid org ID")
+    org = await get_organization(org_id)
+    if not org:
+        raise HTTPException(404, "Organization not found")
+    return org
+
+
+@app.get("/api/organizations/{org_id}/members", dependencies=[Depends(verify_api_key)])
+async def api_list_members(org_id: str):
+    from cogniflow_home.db.tenant import get_members
+    if not _valid_uuid(org_id):
+        raise HTTPException(400, "Invalid org ID")
+    return await get_members(org_id)
+
+
+@app.post("/api/organizations/{org_id}/members", dependencies=[Depends(verify_api_key)])
+async def api_add_member(org_id: str, request: Request):
+    from cogniflow_home.db.tenant import add_member
+    if not _valid_uuid(org_id):
+        raise HTTPException(400, "Invalid org ID")
+    body = await request.json()
+    email = body.get("email", "").strip()
+    role = body.get("role", "member")
+    if not email:
+        raise HTTPException(400, "email is required")
+    if role not in ("owner", "admin", "member", "viewer"):
+        raise HTTPException(400, "role must be owner, admin, member, or viewer")
+    member = await add_member(org_id, email, role)
+    if not member:
+        raise HTTPException(500, "Failed to add member")
+    return member
+
+
+@app.delete("/api/organizations/{org_id}/members/{email}", dependencies=[Depends(verify_api_key)])
+async def api_remove_member(org_id: str, email: str):
+    from cogniflow_home.db.tenant import remove_member
+    if not _valid_uuid(org_id):
+        raise HTTPException(400, "Invalid org ID")
+    removed = await remove_member(org_id, email)
+    if not removed:
+        raise HTTPException(404, "Member not found")
+    return {"status": "removed"}
+
+
+async def resolve_tenant(x_tenant_id: str = Header(default=""), x_api_key: str = Header(default="")):
+    """Resolve tenant from X-Tenant-Id header or org API key."""
+    if x_tenant_id and _valid_uuid(x_tenant_id):
+        from cogniflow_home.db.tenant import get_organization
+        org = await get_organization(x_tenant_id)
+        if org and org.get("is_active"):
+            return org
+    if x_api_key:
+        from cogniflow_home.db.tenant import get_organization_by_api_key
+        org = await get_organization_by_api_key(x_api_key)
+        if org:
+            return org
+    return None

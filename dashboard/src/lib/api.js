@@ -1,15 +1,27 @@
 const BASE = import.meta.env.VITE_API_URL || "";
 const API_KEY = import.meta.env.VITE_API_KEY || "";
 
+let _tenantId = localStorage.getItem("cogniflow_tenant_id") || "";
+
+export function setTenantId(id) {
+  _tenantId = id;
+  if (id) localStorage.setItem("cogniflow_tenant_id", id);
+  else localStorage.removeItem("cogniflow_tenant_id");
+}
+
+export function getTenantId() {
+  return _tenantId;
+}
+
 async function request(path, options = {}) {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      "X-Api-Key": API_KEY,
-      ...options.headers,
-    },
-    ...options,
-  });
+  const headers = {
+    "Content-Type": "application/json",
+    "X-Api-Key": API_KEY,
+    ...options.headers,
+  };
+  if (_tenantId) headers["X-Tenant-Id"] = _tenantId;
+
+  const res = await fetch(`${BASE}${path}`, { headers, ...options });
   return res.json();
 }
 
@@ -20,13 +32,14 @@ export const api = {
     return request(`/api/calls${qs ? `?${qs}` : ""}`);
   },
   getCall: (id) => request(`/api/calls/${id}`),
-  makeCall: (toNumber, provider = "twilio", instructions = "") =>
+  makeCall: (toNumber, provider = "twilio", instructions = "", agentId = null) =>
     request("/api/call", {
       method: "POST",
       body: JSON.stringify({
         to_number: toNumber,
         provider,
         instructions: instructions || undefined,
+        agent_id: agentId || undefined,
       }),
     }),
   hangupCall: (id) => request(`/api/call/${id}/hangup`, { method: "POST" }),
@@ -141,4 +154,25 @@ export const api = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+
+  // Benchmarks
+  runBenchmarks: () => request("/api/benchmarks/run", { method: "POST" }),
+  getLatestBenchmark: () => request("/api/benchmarks/latest"),
+  getPipelineMetrics: () => request("/api/benchmarks/pipeline"),
+  getBehaviourDrift: () => request("/api/benchmarks/drift"),
+
+  // Organizations (multi-tenant)
+  getOrganizations: (email = "") =>
+    request(`/api/organizations${email ? `?email=${encodeURIComponent(email)}` : ""}`),
+  getOrganization: (id) => request(`/api/organizations/${id}`),
+  createOrganization: (data) =>
+    request("/api/organizations", { method: "POST", body: JSON.stringify(data) }),
+  getMembers: (orgId) => request(`/api/organizations/${orgId}/members`),
+  addMember: (orgId, email, role = "member") =>
+    request(`/api/organizations/${orgId}/members`, {
+      method: "POST",
+      body: JSON.stringify({ email, role }),
+    }),
+  removeMember: (orgId, email) =>
+    request(`/api/organizations/${orgId}/members/${encodeURIComponent(email)}`, { method: "DELETE" }),
 };

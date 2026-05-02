@@ -27,31 +27,33 @@ class SemanticEOTDetector:
         score = 0.0
         text = partial_text.strip().lower()
 
-        if not text or len(text.split()) < 2:
+        if not text or len(text.split()) < 3:
             return 0.0
 
-        if text[-1] in ".?!":
-            score += 0.45
+        if text[-1] in ".!":
+            score += 0.35
+        elif text[-1] == "?":
+            score += 0.40
 
         for phrase in self.TURN_FINALS:
             if text.endswith(phrase):
-                score += 0.30
+                score += 0.25
                 break
 
         if re.search(
             r"\b(what|when|where|how|why|can|could|would|is|are|do|does)\b", text
         ) and text[-1] == "?":
-            score += 0.20
+            score += 0.15
 
         word_count = len(text.split())
-        if word_count >= 5:
-            score += 0.15
-        if word_count >= 10:
+        if word_count >= 6:
+            score += 0.10
+        if word_count >= 12:
             score += 0.10
 
-        if silence_ms >= 150:
-            score += 0.15
         if silence_ms >= 300:
+            score += 0.15
+        if silence_ms >= 500:
             score += 0.20
 
         return min(score, 1.0)

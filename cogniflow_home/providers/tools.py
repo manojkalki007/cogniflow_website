@@ -20,7 +20,7 @@ TOOL_DEFINITIONS = [
         "type": "function",
         "function": {
             "name": "book_appointment",
-            "description": "Book an appointment for the caller. Use when they want to schedule a meeting or visit.",
+            "description": "Book an appointment for the caller. Use when they want to schedule a meeting or visit. Always ask for their email so we can send a confirmation.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -28,6 +28,7 @@ TOOL_DEFINITIONS = [
                     "date": {"type": "string", "description": "Preferred date (YYYY-MM-DD)"},
                     "time": {"type": "string", "description": "Preferred time (HH:MM)"},
                     "phone": {"type": "string", "description": "Callback phone number"},
+                    "email": {"type": "string", "description": "Email address for booking confirmation"},
                     "notes": {"type": "string", "description": "Any additional details"},
                 },
                 "required": ["name", "date", "time"],
@@ -154,26 +155,39 @@ async def execute_tool(tool_name: str, args: dict, call_context: dict) -> str:
 
 
 async def _book_appointment(args: dict, ctx: dict) -> str:
+    caller = ctx.get("caller_number", "")
+    email = args.get("email", "")
+
+    if not email and caller:
+        contacts = await db.select("contacts", {"phone_number": caller}, select="email", limit=1)
+        if contacts and contacts[0].get("email"):
+            email = contacts[0]["email"]
+
     appointment = {
         "name": args.get("name", ""),
         "date": args.get("date", ""),
         "time": args.get("time", ""),
-        "phone": args.get("phone", ctx.get("caller_number", "")),
+        "phone": args.get("phone", caller),
+        "email": email,
         "notes": args.get("notes", ""),
         "call_id": ctx.get("call_id", ""),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    caller = ctx.get("caller_number", "")
+    contact_updates = {"name": args.get("name", ""), "metadata": {"last_appointment": appointment}}
+    if email:
+        contact_updates["email"] = email
     if caller:
-        await db.update("contacts", {"phone_number": caller}, {
-            "name": args.get("name", ""),
-            "metadata": {"last_appointment": appointment},
-        })
+        await db.update("contacts", {"phone_number": caller}, contact_updates)
 
     await bus.emit("appointment.booked", appointment)
 
-    return f"Appointment booked for {args['name']} on {args['date']} at {args['time']}. Confirmed."
+    confirmation = f"Appointment booked for {args['name']} on {args['date']} at {args['time']}."
+    if email:
+        confirmation += " A confirmation has been sent to your email and WhatsApp."
+    elif caller:
+        confirmation += " A confirmation has been sent to your WhatsApp."
+    return confirmation
 
 
 async def _transfer_call(args: dict, ctx: dict) -> str:

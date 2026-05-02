@@ -23,7 +23,7 @@ class GroqLLM:
         fallback_model: str = "gpt-4o-mini",
         system_prompt: str = "",
         temperature: float = 0.7,
-        max_tokens: int = 150,
+        max_tokens: int = 80,
     ):
         self.model = model
         self.fallback_model = fallback_model
@@ -144,7 +144,7 @@ class GroqLLM:
                         full_response += token
                         sentence_buffer += token
 
-                        for delimiter in [".", "!", "?", ",", ";", ":"]:
+                        for delimiter in [".", "!", "?"]:
                             if delimiter in sentence_buffer:
                                 parts = sentence_buffer.split(delimiter, 1)
                                 sentence = (parts[0] + delimiter).strip()

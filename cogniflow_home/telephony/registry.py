@@ -5,6 +5,7 @@ Add new providers here after creating their module.
 """
 
 from cogniflow_home.telephony.base import TelephonyProvider
+from cogniflow_home.telephony.browser_provider import BrowserProvider
 from cogniflow_home.telephony.exotel_provider import ExotelProvider
 from cogniflow_home.telephony.generic_provider import GenericProvider
 from cogniflow_home.telephony.twilio_provider import TwilioProvider
@@ -13,6 +14,7 @@ PROVIDERS: dict[str, type[TelephonyProvider]] = {
     "twilio": TwilioProvider,
     "exotel": ExotelProvider,
     "generic": GenericProvider,
+    "browser": BrowserProvider,
 }
 
 

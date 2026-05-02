@@ -59,6 +59,24 @@ async def get_agent_for_number(called_number: str) -> AgentConfig:
     return DEFAULT_AGENT
 
 
+async def get_agent_by_id(agent_id: str) -> AgentConfig | None:
+    try:
+        agents = await db.select("agents", {"id": agent_id})
+        if agents:
+            agent = agents[0]
+            return AgentConfig(
+                id=agent["id"],
+                name=agent["name"],
+                instructions=agent["instructions"],
+                greeting=agent.get("greeting", "") or agent.get("metadata", {}).get("greeting", GREETING),
+                voice_id=agent.get("voice_id", VOICE_ID),
+                language=agent.get("language", "en"),
+            )
+    except Exception:
+        logger.debug(f"Agent lookup by ID failed: {agent_id}")
+    return None
+
+
 async def list_agents() -> list[dict]:
     try:
         return await db.select("agents", order="created_at.desc")

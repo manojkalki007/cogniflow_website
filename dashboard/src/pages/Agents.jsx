@@ -5,7 +5,7 @@ import { useRef, useEffect } from "react";
 import {
   Plus, Save, Bot, Copy, Upload, Loader2, Trash2,
   PhoneOutgoing, BarChart3, Sliders, Wrench, Shield, Brain,
-  MessageCircle, Send, X, User,
+  Phone, PhoneOff, PhoneCall, X,
 } from "lucide-react";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -247,119 +247,245 @@ function AgentFormDialog({ open, onOpenChange, agent, onSave }) {
   );
 }
 
-function TestChatPanel({ agent, onClose }) {
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const scrollRef = useRef(null);
+function TestCallPanel({ agent, onClose }) {
+  const [status, setStatus] = useState("idle");
+  const [error, setError] = useState("");
+  const [duration, setDuration] = useState(0);
+  const [transcript, setTranscript] = useState([]);
+  const wsRef = useRef(null);
+  const streamRef = useRef(null);
+  const audioCtxRef = useRef(null);
+  const timerRef = useRef(null);
+  const nextPlayTimeRef = useRef(0);
+  const gainNodeRef = useRef(null);
+  const transcriptEndRef = useRef(null);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages]);
+    return () => cleanup();
+  }, []);
 
   useEffect(() => {
-    if (agent.greeting) {
-      setMessages([{ role: "assistant", content: agent.greeting }]);
-    }
-  }, [agent.greeting]);
+    transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [transcript]);
 
-  const sendMessage = async () => {
-    if (!input.trim() || isLoading) return;
-    const userMsg = input.trim();
-    setInput("");
-    const updated = [...messages, { role: "user", content: userMsg }];
-    setMessages(updated);
-    setIsLoading(true);
-    try {
-      const history = updated.map(m => ({ role: m.role, content: m.content }));
-      const res = await api.testAgentChat(agent.id, "", history);
-      if (res.error) {
-        setMessages(prev => [...prev, { role: "system", content: `Error: ${res.error}` }]);
-      } else {
-        setMessages(prev => [...prev, { role: "assistant", content: res.reply, model: res.model }]);
-      }
-    } catch {
-      setMessages(prev => [...prev, { role: "system", content: "Failed to get response" }]);
+  const cleanup = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (wsRef.current && wsRef.current.readyState <= 1) {
+      try { wsRef.current.send(JSON.stringify({ event: "stop" })); } catch {}
+      wsRef.current.close();
     }
-    setIsLoading(false);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    if (audioCtxRef.current) {
+      audioCtxRef.current.close().catch(() => {});
+      audioCtxRef.current = null;
+    }
+    wsRef.current = null;
+    nextPlayTimeRef.current = 0;
+    gainNodeRef.current = null;
   };
+
+  const scheduleAudioChunk = (pcm16Bytes) => {
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    const float32 = new Float32Array(pcm16Bytes.length / 2);
+    const view = new DataView(pcm16Bytes.buffer, pcm16Bytes.byteOffset, pcm16Bytes.byteLength);
+    for (let i = 0; i < float32.length; i++) {
+      float32[i] = view.getInt16(i * 2, true) / 32768;
+    }
+    const buf = ctx.createBuffer(1, float32.length, 16000);
+    buf.copyToChannel(float32, 0);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(gainNodeRef.current || ctx.destination);
+    const now = ctx.currentTime;
+    const startAt = Math.max(now + 0.005, nextPlayTimeRef.current);
+    src.start(startAt);
+    nextPlayTimeRef.current = startAt + buf.duration;
+  };
+
+  const startCall = async () => {
+    setError("");
+    setDuration(0);
+    setTranscript([]);
+    setStatus("connecting");
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true },
+      });
+      streamRef.current = stream;
+
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      audioCtxRef.current = audioCtx;
+      const gain = audioCtx.createGain();
+      gain.gain.value = 1.0;
+      gain.connect(audioCtx.destination);
+      gainNodeRef.current = gain;
+      nextPlayTimeRef.current = 0;
+
+      const wsBase = import.meta.env.VITE_API_URL || window.location.origin;
+      const wsUrl = wsBase.replace(/^http/, "ws") + `/voice/browser/test?agent_id=${agent.id}`;
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ event: "start", call_sid: crypto.randomUUID() }));
+        setStatus("active");
+        timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
+
+        const source = audioCtx.createMediaStreamSource(stream);
+        const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+        processor.onaudioprocess = (e) => {
+          if (ws.readyState !== 1) return;
+          const input = e.inputBuffer.getChannelData(0);
+          const pcm16 = new Int16Array(input.length);
+          for (let i = 0; i < input.length; i++) {
+            pcm16[i] = Math.max(-32768, Math.min(32767, Math.round(input[i] * 32768)));
+          }
+          const b64 = btoa(String.fromCharCode(...new Uint8Array(pcm16.buffer)));
+          ws.send(JSON.stringify({ event: "audio", data: b64 }));
+        };
+        source.connect(processor);
+        processor.connect(audioCtx.destination);
+      };
+
+      ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        if (msg.event === "audio") {
+          const raw = atob(msg.data);
+          const bytes = new Uint8Array(raw.length);
+          for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+          scheduleAudioChunk(bytes);
+        } else if (msg.event === "transcript") {
+          setTranscript(prev => [...prev, { role: msg.role, text: msg.text }]);
+        } else if (msg.event === "clear") {
+          nextPlayTimeRef.current = 0;
+        } else if (msg.event === "error") {
+          setError(msg.message || "Agent error");
+          cleanup();
+          setStatus("idle");
+        }
+      };
+
+      ws.onerror = () => { setError("WebSocket connection failed"); setStatus("idle"); cleanup(); };
+      ws.onclose = () => {
+        if (status !== "idle") setStatus("ended");
+        if (timerRef.current) clearInterval(timerRef.current);
+      };
+    } catch (err) {
+      setError(err.message || "Microphone access denied");
+      setStatus("idle");
+    }
+  };
+
+  const endCall = () => {
+    cleanup();
+    setStatus("ended");
+  };
+
+  const formatTime = (s) => `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
 
   return (
     <div className="mt-4 pt-4 border-t border-gray-800/30 animate-fade-in">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-            <MessageCircle size={12} className="text-emerald-400" />
+            <PhoneCall size={12} className="text-emerald-400" />
           </div>
-          <span className="text-xs font-medium text-gray-300">Test Chat</span>
+          <span className="text-xs font-medium text-gray-300">Voice Test</span>
           <span className="text-[10px] text-gray-600">with {agent.name}</span>
         </div>
-        <button onClick={onClose} className="text-gray-500 hover:text-white p-1 rounded-lg hover:bg-gray-800/50 transition-all">
+        <button onClick={() => { cleanup(); onClose(); }} className="text-gray-500 hover:text-white p-1 rounded-lg hover:bg-gray-800/50 transition-all">
           <X size={14} />
         </button>
       </div>
 
-      <div ref={scrollRef} className="h-64 overflow-y-auto rounded-xl bg-gray-900/50 border border-gray-800/30 p-3 space-y-3 mb-3">
-        {messages.length === 0 && (
-          <p className="text-xs text-gray-600 text-center py-8">Send a message to test the agent</p>
-        )}
-        {messages.map((msg, i) => (
-          <div key={i} className={`flex gap-2.5 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-            {msg.role !== "user" && (
-              <div className="w-6 h-6 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0 mt-0.5">
-                <Bot size={11} className="text-blue-400" />
-              </div>
-            )}
-            <div className={`max-w-[80%] rounded-xl px-3.5 py-2.5 text-sm leading-relaxed ${
-              msg.role === "user"
-                ? "bg-blue-600/20 text-blue-100 border border-blue-500/20"
-                : msg.role === "system"
-                ? "bg-red-500/10 text-red-400 border border-red-500/20"
-                : "bg-gray-800/60 text-gray-200 border border-gray-700/30"
-            }`}>
-              {msg.content}
-              {msg.model && (
-                <span className="block text-[9px] text-gray-600 mt-1 font-mono">{msg.model}</span>
-              )}
+      {status === "idle" || status === "ended" ? (
+        <div className="space-y-3">
+          {status === "ended" && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+              <PhoneOff size={13} className="text-emerald-400" />
+              <span className="text-xs text-emerald-400">Call ended — {formatTime(duration)}</span>
             </div>
-            {msg.role === "user" && (
-              <div className="w-6 h-6 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0 mt-0.5">
-                <User size={11} className="text-violet-400" />
-              </div>
-            )}
+          )}
+          {error && (
+            <div className="px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-400">{error}</div>
+          )}
+          {status === "ended" && transcript.length > 0 && (
+            <div className="max-h-48 overflow-y-auto rounded-xl bg-gray-900/50 border border-gray-800/30 p-3 space-y-2">
+              {transcript.map((t, i) => (
+                <div key={i} className={`flex gap-2 text-xs ${t.role === "user" ? "justify-end" : ""}`}>
+                  <div className={`max-w-[85%] px-3 py-1.5 rounded-xl ${
+                    t.role === "user"
+                      ? "bg-blue-500/15 text-blue-300 border border-blue-500/20"
+                      : "bg-gray-800/50 text-gray-300 border border-gray-700/20"
+                  }`}>
+                    <span className="font-medium text-[10px] uppercase tracking-wider opacity-60 block mb-0.5">
+                      {t.role === "user" ? "You" : agent.name}
+                    </span>
+                    {t.text}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-xs text-gray-500">Talk to this agent in real-time using your microphone. The agent will respond with voice.</p>
+          <Button size="sm" onClick={startCall} className="w-full gap-1.5">
+            <Phone size={14} /> {status === "ended" ? "Call Again" : "Start Voice Conversation"}
+          </Button>
+        </div>
+      ) : status === "connecting" ? (
+        <div className="text-center py-8">
+          <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center bg-amber-500/10 animate-pulse">
+            <Loader2 size={24} className="text-amber-400 animate-spin" />
           </div>
-        ))}
-        {isLoading && (
-          <div className="flex gap-2.5">
-            <div className="w-6 h-6 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
-              <Bot size={11} className="text-blue-400" />
-            </div>
-            <div className="bg-gray-800/60 border border-gray-700/30 rounded-xl px-3.5 py-2.5">
-              <div className="flex gap-1">
-                <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+          <p className="text-sm text-gray-400 mt-4">Connecting to agent...</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full flex items-center justify-center bg-emerald-500/10 relative">
+                <Phone size={20} className="text-emerald-400" />
+                <span className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+                <span className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-emerald-400">Live — Speak now</p>
+                <p className="text-lg font-bold text-white font-mono">{formatTime(duration)}</p>
               </div>
             </div>
+            <Button variant="destructive" size="sm" onClick={endCall} className="gap-1.5">
+              <PhoneOff size={14} /> End
+            </Button>
           </div>
-        )}
-      </div>
 
-      <div className="flex gap-2">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-          placeholder="Type a message to test..."
-          className="flex-1 glass-card rounded-xl px-4 py-2.5 text-sm input-glow border border-gray-700/30 bg-gray-800/30"
-          disabled={isLoading}
-        />
-        <Button size="sm" onClick={sendMessage} disabled={!input.trim() || isLoading}>
-          {isLoading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-        </Button>
-      </div>
+          {transcript.length > 0 && (
+            <div className="max-h-48 overflow-y-auto rounded-xl bg-gray-900/50 border border-gray-800/30 p-3 space-y-2">
+              {transcript.map((t, i) => (
+                <div key={i} className={`flex gap-2 text-xs ${t.role === "user" ? "justify-end" : ""}`}>
+                  <div className={`max-w-[85%] px-3 py-1.5 rounded-xl ${
+                    t.role === "user"
+                      ? "bg-blue-500/15 text-blue-300 border border-blue-500/20"
+                      : "bg-gray-800/50 text-gray-300 border border-gray-700/20"
+                  }`}>
+                    <span className="font-medium text-[10px] uppercase tracking-wider opacity-60 block mb-0.5">
+                      {t.role === "user" ? "You" : agent.name}
+                    </span>
+                    {t.text}
+                  </div>
+                </div>
+              ))}
+              <div ref={transcriptEndRef} />
+            </div>
+          )}
+
+          <p className="text-[10px] text-gray-600 text-center">Your mic is active. The agent will respond by voice.</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -416,7 +542,7 @@ function AgentCard({ agent, onEdit, onDelete, onClone }) {
           <Button variant="ghost" size="sm" onClick={() => onEdit(agent)}>Edit</Button>
           <Button variant="ghost" size="sm" onClick={() => onClone(agent)}><Copy size={12} /></Button>
           <Button variant={showTest ? "outline" : "ghost"} size="sm" onClick={() => setShowTest(!showTest)}>
-            <MessageCircle size={12} /> Test
+            <Phone size={12} /> Talk
           </Button>
           <Button variant="ghost" size="sm" onClick={() => { if (confirm("Delete this agent?")) onDelete(agent.id); }}>
             <Trash2 size={12} />
@@ -442,7 +568,7 @@ function AgentCard({ agent, onEdit, onDelete, onClone }) {
       </div>
 
       <AgentPerformance agentId={agent.id} />
-      {showTest && <TestChatPanel agent={agent} onClose={() => setShowTest(false)} />}
+      {showTest && <TestCallPanel agent={agent} onClose={() => setShowTest(false)} />}
     </div>
   );
 }

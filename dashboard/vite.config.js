@@ -8,7 +8,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       "/api": "http://localhost:8000",
-      "/voice": "http://localhost:8000",
+      "/voice": { target: "http://localhost:8000", ws: true },
       "/health": "http://localhost:8000",
     },
   },

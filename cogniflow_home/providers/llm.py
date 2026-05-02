@@ -41,7 +41,7 @@ class OpenAILLM:
                 model=self.model,
                 messages=self.conversation_history,
                 stream=True,
-                max_tokens=150,
+                max_tokens=80,
                 temperature=0.7,
                 tools=TOOL_DEFINITIONS if TOOL_DEFINITIONS else None,
             )
@@ -121,7 +121,7 @@ class OpenAILLM:
                     model=self.model,
                     messages=self.conversation_history,
                     stream=True,
-                    max_tokens=150,
+                    max_tokens=80,
                     temperature=0.7,
                 )
 

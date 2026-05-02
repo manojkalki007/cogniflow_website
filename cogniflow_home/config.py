@@ -72,6 +72,14 @@ class Settings(BaseSettings):
     razorpay_key_id: str = ""
     razorpay_key_secret: str = ""
 
+    # SMTP (Email)
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = "no_reply@cogniflowautomations.com"
+    smtp_from_name: str = "Cogniflow"
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

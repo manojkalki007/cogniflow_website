@@ -18,6 +18,7 @@ import Latency from "./pages/Latency";
 import WhatsApp from "./pages/WhatsApp";
 import Integrations from "./pages/Integrations";
 import Templates from "./pages/Templates";
+import Benchmarks from "./pages/Benchmarks";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 10_000, retry: 1 } },
@@ -43,6 +44,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
             <Route path="/dashboard/latency" element={<Latency />} />
             <Route path="/dashboard/whatsapp" element={<WhatsApp />} />
             <Route path="/dashboard/integrations" element={<Integrations />} />
+            <Route path="/dashboard/benchmarks" element={<Benchmarks />} />
             <Route path="/dashboard/settings" element={<Settings />} />
           </Route>
         </Routes>

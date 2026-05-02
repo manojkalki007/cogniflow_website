@@ -17,6 +17,7 @@ speculative pre-generation, per-component tracing.
 import asyncio
 import base64
 import logging
+import re
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -32,6 +33,8 @@ from cogniflow_home.latency.speculative import SpeculativeGenerator
 from cogniflow_home.latency.tracer import LatencyTracer
 from cogniflow_home.intelligence.emotional_mirror import EmotionalMirror
 from cogniflow_home.language.detector import LanguageDetector, LanguageRouter
+from cogniflow_home.monitoring.turn_quality import TurnEvent, TurnQualityAnalyzer
+from cogniflow_home.monitoring.barge_in import BargeInTracker
 from cogniflow_home.telephony.base import CallInfo, TelephonyProvider
 
 logger = logging.getLogger("cogniflow_home.pipeline")
@@ -39,15 +42,33 @@ logger = logging.getLogger("cogniflow_home.pipeline")
 INDIAN_LANGUAGES = {"hi", "ta", "te", "kn", "ml", "bn", "mr", "gu", "pa", "od", "as", "ur", "ne", "en-in"}
 EUROPEAN_LANGUAGES = {"fr", "de", "es", "it", "pt", "pl", "nl", "sv", "no", "da", "fi", "tr", "ar"}
 
-SYSTEM_PROMPT_LATENCY_RULES = """
-CRITICAL VOICE RULES:
-1. ALWAYS start your response with a short acknowledgment (3-6 words).
-   Examples: "Sure, let me check." / "Got it, one moment." / "Of course!"
-2. Keep all sentences SHORT. Max 15 words per sentence.
-3. Never use lists, bullet points, or formatting. This is a phone call.
-4. Say numbers as words: "four hundred fifty" not "450".
-5. If you need to use a tool, ALWAYS say a filler phrase FIRST:
-   "Let me pull that up for you..." Then call the tool.
+SYSTEM_PROMPT_VOICE_RULES = """
+VOICE CALL RULES — you are on a live phone call, not writing text:
+
+FORMAT:
+- Keep responses to 1-2 sentences MAX. This is a phone call — be concise.
+- Match the caller's length. If they say one sentence, reply with one sentence.
+- Keep sentences short, max 15 words each.
+- NEVER use lists, bullet points, markdown, asterisks, or any formatting.
+- Say numbers as words: "four hundred fifty" not "450".
+- If calling a tool, say a filler first: "Let me pull that up for you..."
+- NEVER repeat information you already said. Don't re-introduce yourself.
+
+LISTENING RULES — these are critical:
+- NEVER cut the caller off. Wait for them to finish their full thought before responding.
+- If the caller pauses mid-sentence, WAIT. They might be thinking. Don't jump in.
+- If the caller interrupts YOU, IMMEDIATELY stop talking and listen to what they're saying. Then respond to their new input.
+- If you can't understand what the caller said, ask them to repeat: "Sorry, I didn't quite catch that. Could you say that again?"
+
+SOUND HUMAN — this is the most important part:
+- ALWAYS use contractions: "don't", "can't", "I'm", "you're", "it's", "that's", "won't", "I'll", "we're", "I'd", "they're", "haven't", "isn't", "wouldn't", "shouldn't".
+- Start responses with natural reactions: "Oh, sure!", "Ah, got it.", "Right, so...", "Hmm, let me think.", "Yeah, absolutely!"
+- Use conversational connectors between sentences: "So,", "Well,", "Actually,", "Honestly,", "You know,"
+- Vary your sentence rhythm. Mix short punchy lines with slightly longer ones. Don't make every sentence the same length.
+- Show warmth and personality. React to what the caller says. Sound like you genuinely care.
+- Use casual phrasing: "a couple of" not "several", "pretty much" not "essentially", "I'd say" not "I would estimate".
+- Add natural hedging where appropriate: "I think", "probably", "I'd say", "as far as I know".
+- NEVER sound like you're reading from a script. Be spontaneous and genuine.
 """
 
 
@@ -59,7 +80,7 @@ def _create_stt(language: str, sample_rate: int = 8000):
     return DeepgramSTT(language=language, sample_rate=sample_rate)
 
 
-def _create_tts(language: str, voice_id: str, sample_rate: int = 8000):
+def _create_tts(language: str, voice_id: str, sample_rate: int = 8000, raw_pcm: bool = False):
     if language in INDIAN_LANGUAGES:
         from cogniflow_home.providers.sarvam_tts import SarvamTTS
         return SarvamTTS(language=language, sample_rate=sample_rate)
@@ -68,12 +89,46 @@ def _create_tts(language: str, voice_id: str, sample_rate: int = 8000):
         return ElevenLabsTTS(voice_id=voice_id, language=language, sample_rate=sample_rate)
     if settings.smallest_ai_api_key:
         from cogniflow_home.providers.smallest_tts import SmallestTTS
-        return SmallestTTS(voice_id=voice_id, language=language, sample_rate=sample_rate)
+        return SmallestTTS(voice_id=voice_id, language=language, sample_rate=sample_rate, raw_pcm=raw_pcm)
     if settings.cartesia_api_key:
         from cogniflow_home.providers.tts import CartesiaTTS
         return CartesiaTTS(voice_id=voice_id, sample_rate=sample_rate)
     from cogniflow_home.providers.sarvam_tts import SarvamTTS
     return SarvamTTS(language="en-in", sample_rate=sample_rate)
+
+
+_CONTRACTIONS = [
+    (r"\bI am\b", "I'm"), (r"\bI have\b", "I've"), (r"\bI will\b", "I'll"),
+    (r"\bI would\b", "I'd"), (r"\bdo not\b", "don't"), (r"\bDo not\b", "Don't"),
+    (r"\bcannot\b", "can't"), (r"\bCannot\b", "Can't"),
+    (r"\bwill not\b", "won't"), (r"\bWill not\b", "Won't"),
+    (r"\bshould not\b", "shouldn't"), (r"\bwould not\b", "wouldn't"),
+    (r"\bcould not\b", "couldn't"), (r"\bthat is\b", "that's"),
+    (r"\bThat is\b", "That's"), (r"\bit is\b", "it's"), (r"\bIt is\b", "It's"),
+    (r"\bwhat is\b", "what's"), (r"\bWhat is\b", "What's"),
+    (r"\bhere is\b", "here's"), (r"\bHere is\b", "Here's"),
+    (r"\bthere is\b", "there's"), (r"\bThere is\b", "There's"),
+    (r"\blet us\b", "let's"), (r"\bLet us\b", "Let's"),
+    (r"\byou are\b", "you're"), (r"\bYou are\b", "You're"),
+    (r"\bthey are\b", "they're"), (r"\bThey are\b", "They're"),
+    (r"\bwe are\b", "we're"), (r"\bWe are\b", "We're"),
+    (r"\bhave not\b", "haven't"), (r"\bhas not\b", "hasn't"),
+    (r"\bdid not\b", "didn't"), (r"\bis not\b", "isn't"),
+    (r"\bare not\b", "aren't"), (r"\bwere not\b", "weren't"),
+    (r"\bwas not\b", "wasn't"), (r"\bwho is\b", "who's"),
+    (r"\bwhere is\b", "where's"), (r"\bhow is\b", "how's"),
+]
+
+
+def _humanize_for_speech(text: str) -> str:
+    t = text
+    for pattern, repl in _CONTRACTIONS:
+        t = re.sub(pattern, repl, t)
+    t = re.sub(r'\*+', '', t)
+    t = re.sub(r'#+\s*', '', t)
+    t = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', t)
+    t = re.sub(r'\s{2,}', ' ', t)
+    return t.strip()
 
 
 def _create_llm(system_prompt: str):
@@ -104,8 +159,10 @@ class VoicePipeline:
 
     def __init__(self, call_info: CallInfo, telephony: TelephonyProvider,
                  instructions_override: str = "", greeting_override: str = "",
-                 language: str = "en", voice_id: str = ""):
+                 language: str = "en", voice_id: str = "",
+                 sample_rate: int = 8000):
         call_id = call_info.call_sid or str(uuid.uuid4())
+        self._sample_rate = sample_rate
         self.state = CallState(
             call_sid=call_id,
             caller_number=call_info.caller_number,
@@ -116,12 +173,13 @@ class VoicePipeline:
             language=language,
         )
         self._telephony = telephony
+        self._raw_pcm = getattr(telephony, 'raw_pcm', False)
 
         base_instructions = instructions_override or AGENT_INSTRUCTIONS
-        self._instructions = base_instructions + "\n\n" + SYSTEM_PROMPT_LATENCY_RULES
+        self._instructions = base_instructions + "\n\n" + SYSTEM_PROMPT_VOICE_RULES
         self._greeting = greeting_override or GREETING
 
-        self.stt = _create_stt(language, sample_rate=8000)
+        self.stt = _create_stt(language, sample_rate=sample_rate)
         self.llm = _create_llm(self._instructions)
         self.llm.call_context = {
             "call_id": call_id,
@@ -129,22 +187,27 @@ class VoicePipeline:
             "called_number": call_info.called_number,
             "direction": call_info.direction,
         }
-        self.tts = _create_tts(language, voice_id or VOICE_ID, sample_rate=8000)
+        self.tts = _create_tts(language, voice_id or VOICE_ID, sample_rate=sample_rate, raw_pcm=self._raw_pcm)
 
-        self.eot = SemanticEOTDetector(threshold=0.65)
+        self.eot = SemanticEOTDetector(threshold=0.80)
         self.tracer = LatencyTracer(call_id)
         self.compliance = ComplianceEngine()
-        self.speculative = SpeculativeGenerator(eot_threshold=0.7, min_words=4)
+        self.speculative = SpeculativeGenerator(eot_threshold=0.85, min_words=5)
         self.filler = FillerAudioManager()
         self.emotional_mirror = EmotionalMirror()
         self.language_detector = LanguageDetector(primary_language=language)
         self.language_router = LanguageRouter()
+        self.turn_quality = TurnQualityAnalyzer()
+        self.barge_in_tracker = BargeInTracker()
 
         self._running = False
         self._stt_task = None
         self._audio_chunk_count = 0
         self._silence_chunks = 0
         self._speech_energy_threshold = 200
+        self._user_speech_end_ts = 0.0
+        self._turn_number = 0
+        self.on_transcript = None
 
     def inject_context(self, context: str):
         if context:
@@ -153,27 +216,9 @@ class VoicePipeline:
                 "content": f"Caller context: {context}",
             })
 
-    async def _prewarm_tts(self):
-        """Send a tiny dummy request to warm the TTS WebSocket connection."""
-        try:
-            async for _ in self.tts.synthesize("."):
-                pass
-            logger.debug("TTS connection pre-warmed")
-        except Exception as e:
-            logger.warning(f"TTS pre-warm failed (non-fatal): {e}")
-
-    async def start(self):
-        self._running = True
-        await self.stt.connect()
-        await self.tts.connect()
-        await self._prewarm_tts()
-
-        self.speculative.set_generate_fn(self.llm.generate_stream)
-        self.llm.on_tool_call = self._on_tool_call
-        asyncio.create_task(self.filler.initialize(self.tts))
-
-        # Cross-session caller memory + pre-call prediction
-        greeting = self._greeting
+    async def _fetch_memory_and_prediction(self) -> str | None:
+        """Fetch caller memory and pre-call prediction. Returns custom greeting or None."""
+        custom_greeting = None
         try:
             from cogniflow_home.memory.caller_memory import caller_memory
             profile = await caller_memory.recall(self.state.caller_number)
@@ -182,7 +227,10 @@ class VoicePipeline:
                 self._instructions = self._instructions + memory_prompt
                 self.llm.conversation_history[0]["content"] = self._instructions
                 logger.info(f"Loaded memory for {self.state.caller_number}: {profile.get('name')}")
+        except Exception:
+            logger.debug("Memory recall unavailable (non-fatal)", exc_info=True)
 
+        try:
             from cogniflow_home.intelligence.predictor import pre_call_predictor
             prediction = await pre_call_predictor.predict(self.state.caller_number)
             if prediction and prediction["confidence"] >= 0.6:
@@ -190,9 +238,27 @@ class VoicePipeline:
                 self._instructions = self._instructions + prediction_prompt
                 self.llm.conversation_history[0]["content"] = self._instructions
                 if prediction["confidence"] >= 0.7:
-                    greeting = prediction["suggested_greeting"]
+                    custom_greeting = prediction["suggested_greeting"]
         except Exception:
-            logger.debug("Memory/prediction unavailable (non-fatal)", exc_info=True)
+            logger.debug("Pre-call prediction unavailable (non-fatal)", exc_info=True)
+
+        return custom_greeting
+
+    async def start(self):
+        self._running = True
+
+        # Parallelize all startup network calls
+        _, _, custom_greeting = await asyncio.gather(
+            self.stt.connect(),
+            self.tts.connect(),
+            self._fetch_memory_and_prediction(),
+        )
+
+        self.speculative.set_generate_fn(self.llm.generate_stream)
+        self.llm.on_tool_call = self._on_tool_call
+        asyncio.create_task(self.filler.initialize(self.tts))
+
+        greeting = custom_greeting or self._greeting
 
         self._stt_task = asyncio.create_task(self._process_transcripts())
         logger.info(
@@ -211,29 +277,50 @@ class VoicePipeline:
         })
 
         await self._speak(greeting)
+        # Record greeting in conversation history so the LLM knows it already spoke
+        self.llm.add_message("assistant", greeting)
+        self.state.transcript.append(
+            {"role": "agent", "text": greeting, "ts": time.time()}
+        )
 
     async def handle_audio(self, mulaw_bytes: bytes):
         if not self._running:
             return
 
-        await self.stt.send_audio(mulaw_bytes)
+        if not self.state.is_agent_speaking:
+            await self.stt.send_audio(mulaw_bytes)
 
         if self.state.is_agent_speaking:
             energy = compute_energy_mulaw(mulaw_bytes)
             if energy > self._speech_energy_threshold:
                 self._silence_chunks = 0
                 self._audio_chunk_count += 1
-                if self._audio_chunk_count >= 10:
-                    logger.info("Barge-in detected — stopping agent speech")
+                if self._audio_chunk_count >= 18:
+                    barge_detect_ts = time.perf_counter() * 1000
+                    logger.info("Barge-in detected — pausing to listen")
                     self.state.barge_in = True
                     self.state.is_agent_speaking = False
                     self._audio_chunk_count = 0
                     self.eot.cancel()
                     self.speculative.cancel()
                     await self._telephony.clear_audio()
+                    # Flush stale STT results so we only respond to new speech
+                    while not self.stt._result_queue.empty():
+                        try:
+                            self.stt._result_queue.get_nowait()
+                        except Exception:
+                            break
+                    audio_stopped_ts = time.perf_counter() * 1000
+                    self.barge_in_tracker.record_barge_in(
+                        user_speech_detected_ms=barge_detect_ts,
+                        agent_audio_stopped_ms=audio_stopped_ts,
+                        llm_cancelled_ms=audio_stopped_ts,
+                        stt_resumed_ms=audio_stopped_ts,
+                        new_response_started_ms=0,
+                    )
             else:
                 self._silence_chunks += 1
-                if self._silence_chunks > 5:
+                if self._silence_chunks > 8:
                     self._audio_chunk_count = 0
         else:
             self._audio_chunk_count = 0
@@ -269,17 +356,39 @@ class VoicePipeline:
                     })
 
                 logger.info(f"User said: {redacted}")
+                self._user_speech_end_ts = time.perf_counter() * 1000
+                self._turn_number += 1
+
+                # Handle unclear/inaudible speech
+                cleaned = redacted.strip().lower()
+                noise_tokens = {"", "uh", "um", "hmm", "hm", "ah", "oh"}
+                words = cleaned.split()
+                if not cleaned or (len(words) <= 1 and cleaned in noise_tokens):
+                    self._unclear_count = getattr(self, '_unclear_count', 0) + 1
+                    if self._unclear_count >= 2:
+                        await self._speak("I'm having trouble hearing you. Could you speak a little louder and clearer?")
+                        self._unclear_count = 0
+                    continue
+
+                self._unclear_count = 0
+
                 self.state.transcript.append(
                     {"role": "user", "text": redacted, "ts": time.time()}
                 )
+                if self.on_transcript:
+                    try:
+                        await self.on_transcript("user", redacted)
+                    except Exception:
+                        pass
 
                 self.tracer.new_turn()
+                eot_ts = time.perf_counter() * 1000
 
                 speculative = await self.speculative.on_final_transcript(redacted)
                 if speculative:
                     await self._speak_speculative(speculative)
                 else:
-                    await self._generate_and_speak(redacted)
+                    await self._generate_and_speak(redacted, eot_ts=eot_ts)
 
                 self.tracer.check_alert()
         except asyncio.CancelledError:
@@ -287,7 +396,7 @@ class VoicePipeline:
         except Exception:
             logger.exception("Transcript processing error")
 
-    async def _generate_and_speak(self, user_text: str):
+    async def _generate_and_speak(self, user_text: str, eot_ts: float = 0):
         self.state.is_agent_speaking = True
         self.state.barge_in = False
 
@@ -331,8 +440,21 @@ class VoicePipeline:
                 await self._speak(sentence)
                 self.tracer.end(t_tts)
 
+                if first_sentence is False and eot_ts and self._user_speech_end_ts:
+                    agent_first_audio_ts = time.perf_counter() * 1000
+                    self.turn_quality.record_turn(TurnEvent(
+                        turn_number=self._turn_number,
+                        user_speech_end_ms=self._user_speech_end_ts,
+                        eot_fired_ms=eot_ts,
+                        agent_first_audio_ms=agent_first_audio_ts,
+                        agent_speech_end_ms=0,
+                    ))
+                    eot_ts = 0
+
                 if self.state.barge_in:
                     break
+
+                await asyncio.sleep(0.03)
 
         except Exception:
             logger.exception("Generate-and-speak error")
@@ -346,6 +468,11 @@ class VoicePipeline:
             self.state.transcript.append(
                 {"role": "agent", "text": full_response.strip(), "ts": time.time()}
             )
+            if self.on_transcript:
+                try:
+                    await self.on_transcript("agent", full_response.strip())
+                except Exception:
+                    pass
 
             agent_text = " ".join(
                 t["text"] for t in self.state.transcript if t["role"] == "agent"
@@ -381,7 +508,7 @@ class VoicePipeline:
     async def _on_tool_call(self, tool_name: str):
         filler_audio = self.filler.get_filler(tool_name)
         if filler_audio:
-            chunk_size = 160
+            chunk_size = self._sample_rate // 50
             for i in range(0, len(filler_audio), chunk_size):
                 if self.state.barge_in:
                     break
@@ -399,13 +526,12 @@ class VoicePipeline:
         logger.info(f"Switching to language: {language}, providers: {providers}")
 
         await self.stt.close()
-        self.stt = _create_stt(language, sample_rate=8000)
+        self.stt = _create_stt(language, sample_rate=self._sample_rate)
         await self.stt.connect()
 
         await self.tts.close()
-        self.tts = _create_tts(language, "", sample_rate=8000)
+        self.tts = _create_tts(language, "", sample_rate=self._sample_rate, raw_pcm=self._raw_pcm)
         await self.tts.connect()
-        await self._prewarm_tts()
 
         self.state.language = language
         await bus.emit("language.switched", {
@@ -432,18 +558,27 @@ class VoicePipeline:
 
     async def _speak(self, text: str):
         try:
-            async for audio_chunk in self.tts.synthesize(text):
+            text = _humanize_for_speech(text)
+            if not text:
+                return
+            emotion_speed = self.emotional_mirror.get_tts_params().get("speed", 0)
+            synth_kwargs = {"speed": emotion_speed} if emotion_speed else {}
+            async for audio_chunk in self.tts.synthesize(text, **synth_kwargs):
                 if self.state.barge_in:
                     break
 
-                chunk_size = 160
-                for i in range(0, len(audio_chunk), chunk_size):
-                    if self.state.barge_in:
-                        break
-                    segment = audio_chunk[i : i + chunk_size]
-                    payload = base64.b64encode(segment).decode("ascii")
+                if self._raw_pcm:
+                    payload = base64.b64encode(audio_chunk).decode("ascii")
                     await self._telephony.send_audio(payload)
-                    await asyncio.sleep(0.018)
+                else:
+                    chunk_size = self._sample_rate // 50
+                    for i in range(0, len(audio_chunk), chunk_size):
+                        if self.state.barge_in:
+                            break
+                        segment = audio_chunk[i : i + chunk_size]
+                        payload = base64.b64encode(segment).decode("ascii")
+                        await self._telephony.send_audio(payload)
+                        await asyncio.sleep(0.018)
 
         except Exception:
             logger.exception("TTS speak error")
@@ -463,6 +598,9 @@ class VoicePipeline:
 
         await self.tracer.save()
 
+        turn_summary = self.turn_quality.get_summary()
+        barge_summary = self.barge_in_tracker.get_summary()
+
         await bus.emit("call.completed", {
             "call_id": self.state.call_sid,
             "direction": self.state.direction,
@@ -473,7 +611,16 @@ class VoicePipeline:
             "language": self.state.language,
             "duration_seconds": duration,
             "transcript": self.state.transcript,
+            "turn_quality": turn_summary,
+            "barge_in_quality": barge_summary,
         })
+
+        if turn_summary:
+            logger.info(
+                f"Turn quality: p50={turn_summary.get('turn_gap_p50_ms', 0):.0f}ms, "
+                f"p95={turn_summary.get('turn_gap_p95_ms', 0):.0f}ms, "
+                f"false_endpoints={turn_summary.get('false_endpoint_rate', 0)}%"
+            )
 
         logger.info(
             f"Pipeline stopped for call {self.state.call_sid} "

@@ -12,18 +12,18 @@ class EmotionalMirror:
 
     EMOTION_PRESETS = {
         "frustrated": {
-            "tts_speed": 0.9,
+            "tts_speed": 0.95,
             "tts_emotion": ["calmness:high", "empathy:high"],
             "prompt_injection": (
                 "The caller sounds frustrated. Respond with empathy. "
                 "Acknowledge their frustration FIRST before solving. "
-                "Use shorter sentences. Speak slowly and clearly. "
+                "Use shorter sentences. Be clear and direct. "
                 "Say things like 'I completely understand your frustration' "
                 "or 'I'm sorry you're dealing with this.'"
             ),
         },
         "angry": {
-            "tts_speed": 0.85,
+            "tts_speed": 0.95,
             "tts_emotion": ["calmness:highest", "empathy:high"],
             "prompt_injection": (
                 "The caller is angry. Stay calm and professional. "
@@ -34,7 +34,7 @@ class EmotionalMirror:
             ),
         },
         "confused": {
-            "tts_speed": 0.85,
+            "tts_speed": 0.95,
             "tts_emotion": ["calmness:high", "positivity:medium"],
             "prompt_injection": (
                 "The caller seems confused. Use simpler language. "

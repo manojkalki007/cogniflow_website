@@ -1,7 +1,11 @@
+import { useState, useEffect } from "react";
 import { NavLink, Outlet } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { api, setTenantId, getTenantId } from "../lib/api";
 import {
   Phone, PhoneOutgoing, Users, BarChart3, Bot, LayoutTemplate, Megaphone,
-  Settings, DollarSign, ShieldCheck, Gauge, MessageSquare, Plug, Zap,
+  Settings, DollarSign, ShieldCheck, Gauge, MessageSquare, Plug, Zap, Activity,
+  Building2, ChevronDown,
 } from "lucide-react";
 
 const NAV_MAIN = [
@@ -20,6 +24,7 @@ const NAV_FEATURES = [
   { to: "/dashboard/latency", label: "Latency", icon: Gauge },
   { to: "/dashboard/whatsapp", label: "WhatsApp", icon: MessageSquare },
   { to: "/dashboard/integrations", label: "Integrations", icon: Plug },
+  { to: "/dashboard/benchmarks", label: "Benchmarks", icon: Activity },
 ];
 
 function NavItem({ to, label, icon: Icon, end }) {
@@ -35,9 +40,79 @@ function NavItem({ to, label, icon: Icon, end }) {
         }`
       }
     >
-      <Icon size={16} strokeWidth={isActive => isActive ? 2.5 : 1.5} />
+      <Icon size={16} strokeWidth={1.5} />
       {label}
     </NavLink>
+  );
+}
+
+function OrgSwitcher() {
+  const [open, setOpen] = useState(false);
+  const [currentId, setCurrentId] = useState(getTenantId());
+
+  const { data: orgs } = useQuery({
+    queryKey: ["organizations"],
+    queryFn: () => api.getOrganizations(),
+    staleTime: 60000,
+  });
+
+  const current = orgs?.find?.(o => o.id === currentId);
+  const orgList = Array.isArray(orgs) ? orgs : [];
+
+  function switchOrg(org) {
+    setTenantId(org.id);
+    setCurrentId(org.id);
+    setOpen(false);
+    window.location.reload();
+  }
+
+  function clearOrg() {
+    setTenantId("");
+    setCurrentId("");
+    setOpen(false);
+    window.location.reload();
+  }
+
+  if (!orgList.length) return null;
+
+  return (
+    <div className="relative px-3 mb-2">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.03] border border-gray-800/50 hover:border-gray-700/50 transition-colors text-left"
+      >
+        <Building2 size={14} className="text-gray-500 shrink-0" />
+        <span className="text-[12px] text-gray-300 truncate flex-1">
+          {current?.name || "All Organizations"}
+        </span>
+        <ChevronDown size={12} className={`text-gray-600 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute left-3 right-3 top-full mt-1 z-50 rounded-lg bg-gray-900 border border-gray-800 shadow-xl overflow-hidden">
+          <button
+            onClick={clearOrg}
+            className={`w-full text-left px-3 py-2 text-[12px] hover:bg-white/[0.05] transition-colors ${
+              !currentId ? "text-blue-400" : "text-gray-400"
+            }`}
+          >
+            All Organizations
+          </button>
+          {orgList.map(org => (
+            <button
+              key={org.id}
+              onClick={() => switchOrg(org)}
+              className={`w-full text-left px-3 py-2 text-[12px] hover:bg-white/[0.05] transition-colors border-t border-gray-800/30 ${
+                currentId === org.id ? "text-blue-400" : "text-gray-400"
+              }`}
+            >
+              <span className="block truncate">{org.name}</span>
+              <span className="text-[10px] text-gray-600">{org.plan}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -59,7 +134,11 @@ export default function Layout() {
 
         <div className="h-px bg-gradient-to-r from-transparent via-gray-700/50 to-transparent mx-4" />
 
-        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+        <div className="pt-3">
+          <OrgSwitcher />
+        </div>
+
+        <nav className="flex-1 p-3 pt-1 space-y-0.5 overflow-y-auto">
           {NAV_MAIN.map(({ to, label, icon }) => (
             <NavItem key={to} to={to} label={label} icon={icon} end={to === "/dashboard"} />
           ))}
@@ -79,7 +158,7 @@ export default function Layout() {
 
         <div className="p-4 border-t border-gray-800/30">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] text-gray-600 font-mono">v2.0.0</span>
+            <span className="text-[11px] text-gray-600 font-mono">v2.1.0</span>
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="System online" />
           </div>
         </div>
