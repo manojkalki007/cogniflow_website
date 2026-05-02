@@ -67,7 +67,10 @@ async def list_agents() -> list[dict]:
 
 
 async def create_agent(data: dict) -> dict | None:
-    return await db.insert("agents", data)
+    result = await db.insert("agents", data)
+    if result is None:
+        logger.error(f"Failed to insert agent: {data.get('name', 'unknown')}")
+    return result
 
 
 async def update_agent(agent_id: str, data: dict) -> dict | None:

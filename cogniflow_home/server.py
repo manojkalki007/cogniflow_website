@@ -37,7 +37,7 @@ from typing import Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from cogniflow_home.agents import create_agent, get_agent_for_number, list_agents, update_agent
 from cogniflow_home.campaigns.manager import (
@@ -544,7 +544,7 @@ async def api_create_agent(request: Request):
     instructions = body.get("instructions")
     if not name or not instructions:
         return {"error": "name and instructions are required"}
-    result = await create_agent({
+    agent_data = {
         "name": name,
         "instructions": instructions,
         "voice_id": body.get("voice_id", ""),
@@ -559,8 +559,17 @@ async def api_create_agent(request: Request):
         "tts_provider": body.get("tts_provider", "cartesia"),
         "temperature": body.get("temperature", 0.7),
         "tools_enabled": body.get("tools_enabled", []),
-    })
-    return result or {"error": "Failed to create agent"}
+        "max_call_duration": body.get("max_call_duration", 600),
+        "enable_memory": body.get("enable_memory", True),
+        "enable_prediction": body.get("enable_prediction", True),
+        "enable_emotion": body.get("enable_emotion", True),
+        "enable_language_switch": body.get("enable_language_switch", True),
+        "enable_rag": body.get("enable_rag", False),
+    }
+    result = await create_agent(agent_data)
+    if not result:
+        return JSONResponse({"error": "Failed to create agent"}, status_code=500)
+    return result
 
 
 @app.patch("/api/agents/{agent_id}", dependencies=[Depends(verify_api_key)])
@@ -1229,7 +1238,7 @@ async def api_deploy_template(template_id: str, request: Request):
 
     agent_data = {
         "name": agent_name,
-        "system_prompt": instructions,
+        "instructions": instructions,
         "greeting": f"Hello, this is {agent_name} from {company_name}.",
         "language": lang,
         "llm_provider": llm_provider,
