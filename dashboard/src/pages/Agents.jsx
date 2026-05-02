@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
+import { useRef, useEffect } from "react";
 import {
   Plus, Save, Bot, Copy, Upload, Loader2, Trash2,
   PhoneOutgoing, BarChart3, Sliders, Wrench, Shield, Brain,
+  MessageCircle, Send, X, User,
 } from "lucide-react";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -245,24 +247,119 @@ function AgentFormDialog({ open, onOpenChange, agent, onSave }) {
   );
 }
 
-function TestCallWidget({ agent }) {
-  const [phone, setPhone] = useState("");
-  const [status, setStatus] = useState(null);
+function TestChatPanel({ agent, onClose }) {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const scrollRef = useRef(null);
 
-  const callMut = useMutation({
-    mutationFn: () => api.makeCall(phone, "twilio", agent.instructions),
-    onSuccess: (data) => setStatus(data.error ? `Error: ${data.error}` : `Call started: ${data.call_sid}`),
-    onError: () => setStatus("Failed to start call"),
-  });
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    if (agent.greeting) {
+      setMessages([{ role: "assistant", content: agent.greeting }]);
+    }
+  }, [agent.greeting]);
+
+  const sendMessage = async () => {
+    if (!input.trim() || isLoading) return;
+    const userMsg = input.trim();
+    setInput("");
+    const updated = [...messages, { role: "user", content: userMsg }];
+    setMessages(updated);
+    setIsLoading(true);
+    try {
+      const history = updated.map(m => ({ role: m.role, content: m.content }));
+      const res = await api.testAgentChat(agent.id, "", history);
+      if (res.error) {
+        setMessages(prev => [...prev, { role: "system", content: `Error: ${res.error}` }]);
+      } else {
+        setMessages(prev => [...prev, { role: "assistant", content: res.reply, model: res.model }]);
+      }
+    } catch {
+      setMessages(prev => [...prev, { role: "system", content: "Failed to get response" }]);
+    }
+    setIsLoading(false);
+  };
 
   return (
-    <div className="flex items-center gap-3 mt-4 pt-4 border-t border-gray-800/30">
-      <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91..."
-        className="flex-1 glass-card rounded-xl px-4 py-2.5 text-xs input-glow border border-gray-700/30 bg-gray-800/30 font-mono" />
-      <Button size="sm" variant="outline" onClick={() => callMut.mutate()} disabled={!phone || callMut.isPending}>
-        <PhoneOutgoing size={12} /> Test
-      </Button>
-      {status && <span className="text-xs text-gray-400">{status}</span>}
+    <div className="mt-4 pt-4 border-t border-gray-800/30 animate-fade-in">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+            <MessageCircle size={12} className="text-emerald-400" />
+          </div>
+          <span className="text-xs font-medium text-gray-300">Test Chat</span>
+          <span className="text-[10px] text-gray-600">with {agent.name}</span>
+        </div>
+        <button onClick={onClose} className="text-gray-500 hover:text-white p-1 rounded-lg hover:bg-gray-800/50 transition-all">
+          <X size={14} />
+        </button>
+      </div>
+
+      <div ref={scrollRef} className="h-64 overflow-y-auto rounded-xl bg-gray-900/50 border border-gray-800/30 p-3 space-y-3 mb-3">
+        {messages.length === 0 && (
+          <p className="text-xs text-gray-600 text-center py-8">Send a message to test the agent</p>
+        )}
+        {messages.map((msg, i) => (
+          <div key={i} className={`flex gap-2.5 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+            {msg.role !== "user" && (
+              <div className="w-6 h-6 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                <Bot size={11} className="text-blue-400" />
+              </div>
+            )}
+            <div className={`max-w-[80%] rounded-xl px-3.5 py-2.5 text-sm leading-relaxed ${
+              msg.role === "user"
+                ? "bg-blue-600/20 text-blue-100 border border-blue-500/20"
+                : msg.role === "system"
+                ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                : "bg-gray-800/60 text-gray-200 border border-gray-700/30"
+            }`}>
+              {msg.content}
+              {msg.model && (
+                <span className="block text-[9px] text-gray-600 mt-1 font-mono">{msg.model}</span>
+              )}
+            </div>
+            {msg.role === "user" && (
+              <div className="w-6 h-6 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                <User size={11} className="text-violet-400" />
+              </div>
+            )}
+          </div>
+        ))}
+        {isLoading && (
+          <div className="flex gap-2.5">
+            <div className="w-6 h-6 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
+              <Bot size={11} className="text-blue-400" />
+            </div>
+            <div className="bg-gray-800/60 border border-gray-700/30 rounded-xl px-3.5 py-2.5">
+              <div className="flex gap-1">
+                <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="flex gap-2">
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+          placeholder="Type a message to test..."
+          className="flex-1 glass-card rounded-xl px-4 py-2.5 text-sm input-glow border border-gray-700/30 bg-gray-800/30"
+          disabled={isLoading}
+        />
+        <Button size="sm" onClick={sendMessage} disabled={!input.trim() || isLoading}>
+          {isLoading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -318,8 +415,8 @@ function AgentCard({ agent, onEdit, onDelete, onClone }) {
         <div className="flex gap-1">
           <Button variant="ghost" size="sm" onClick={() => onEdit(agent)}>Edit</Button>
           <Button variant="ghost" size="sm" onClick={() => onClone(agent)}><Copy size={12} /></Button>
-          <Button variant="ghost" size="sm" onClick={() => setShowTest(!showTest)}>
-            <PhoneOutgoing size={12} />
+          <Button variant={showTest ? "outline" : "ghost"} size="sm" onClick={() => setShowTest(!showTest)}>
+            <MessageCircle size={12} /> Test
           </Button>
           <Button variant="ghost" size="sm" onClick={() => { if (confirm("Delete this agent?")) onDelete(agent.id); }}>
             <Trash2 size={12} />
@@ -345,7 +442,7 @@ function AgentCard({ agent, onEdit, onDelete, onClone }) {
       </div>
 
       <AgentPerformance agentId={agent.id} />
-      {showTest && <TestCallWidget agent={agent} />}
+      {showTest && <TestChatPanel agent={agent} onClose={() => setShowTest(false)} />}
     </div>
   );
 }

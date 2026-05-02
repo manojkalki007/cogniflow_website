@@ -102,6 +102,11 @@ export const api = {
   getAgent: (id) => request(`/api/agents/${id}`),
   deleteAgent: (id) => request(`/api/agents/${id}`, { method: "DELETE" }),
   getAgentPerformance: (id) => request(`/api/agents/${id}/performance`),
+  testAgentChat: (id, message, messages = []) =>
+    request(`/api/agents/${id}/test-chat`, {
+      method: "POST",
+      body: JSON.stringify({ message, messages }),
+    }),
 
   // Integrations
   getIntegrations: () => request("/api/integrations"),

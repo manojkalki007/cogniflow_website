@@ -990,6 +990,59 @@ async def api_agent_performance(agent_id: str):
     }
 
 
+@app.post("/api/agents/{agent_id}/test-chat", dependencies=[Depends(verify_api_key)])
+async def api_test_agent_chat(agent_id: str, request: Request):
+    if not _valid_uuid(agent_id):
+        return JSONResponse({"error": "Invalid agent ID format"}, status_code=400)
+    agents = await db.select("agents", {"id": agent_id})
+    if not agents:
+        return JSONResponse({"error": "Agent not found"}, status_code=404)
+    agent = agents[0]
+    body = await request.json()
+    messages = body.get("messages", [])
+    user_msg = body.get("message", "")
+    if user_msg:
+        messages.append({"role": "user", "content": user_msg})
+    if not messages:
+        return JSONResponse({"error": "No message provided"}, status_code=400)
+
+    system_prompt = agent.get("instructions", "")
+    greeting = agent.get("greeting", "")
+    if greeting:
+        system_prompt += f"\n\nYour greeting when starting a conversation: {greeting}"
+
+    provider = agent.get("llm_provider", "openai")
+    model = agent.get("llm_model", "gpt-4o-mini")
+    temperature = agent.get("temperature", 0.7)
+
+    try:
+        from openai import AsyncOpenAI
+        if provider == "groq" and settings.groq_api_key:
+            client = AsyncOpenAI(
+                api_key=settings.groq_api_key,
+                base_url="https://api.groq.com/openai/v1",
+            )
+        elif settings.openai_api_key:
+            client = AsyncOpenAI(api_key=settings.openai_api_key)
+            if provider == "groq":
+                model = "gpt-4o-mini"
+                provider = "openai"
+        else:
+            return JSONResponse({"error": "No LLM provider configured"}, status_code=500)
+
+        resp = await client.chat.completions.create(
+            model=model,
+            messages=[{"role": "system", "content": system_prompt}] + messages,
+            temperature=temperature,
+            max_tokens=500,
+        )
+        reply = resp.choices[0].message.content
+        return {"reply": reply, "model": model, "provider": provider}
+    except Exception as e:
+        logger.error(f"Test chat error: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 # ─── Integrations ───
 
 @app.get("/api/integrations", dependencies=[Depends(verify_api_key)])
