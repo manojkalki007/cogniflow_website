@@ -1,16 +1,27 @@
-FROM python:3.12-slim
+FROM node:20-alpine AS base
 
-RUN adduser --disabled-password --gecos '' appuser
-
+FROM base AS deps
 WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm run build
 
-COPY --chown=appuser:appuser . .
+FROM base AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
 
-USER appuser
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-EXPOSE 8000
-
-CMD ["python", "main.py"]
+USER nextjs
+EXPOSE 3001
+ENV PORT=3001
+CMD ["node", "server.js"]
