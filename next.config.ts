@@ -24,7 +24,7 @@ const nextConfig: NextConfig = {
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' https://images.unsplash.com data:",
               "media-src 'self' https://stream.mux.com",
-              "connect-src 'self' https://stream.mux.com",
+              "connect-src 'self' https://stream.mux.com https://cbpzsvzfoquowbldtsrh.supabase.co",
               "frame-ancestors 'none'",
             ].join('; '),
           },

@@ -6,6 +6,8 @@ import ScrollReveal from "./ScrollReveal";
 
 export default function FinalCTA() {
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   return (
     <section
@@ -111,9 +113,32 @@ export default function FinalCTA() {
               </div>
             ) : (
               <form
-                onSubmit={(e) => {
+                onSubmit={async (e) => {
                   e.preventDefault();
-                  setSubmitted(true);
+                  setSubmitting(true);
+                  setError("");
+                  const form = e.currentTarget;
+                  const data = new FormData(form);
+                  try {
+                    const res = await fetch("/api/demo-request", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        firstName: data.get("firstName"),
+                        lastName: data.get("lastName"),
+                        email: data.get("email"),
+                        company: data.get("company"),
+                        phone: data.get("phone"),
+                        sdrCount: data.get("sdrCount"),
+                      }),
+                    });
+                    if (!res.ok) throw new Error();
+                    setSubmitted(true);
+                  } catch {
+                    setError("Something went wrong. Please try again.");
+                  } finally {
+                    setSubmitting(false);
+                  }
                 }}
                 className="space-y-5"
               >
@@ -126,8 +151,10 @@ export default function FinalCTA() {
                       First Name
                     </label>
                     <input
+                      name="firstName"
                       type="text"
                       required
+                      maxLength={100}
                       className="w-full px-4 py-3 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-white/25 focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/25 transition-all"
                       placeholder="John"
                       style={{ fontFamily: "'Instrument Sans', sans-serif" }}
@@ -141,8 +168,10 @@ export default function FinalCTA() {
                       Last Name
                     </label>
                     <input
+                      name="lastName"
                       type="text"
                       required
+                      maxLength={100}
                       className="w-full px-4 py-3 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-white/25 focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/25 transition-all"
                       placeholder="Doe"
                       style={{ fontFamily: "'Instrument Sans', sans-serif" }}
@@ -158,8 +187,10 @@ export default function FinalCTA() {
                     Work Email
                   </label>
                   <input
+                    name="email"
                     type="email"
                     required
+                    maxLength={255}
                     className="w-full px-4 py-3 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-white/25 focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/25 transition-all"
                     placeholder="john@company.com"
                     style={{ fontFamily: "'Instrument Sans', sans-serif" }}
@@ -174,8 +205,10 @@ export default function FinalCTA() {
                     Company
                   </label>
                   <input
+                    name="company"
                     type="text"
                     required
+                    maxLength={200}
                     className="w-full px-4 py-3 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-white/25 focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/25 transition-all"
                     placeholder="Acme Corp"
                     style={{ fontFamily: "'Instrument Sans', sans-serif" }}
@@ -190,7 +223,9 @@ export default function FinalCTA() {
                     Phone Number
                   </label>
                   <input
+                    name="phone"
                     type="tel"
+                    maxLength={30}
                     className="w-full px-4 py-3 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-white/25 focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/25 transition-all"
                     placeholder="+1 (555) 000-0000"
                     style={{ fontFamily: "'Instrument Sans', sans-serif" }}
@@ -205,6 +240,7 @@ export default function FinalCTA() {
                     How many SDRs do you have?
                   </label>
                   <select
+                    name="sdrCount"
                     className="w-full px-4 py-3 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/25 transition-all appearance-none"
                     style={{
                       fontFamily: "'Instrument Sans', sans-serif",
@@ -222,12 +258,19 @@ export default function FinalCTA() {
                   </select>
                 </div>
 
+                {error && (
+                  <p className="text-center text-sm text-red-400" style={{ fontFamily: "'Instrument Sans', sans-serif" }}>
+                    {error}
+                  </p>
+                )}
+
                 <button
                   type="submit"
-                  className="group w-full flex items-center justify-center gap-3 pl-6 pr-3 py-3.5 rounded-full bg-white text-[#0a0400] font-semibold text-base hover:shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:scale-[1.02] transition-all duration-300"
+                  disabled={submitting}
+                  className="group w-full flex items-center justify-center gap-3 pl-6 pr-3 py-3.5 rounded-full bg-white text-[#0a0400] font-semibold text-base hover:shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:scale-[1.02] transition-all duration-300 disabled:opacity-60 disabled:pointer-events-none"
                   style={{ fontFamily: "'Instrument Sans', sans-serif" }}
                 >
-                  Book Your Demo
+                  {submitting ? "Submitting..." : "Book Your Demo"}
                   <span className="flex items-center justify-center w-8 h-8 rounded-full bg-[#22d3ee] group-hover:bg-[#06b6d4] transition-colors duration-200">
                     <ArrowRight className="w-4 h-4 text-white" />
                   </span>
