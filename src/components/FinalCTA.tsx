@@ -72,7 +72,7 @@ export default function FinalCTA() {
                 <div key={item} className="flex items-center gap-3">
                   <div className="w-5 h-5 rounded-full bg-brand/20 flex items-center justify-center flex-shrink-0">
                     <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                      <path d="M2.5 6L5 8.5L9.5 3.5" stroke="#22d3ee" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M2.5 6L5 8.5L9.5 3.5" stroke="#0018FF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </div>
                   <span
@@ -98,7 +98,7 @@ export default function FinalCTA() {
               <div className="text-center py-12">
                 <div className="w-16 h-16 rounded-full bg-brand/20 flex items-center justify-center mx-auto mb-6">
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-                    <path d="M5 13l4 4L19 7" stroke="#22d3ee" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M5 13l4 4L19 7" stroke="#0018FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </div>
                 <h3
@@ -271,7 +271,7 @@ export default function FinalCTA() {
                   style={{ fontFamily: "'Instrument Sans', sans-serif" }}
                 >
                   {submitting ? "Submitting..." : "Book Your Demo"}
-                  <span className="flex items-center justify-center w-8 h-8 rounded-full bg-[#22d3ee] group-hover:bg-[#06b6d4] transition-colors duration-200">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-full bg-[#0018FF] group-hover:bg-[#0012CC] transition-colors duration-200">
                     <ArrowRight className="w-4 h-4 text-white" />
                   </span>
                 </button>

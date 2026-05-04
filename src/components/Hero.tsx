@@ -1,165 +1,200 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { motion } from "framer-motion";
-import { ArrowRight } from "lucide-react";
-import Hls from "hls.js";
+import { motion } from "motion/react";
+import { Sparkles, ArrowRight } from "lucide-react";
 
-const VIDEO_SRC =
-  "https://stream.mux.com/T6oQJQ02cQ6N01TR6iHwZkKFkbepS34dkkIc9iukgy400g.m3u8";
-const POSTER =
-  "https://images.unsplash.com/photo-1647356191320-d7a1f80ca777?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGRhcmslMjB0ZWNobm9sb2d5JTIwbmV1cmFsJTIwbmV0d29ya3xlbnwxfHx8fDE3Njg5NzIyNTV8MA&ixlib=rb-4.1.0&q=80&w=1080";
+const ease = [0.22, 1, 0.36, 1] as const;
 
-function HeroVideo() {
+function BlurIn({
+  children,
+  delay = 0,
+  duration = 0.6,
+  className = "",
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  duration?: number;
+  className?: string;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, filter: "blur(10px)", y: 20 }}
+      animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
+      transition={{ delay, duration, ease }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function SplitText({
+  text,
+  startIndex = 0,
+  staggerDelay = 0.08,
+  duration = 0.6,
+}: {
+  text: string;
+  startIndex?: number;
+  staggerDelay?: number;
+  duration?: number;
+}) {
+  const words = text.split(" ");
+  return (
+    <>
+      {words.map((word, i) => (
+        <motion.span
+          key={i}
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            delay: (startIndex + i) * staggerDelay,
+            duration,
+            ease,
+          }}
+          className="inline-block"
+          style={{ marginRight: "0.3em" }}
+        >
+          {word}
+        </motion.span>
+      ))}
+    </>
+  );
+}
+
+const HLS_SRC =
+  "https://stream.mux.com/s8pMcOvMQXc4GD6AX4e1o01xFogFxipmuKltNfSYza0200.m3u8";
+
+export default function Hero() {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
-    if (Hls.isSupported()) {
-      const hls = new Hls();
-      hls.loadSource(VIDEO_SRC);
-      hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.play().catch(() => {});
-      });
-      return () => hls.destroy();
-    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = VIDEO_SRC;
-      video.addEventListener("loadedmetadata", () => {
-        video.play().catch(() => {});
-      });
+    let hlsInstance: any = null;
+
+    // Safari supports HLS natively
+    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = HLS_SRC;
+      video.play().catch(() => {});
+      return;
     }
+
+    // Dynamic import of bundled hls.js (runs client-side only inside useEffect)
+    import("hls.js")
+      .then((mod) => {
+        const Hls = mod.default;
+        if (!Hls.isSupported()) return;
+
+        hlsInstance = new Hls();
+        hlsInstance.loadSource(HLS_SRC);
+        hlsInstance.attachMedia(video);
+        hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+          video.play().catch(() => {});
+        });
+      })
+      .catch(() => {});
+
+    return () => {
+      hlsInstance?.destroy();
+    };
   }, []);
 
   return (
-    <video
-      ref={videoRef}
-      className="absolute inset-0 w-full h-full object-cover opacity-60"
-      muted
-      loop
-      playsInline
-      poster={POSTER}
-    />
-  );
-}
-
-export default function Hero() {
-  return (
-    <section className="relative w-full min-h-screen bg-black text-white overflow-hidden">
-      {/* Background video */}
-      <HeroVideo />
-
-      {/* Video overlay */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]" />
-
-      {/* Decorative gradients */}
-      <div
-        className="absolute rounded-full mix-blend-screen pointer-events-none"
+    <section
+      className="relative w-full h-screen overflow-hidden"
+      style={{ backgroundColor: "#070612" }}
+    >
+      {/* Background Video */}
+      <video
+        ref={videoRef}
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="absolute inset-0 h-full object-cover pointer-events-none"
         style={{
-          top: "-20%",
-          left: "20%",
-          width: "600px",
-          height: "600px",
-          background: "rgba(30, 58, 138, 0.2)",
-          filter: "blur(120px)",
+          zIndex: 0,
+          marginLeft: "200px",
+          width: "calc(100% - 200px)",
+          transform: "scale(1.2)",
+          transformOrigin: "left center",
         }}
       />
+
+      {/* Bottom fade gradient */}
       <div
-        className="absolute rounded-full mix-blend-screen pointer-events-none"
+        className="absolute bottom-0 left-0 w-full h-40"
         style={{
-          bottom: "-10%",
-          right: "20%",
-          width: "500px",
-          height: "500px",
-          background: "rgba(49, 46, 129, 0.2)",
-          filter: "blur(120px)",
+          zIndex: 10,
+          background: "linear-gradient(to top, #070612, transparent)",
         }}
       />
 
       {/* Content */}
-      <div className="relative z-10 flex flex-col items-center text-center max-w-5xl mx-auto px-6 mt-20 space-y-12 min-h-screen justify-center">
-        {/* Pre-headline */}
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="text-3xl sm:text-5xl lg:text-[48px] leading-[1.1] text-white"
-          style={{ fontFamily: "'Instrument Serif', serif", fontStyle: "italic" }}
-        >
-          The future of sales, automated
-        </motion.p>
+      <div
+        className="relative mx-auto max-w-7xl h-full flex flex-col justify-center px-6 lg:px-12"
+        style={{ zIndex: 20 }}
+      >
+        <div className="flex flex-col gap-12">
+          <div className="flex flex-col gap-6">
+            {/* Badge */}
+            <BlurIn delay={0} duration={0.6}>
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/20 backdrop-blur-sm px-4 py-2 w-fit">
+                <Sparkles className="w-3 h-3 text-white/80" />
+                <span className="text-sm font-medium text-white/80">
+                  New AI Automation Ally
+                </span>
+              </div>
+            </BlurIn>
 
-        {/* Main headline */}
-        <motion.h1
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.2, duration: 0.6 }}
-          className="text-6xl sm:text-8xl lg:text-[136px] font-semibold leading-[0.9] tracking-tighter bg-gradient-to-b from-white via-white to-[#7dd3fc] bg-clip-text text-transparent"
-          style={{ fontFamily: "'Instrument Sans', sans-serif" }}
-        >
-          Outperform
-        </motion.h1>
+            {/* Heading */}
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-medium leading-tight lg:leading-[1.2] text-white">
+              <span className="block">
+                <SplitText text="The AI Employee That" startIndex={0} />
+              </span>
+              <SplitText text="Outperforms Your Best" startIndex={4} />
+              <motion.span
+                initial={{ opacity: 0, y: 40 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 7 * 0.08, duration: 0.6, ease }}
+                className="inline-block italic"
+                style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}
+              >
+                SDR.
+              </motion.span>
+            </h1>
 
-        {/* Subtitle */}
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.7 }}
-          transition={{ delay: 0.4, duration: 0.6 }}
-          className="text-lg sm:text-[20px] leading-[1.65] text-white max-w-xl"
-          style={{ fontFamily: "'Instrument Sans', sans-serif" }}
-        >
-          The autonomous AI SDR that calls, writes hyperpersonalized emails,
-          and follows up on WhatsApp — in under 500ms. While you sleep.
-        </motion.p>
+            {/* Subtitle */}
+            <BlurIn delay={0.4} duration={0.6}>
+              <p className="text-white/80 text-lg font-normal leading-relaxed max-w-xl">
+                It calls. It writes hyperpersonalized emails. It follows up on
+                WhatsApp. In under 500ms. While you sleep.
+              </p>
+            </BlurIn>
+          </div>
 
-        {/* CTA Buttons */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6, duration: 0.5 }}
-          className="flex flex-col sm:flex-row items-center gap-6"
-        >
-          {/* Primary button */}
-          <a
-            href="#book-demo"
-            className="group flex items-center gap-3 pl-6 pr-2 py-2 rounded-full bg-white text-[#0a0400] font-medium text-lg hover:shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:scale-105 transition-all duration-300"
-            style={{ fontFamily: "'Instrument Sans', sans-serif" }}
-          >
-            Book a Demo
-            <span className="flex items-center justify-center w-10 h-10 rounded-full bg-[#22d3ee] group-hover:bg-[#06b6d4] transition-colors duration-200">
-              <ArrowRight className="w-5 h-5 text-white" />
-            </span>
-          </a>
-
-          {/* Secondary button */}
-          <a
-            href="#product"
-            className="group flex items-center gap-2 px-4 py-2 rounded-lg text-white/70 hover:text-white backdrop-blur-sm hover:bg-white/5 transition-all duration-300"
-            style={{ fontFamily: "'Instrument Sans', sans-serif" }}
-          >
-            See How It Works
-            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-200" />
-          </a>
-        </motion.div>
-      </div>
-
-      {/* Scroll indicator */}
-      <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-10">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.5, duration: 1 }}
-        >
-          <motion.div
-            animate={{ y: [0, 6, 0] }}
-            transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
-            className="w-5 h-8 rounded-full border border-white/[0.15] flex items-start justify-center p-1.5"
-          >
-            <div className="w-1 h-1.5 rounded-full bg-white/40" />
-          </motion.div>
-        </motion.div>
+          {/* CTA Buttons */}
+          <BlurIn delay={0.6} duration={0.6}>
+            <div className="flex flex-wrap gap-4">
+              <a
+                href="/book-call"
+                className="inline-flex items-center gap-2 rounded-full bg-[#0018FF] text-white px-5 py-3 font-medium transition-transform hover:scale-105"
+              >
+                Book A Free Call
+                <ArrowRight className="w-4 h-4" />
+              </a>
+              <a
+                href="#"
+                className="inline-flex items-center rounded-full bg-white/20 backdrop-blur-sm text-white px-8 py-3 font-medium transition-colors hover:bg-white/30"
+              >
+                Learn now
+              </a>
+            </div>
+          </BlurIn>
+        </div>
       </div>
     </section>
   );

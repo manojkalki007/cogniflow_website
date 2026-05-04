@@ -74,14 +74,14 @@ export default function WorkflowAnimation() {
             <path
               d={d}
               fill="none"
-              stroke="rgba(34,211,238,0.12)"
+              stroke="rgba(0,24,255,0.12)"
               strokeWidth="1.5"
             />
             {/* Animated flowing path */}
             <path
               d={d}
               fill="none"
-              stroke="rgba(34,211,238,0.35)"
+              stroke="rgba(0,24,255,0.35)"
               strokeWidth="1.5"
               strokeDasharray="8 16"
               className="animate-flow"
@@ -91,7 +91,7 @@ export default function WorkflowAnimation() {
               <circle
                 key={p}
                 r="2.5"
-                fill="#22d3ee"
+                fill="#0018FF"
                 filter="url(#particleGlow)"
                 opacity="0.8"
               >
@@ -124,7 +124,7 @@ export default function WorkflowAnimation() {
             width="120"
             height="60"
             rx="12"
-            fill="rgba(34,211,238,0.03)"
+            fill="rgba(0,24,255,0.03)"
             filter="url(#nodeGlow)"
             className="animate-nodePulse"
             style={{ animationDelay: `${i * 0.4}s` }}
@@ -145,7 +145,7 @@ export default function WorkflowAnimation() {
             <path
               d={node.icon}
               fill="none"
-              stroke="#22d3ee"
+              stroke="#0018FF"
               strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"
