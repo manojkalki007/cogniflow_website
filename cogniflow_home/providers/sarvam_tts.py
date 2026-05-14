@@ -19,26 +19,32 @@ logger = logging.getLogger("cogniflow_home.tts.sarvam")
 SARVAM_TTS_URL = "https://api.sarvam.ai/text-to-speech"
 
 VOICES = {
-    "hi": {"voice": "arvind", "language": "hi-IN"},
-    "ta": {"voice": "meera", "language": "ta-IN"},
-    "te": {"voice": "arvind", "language": "te-IN"},
-    "kn": {"voice": "arvind", "language": "kn-IN"},
-    "ml": {"voice": "meera", "language": "ml-IN"},
-    "bn": {"voice": "arvind", "language": "bn-IN"},
-    "mr": {"voice": "arvind", "language": "mr-IN"},
-    "gu": {"voice": "arvind", "language": "gu-IN"},
-    "pa": {"voice": "arvind", "language": "pa-IN"},
-    "od": {"voice": "arvind", "language": "od-IN"},
-    "en-in": {"voice": "arvind", "language": "en-IN"},
+    "hi":    {"voice": "priya",   "language": "hi-IN"},
+    "ta":    {"voice": "priya",   "language": "ta-IN"},
+    "te":    {"voice": "rahul",   "language": "te-IN"},
+    "kn":    {"voice": "rahul",   "language": "kn-IN"},
+    "ml":    {"voice": "priya",   "language": "ml-IN"},
+    "bn":    {"voice": "rahul",   "language": "bn-IN"},
+    "mr":    {"voice": "rahul",   "language": "mr-IN"},
+    "gu":    {"voice": "priya",   "language": "gu-IN"},
+    "pa":    {"voice": "rahul",   "language": "pa-IN"},
+    "od":    {"voice": "rahul",   "language": "od-IN"},
+    "en-in": {"voice": "priya",   "language": "en-IN"},
+    "en":    {"voice": "priya",   "language": "en-IN"},
+    "as":    {"voice": "priya",   "language": "as-IN"},
+    "ur":    {"voice": "rahul",   "language": "ur-IN"},
 }
 
 
 class SarvamTTS:
-    def __init__(self, language: str = "hi", sample_rate: int = 8000):
+    def __init__(self, language: str = "hi", sample_rate: int = 8000,
+                 voice: str = "", temperature: float = 0.6, pace: float = 1.0):
         voice_config = VOICES.get(language, VOICES["hi"])
-        self.voice = voice_config["voice"]
+        self.voice = voice or voice_config["voice"]
         self.language = voice_config["language"]
         self.sample_rate = sample_rate
+        self.temperature = temperature
+        self.pace = pace
         self._client = httpx.AsyncClient(timeout=15.0)
         self._headers = {
             "api-subscription-key": settings.sarvam_api_key,
@@ -46,19 +52,25 @@ class SarvamTTS:
         }
 
     async def connect(self):
-        logger.info(f"Sarvam TTS ready (language={self.language}, voice={self.voice})")
+        logger.info(f"Sarvam TTS ready (language={self.language}, voice={self.voice}, "
+                     f"temp={self.temperature}, pace={self.pace})")
 
-    async def synthesize(self, text: str) -> AsyncIterator[bytes]:
+    async def synthesize(self, text: str, **kwargs) -> AsyncIterator[bytes]:
         if not text.strip():
             return
+
+        temperature = kwargs.get("temperature", self.temperature)
+        pace = kwargs.get("pace", self.pace)
 
         body = {
             "inputs": [text],
             "target_language_code": self.language,
-            "speaker": self.voice,
-            "model": "bulbul:v2",
+            "speaker": kwargs.get("voice", self.voice),
+            "model": "bulbul:v3",
             "audio_format": "mulaw",
             "sample_rate": self.sample_rate,
+            "temperature": max(0.01, min(1.0, temperature)),
+            "pace": max(0.5, min(2.0, pace)),
         }
 
         try:

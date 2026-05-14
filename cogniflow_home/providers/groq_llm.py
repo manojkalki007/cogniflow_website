@@ -1,7 +1,6 @@
-"""Streaming LLM via Groq (primary) with OpenAI fallback.
+"""Streaming LLM via Groq.
 
-Groq delivers ~80ms TTFT vs OpenAI's 300-500ms.
-Falls back to OpenAI automatically if Groq is unavailable.
+Groq delivers ~80ms TTFT — purpose-built for real-time voice.
 """
 
 import json
@@ -20,13 +19,11 @@ class GroqLLM:
     def __init__(
         self,
         model: str = "llama-3.3-70b-versatile",
-        fallback_model: str = "gpt-4o-mini",
         system_prompt: str = "",
         temperature: float = 0.7,
-        max_tokens: int = 80,
+        max_tokens: int = 150,
     ):
         self.model = model
-        self.fallback_model = fallback_model
         self.system_prompt = system_prompt
         self.temperature = temperature
         self.max_tokens = max_tokens
@@ -40,7 +37,6 @@ class GroqLLM:
             )
 
         self._groq_url = "https://api.groq.com/openai/v1/chat/completions"
-        self._openai_url = "https://api.openai.com/v1/chat/completions"
 
     def add_message(self, role: str, content: str):
         self.conversation_history.append({"role": role, "content": content})
@@ -49,6 +45,30 @@ class GroqLLM:
         while total_chars > max_chars and len(self.conversation_history) > 2:
             removed = self.conversation_history.pop(1)
             total_chars -= len(removed.get("content", ""))
+
+    async def prewarm(self):
+        """Send system prompt with max_tokens=1 to warm the KV cache."""
+        api_key = settings.groq_api_key
+        if not api_key:
+            return
+        body = {
+            "model": self.model,
+            "messages": self.conversation_history + [{"role": "user", "content": "."}],
+            "max_tokens": 1,
+            "temperature": 0,
+        }
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                await client.post(
+                    self._groq_url,
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json=body,
+                )
+        except Exception:
+            logger.debug("LLM prewarm failed (non-fatal)", exc_info=True)
 
     async def generate_stream(
         self, user_text: str, tools: list | None = None
@@ -64,18 +84,8 @@ class GroqLLM:
             ):
                 yield sentence
         except Exception:
-            logger.warning("Groq failed, falling back to OpenAI")
-            try:
-                async for sentence in self._try_stream(
-                    self._openai_url,
-                    settings.openai_api_key,
-                    self.fallback_model,
-                    tools,
-                ):
-                    yield sentence
-            except Exception:
-                logger.exception("Both Groq and OpenAI failed")
-                yield "I'm sorry, I'm having trouble right now. Could you repeat that?"
+            logger.exception("Groq LLM failed")
+            yield "I'm sorry, I'm having trouble right now. Could you repeat that?"
 
     async def _try_stream(
         self,
@@ -100,6 +110,7 @@ class GroqLLM:
         full_response = ""
         sentence_buffer = ""
         tool_calls_data: dict[int, dict] = {}
+        first_chunk_sent = False
 
         async with httpx.AsyncClient(timeout=10.0) as client:
             async with client.stream(
@@ -144,14 +155,24 @@ class GroqLLM:
                         full_response += token
                         sentence_buffer += token
 
-                        for delimiter in [".", "!", "?"]:
+                        yielded = False
+                        for delimiter in [".", "!", "?", ",", ";", ":"]:
                             if delimiter in sentence_buffer:
                                 parts = sentence_buffer.split(delimiter, 1)
                                 sentence = (parts[0] + delimiter).strip()
                                 sentence_buffer = parts[1] if len(parts) > 1 else ""
                                 if sentence:
+                                    first_chunk_sent = True
+                                    yielded = True
                                     yield sentence
                                 break
+
+                        if not yielded and not first_chunk_sent and len(sentence_buffer.split()) >= 4:
+                            text = sentence_buffer.strip()
+                            sentence_buffer = ""
+                            if text:
+                                first_chunk_sent = True
+                                yield text
 
         if sentence_buffer.strip() and not tool_calls_data:
             yield sentence_buffer.strip()

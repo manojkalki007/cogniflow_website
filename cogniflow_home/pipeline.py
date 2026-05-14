@@ -35,13 +35,13 @@ from cogniflow_home.intelligence.emotional_mirror import EmotionalMirror
 from cogniflow_home.language.detector import LanguageDetector, LanguageRouter
 from cogniflow_home.monitoring.turn_quality import TurnEvent, TurnQualityAnalyzer
 from cogniflow_home.monitoring.barge_in import BargeInTracker
+from cogniflow_home.emotions.tts_adapter import EmotionTTSAdapter
 from cogniflow_home.telephony.base import CallInfo, TelephonyProvider
 
 logger = logging.getLogger("cogniflow_home.pipeline")
 
 INDIAN_LANGUAGES = {"hi", "ta", "te", "kn", "ml", "bn", "mr", "gu", "pa", "od", "as", "ur", "ne", "en-in"}
-EUROPEAN_LANGUAGES = {"fr", "de", "es", "it", "pt", "pl", "nl", "sv", "no", "da", "fi", "tr", "ar"}
-
+SARVAM_TTS_LANGUAGES = {"hi", "ta", "te", "kn", "ml", "bn", "mr", "gu", "pa", "od", "as", "ur", "ne", "en-in"}
 SYSTEM_PROMPT_VOICE_RULES = """
 VOICE CALL RULES — you are on a live phone call, not writing text:
 
@@ -81,20 +81,14 @@ def _create_stt(language: str, sample_rate: int = 8000):
 
 
 def _create_tts(language: str, voice_id: str, sample_rate: int = 8000, raw_pcm: bool = False):
-    if language in INDIAN_LANGUAGES:
+    if language in SARVAM_TTS_LANGUAGES:
         from cogniflow_home.providers.sarvam_tts import SarvamTTS
         return SarvamTTS(language=language, sample_rate=sample_rate)
-    if language in EUROPEAN_LANGUAGES:
-        from cogniflow_home.providers.elevenlabs_tts import ElevenLabsTTS
-        return ElevenLabsTTS(voice_id=voice_id, language=language, sample_rate=sample_rate)
     if settings.smallest_ai_api_key:
         from cogniflow_home.providers.smallest_tts import SmallestTTS
         return SmallestTTS(voice_id=voice_id, language=language, sample_rate=sample_rate, raw_pcm=raw_pcm)
-    if settings.cartesia_api_key:
-        from cogniflow_home.providers.tts import CartesiaTTS
-        return CartesiaTTS(voice_id=voice_id, sample_rate=sample_rate)
     from cogniflow_home.providers.sarvam_tts import SarvamTTS
-    return SarvamTTS(language="en-in", sample_rate=sample_rate)
+    return SarvamTTS(language=language if language in SARVAM_TTS_LANGUAGES else "en-in", sample_rate=sample_rate)
 
 
 _CONTRACTIONS = [
@@ -132,11 +126,8 @@ def _humanize_for_speech(text: str) -> str:
 
 
 def _create_llm(system_prompt: str):
-    if settings.groq_api_key:
-        from cogniflow_home.providers.groq_llm import GroqLLM
-        return GroqLLM(system_prompt=system_prompt)
-    from cogniflow_home.providers.llm import OpenAILLM
-    return OpenAILLM(system_prompt=system_prompt)
+    from cogniflow_home.providers.groq_llm import GroqLLM
+    return GroqLLM(system_prompt=system_prompt)
 
 
 @dataclass
@@ -148,6 +139,7 @@ class CallState:
     provider: str = "twilio"
     agent_name: str = ""
     language: str = "en"
+    tenant_id: str = ""
     started_at: float = field(default_factory=time.time)
     transcript: list[dict] = field(default_factory=list)
     is_agent_speaking: bool = False
@@ -160,7 +152,8 @@ class VoicePipeline:
     def __init__(self, call_info: CallInfo, telephony: TelephonyProvider,
                  instructions_override: str = "", greeting_override: str = "",
                  language: str = "en", voice_id: str = "",
-                 sample_rate: int = 8000):
+                 sample_rate: int = 8000, tenant_id: str = "",
+                 emotion_profile: str = "friendly", voice_gender: str = "female"):
         call_id = call_info.call_sid or str(uuid.uuid4())
         self._sample_rate = sample_rate
         self.state = CallState(
@@ -171,12 +164,14 @@ class VoicePipeline:
             provider=call_info.provider,
             agent_name=AGENT_NAME,
             language=language,
+            tenant_id=tenant_id,
         )
         self._telephony = telephony
         self._raw_pcm = getattr(telephony, 'raw_pcm', False)
 
         base_instructions = instructions_override or AGENT_INSTRUCTIONS
-        self._instructions = base_instructions + "\n\n" + SYSTEM_PROMPT_VOICE_RULES
+        emotion_instructions = self.emotion_adapter.get_llm_emotion_instructions()
+        self._instructions = base_instructions + "\n\n" + SYSTEM_PROMPT_VOICE_RULES + "\n\n" + emotion_instructions
         self._greeting = greeting_override or GREETING
 
         self.stt = _create_stt(language, sample_rate=sample_rate)
@@ -189,16 +184,20 @@ class VoicePipeline:
         }
         self.tts = _create_tts(language, voice_id or VOICE_ID, sample_rate=sample_rate, raw_pcm=self._raw_pcm)
 
-        self.eot = SemanticEOTDetector(threshold=0.80)
+        self.eot = SemanticEOTDetector(threshold=0.75)
         self.tracer = LatencyTracer(call_id)
         self.compliance = ComplianceEngine()
-        self.speculative = SpeculativeGenerator(eot_threshold=0.85, min_words=5)
+        self.speculative = SpeculativeGenerator(eot_threshold=0.70, min_words=5)
         self.filler = FillerAudioManager()
         self.emotional_mirror = EmotionalMirror()
         self.language_detector = LanguageDetector(primary_language=language)
         self.language_router = LanguageRouter()
         self.turn_quality = TurnQualityAnalyzer()
         self.barge_in_tracker = BargeInTracker()
+        self.emotion_adapter = EmotionTTSAdapter(
+            template_type=emotion_profile,
+            gender=voice_gender,
+        )
 
         self._running = False
         self._stt_task = None
@@ -207,7 +206,9 @@ class VoicePipeline:
         self._speech_energy_threshold = 200
         self._user_speech_end_ts = 0.0
         self._turn_number = 0
+        self._turn_first_byte_ts = 0.0
         self.on_transcript = None
+        self.on_latency = None
 
     def inject_context(self, context: str):
         if context:
@@ -244,14 +245,24 @@ class VoicePipeline:
 
         return custom_greeting
 
+    async def _prewarm_tts(self):
+        """Connect TTS then synthesize a silent token to wake the voice model."""
+        await self.tts.connect()
+        try:
+            async for _ in self.tts.synthesize("."):
+                pass
+        except Exception:
+            logger.debug("TTS voice prewarm failed (non-fatal)", exc_info=True)
+
     async def start(self):
         self._running = True
 
-        # Parallelize all startup network calls
-        _, _, custom_greeting = await asyncio.gather(
+        # Prewarm everything simultaneously while the caller hears ringing
+        _, _, custom_greeting, _ = await asyncio.gather(
             self.stt.connect(),
-            self.tts.connect(),
+            self._prewarm_tts(),
             self._fetch_memory_and_prediction(),
+            self.llm.prewarm(),
         )
 
         self.speculative.set_generate_fn(self.llm.generate_stream)
@@ -295,7 +306,7 @@ class VoicePipeline:
             if energy > self._speech_energy_threshold:
                 self._silence_chunks = 0
                 self._audio_chunk_count += 1
-                if self._audio_chunk_count >= 18:
+                if self._audio_chunk_count >= 28:
                     barge_detect_ts = time.perf_counter() * 1000
                     logger.info("Barge-in detected — pausing to listen")
                     self.state.barge_in = True
@@ -372,6 +383,8 @@ class VoicePipeline:
 
                 self._unclear_count = 0
 
+                self.emotion_adapter.update_caller_emotion(redacted)
+
                 self.state.transcript.append(
                     {"role": "user", "text": redacted, "ts": time.time()}
                 )
@@ -399,12 +412,16 @@ class VoicePipeline:
     async def _generate_and_speak(self, user_text: str, eot_ts: float = 0):
         self.state.is_agent_speaking = True
         self.state.barge_in = False
+        self._turn_first_byte_ts = 0.0
+        eot_ts_orig = eot_ts
 
         # Emotional mirroring — inject emotion context
         emotion_prompt = self.emotional_mirror.get_prompt_injection()
+        caller_emotion_prompt = self.emotion_adapter.get_caller_emotion_prompt()
         llm_input = user_text
-        if emotion_prompt:
-            llm_input = f"[EMOTION CONTEXT: {emotion_prompt}]\n\nCaller said: \"{user_text}\""
+        combined_emotion = (emotion_prompt + "\n" + caller_emotion_prompt).strip()
+        if combined_emotion:
+            llm_input = f"[EMOTION CONTEXT: {combined_emotion}]\n\nCaller said: \"{user_text}\""
         if self.emotional_mirror.should_offer_human():
             llm_input += "\n[SYSTEM: Caller has been frustrated for 30+ seconds. Proactively offer to transfer to a human agent.]"
 
@@ -440,21 +457,18 @@ class VoicePipeline:
                 await self._speak(sentence)
                 self.tracer.end(t_tts)
 
-                if first_sentence is False and eot_ts and self._user_speech_end_ts:
-                    agent_first_audio_ts = time.perf_counter() * 1000
+                if eot_ts and self._user_speech_end_ts and self._turn_first_byte_ts:
                     self.turn_quality.record_turn(TurnEvent(
                         turn_number=self._turn_number,
                         user_speech_end_ms=self._user_speech_end_ts,
                         eot_fired_ms=eot_ts,
-                        agent_first_audio_ms=agent_first_audio_ts,
+                        agent_first_audio_ms=self._turn_first_byte_ts,
                         agent_speech_end_ms=0,
                     ))
                     eot_ts = 0
 
                 if self.state.barge_in:
                     break
-
-                await asyncio.sleep(0.03)
 
         except Exception:
             logger.exception("Generate-and-speak error")
@@ -471,6 +485,23 @@ class VoicePipeline:
             if self.on_transcript:
                 try:
                     await self.on_transcript("agent", full_response.strip())
+                except Exception:
+                    pass
+
+            if self.on_latency and self._user_speech_end_ts and eot_ts_orig:
+                first_byte = self._turn_first_byte_ts or (time.perf_counter() * 1000)
+                total_ms = round(first_byte - self._user_speech_end_ts)
+                eot_decision = round(eot_ts_orig - self._user_speech_end_ts)
+                llm_ms = round(self.tracer.get_turn_summary().get("llm_ttft", 0))
+                tts_ms = max(0, total_ms - eot_decision - llm_ms)
+                try:
+                    await self.on_latency({
+                        "turn": self._turn_number,
+                        "eot_ms": eot_decision,
+                        "llm_ms": llm_ms,
+                        "tts_ms": tts_ms,
+                        "total_ms": total_ms,
+                    })
                 except Exception:
                     pass
 
@@ -561,8 +592,8 @@ class VoicePipeline:
             text = _humanize_for_speech(text)
             if not text:
                 return
-            emotion_speed = self.emotional_mirror.get_tts_params().get("speed", 0)
-            synth_kwargs = {"speed": emotion_speed} if emotion_speed else {}
+            text = self.emotion_adapter.add_prosody_hints(text)
+            synth_kwargs = self.emotion_adapter.get_tts_kwargs()
             async for audio_chunk in self.tts.synthesize(text, **synth_kwargs):
                 if self.state.barge_in:
                     break
@@ -570,6 +601,8 @@ class VoicePipeline:
                 if self._raw_pcm:
                     payload = base64.b64encode(audio_chunk).decode("ascii")
                     await self._telephony.send_audio(payload)
+                    if not self._turn_first_byte_ts:
+                        self._turn_first_byte_ts = time.perf_counter() * 1000
                 else:
                     chunk_size = self._sample_rate // 50
                     for i in range(0, len(audio_chunk), chunk_size):
@@ -578,6 +611,8 @@ class VoicePipeline:
                         segment = audio_chunk[i : i + chunk_size]
                         payload = base64.b64encode(segment).decode("ascii")
                         await self._telephony.send_audio(payload)
+                        if not self._turn_first_byte_ts:
+                            self._turn_first_byte_ts = time.perf_counter() * 1000
                         await asyncio.sleep(0.018)
 
         except Exception:
@@ -614,6 +649,16 @@ class VoicePipeline:
             "turn_quality": turn_summary,
             "barge_in_quality": barge_summary,
         })
+
+        if self.state.tenant_id and duration > 0:
+            from cogniflow_home.tenants.manager import record_call_usage
+            asyncio.create_task(record_call_usage(
+                tenant_id=self.state.tenant_id,
+                call_id=self.state.call_sid,
+                duration_seconds=duration,
+                language=self.state.language,
+                provider=self.state.provider,
+            ))
 
         if turn_summary:
             logger.info(

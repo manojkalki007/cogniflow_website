@@ -8,6 +8,7 @@ import { Search, Phone, User, Upload, Plus, X, FileSpreadsheet, AlertTriangle, T
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
+import PageHeader from "../components/PageHeader";
 
 function ContactForm({ onSubmit, onCancel }) {
   const [form, setForm] = useState({ name: "", phone_number: "", email: "", company: "", tags: "", notes: "" });
@@ -17,37 +18,49 @@ function ContactForm({ onSubmit, onCancel }) {
     <div className="space-y-4 text-sm">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm text-gray-400 mb-1.5 font-medium">Name *</label>
+          <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-muted)' }}>Name *</label>
           <input value={form.name} onChange={(e) => set("name", e.target.value)}
-            className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30" placeholder="John Doe" />
+            className="w-full rounded-xl px-4 py-3 border outline-none transition-colors focus:border-[var(--accent)]"
+            style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+            placeholder="John Doe" />
         </div>
         <div>
-          <label className="block text-sm text-gray-400 mb-1.5 font-medium">Phone *</label>
+          <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-muted)' }}>Phone *</label>
           <input value={form.phone_number} onChange={(e) => set("phone_number", e.target.value)}
-            className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30 font-mono" placeholder="+919876543210" />
+            className="w-full rounded-xl px-4 py-3 border font-mono outline-none transition-colors focus:border-[var(--accent)]"
+            style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+            placeholder="+919876543210" />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm text-gray-400 mb-1.5 font-medium">Email</label>
+          <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-muted)' }}>Email</label>
           <input value={form.email} onChange={(e) => set("email", e.target.value)}
-            className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30" placeholder="john@example.com" />
+            className="w-full rounded-xl px-4 py-3 border outline-none transition-colors focus:border-[var(--accent)]"
+            style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+            placeholder="john@example.com" />
         </div>
         <div>
-          <label className="block text-sm text-gray-400 mb-1.5 font-medium">Company</label>
+          <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-muted)' }}>Company</label>
           <input value={form.company} onChange={(e) => set("company", e.target.value)}
-            className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30" placeholder="Acme Corp" />
+            className="w-full rounded-xl px-4 py-3 border outline-none transition-colors focus:border-[var(--accent)]"
+            style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+            placeholder="Acme Corp" />
         </div>
       </div>
       <div>
-        <label className="block text-sm text-gray-400 mb-1.5 font-medium">Tags <span className="text-gray-600">(comma-separated)</span></label>
+        <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-muted)' }}>Tags <span style={{ color: 'var(--text-muted)' }}>(comma-separated)</span></label>
         <input value={form.tags} onChange={(e) => set("tags", e.target.value)}
-          className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30" placeholder="lead, enterprise, inbound" />
+          className="w-full rounded-xl px-4 py-3 border outline-none transition-colors focus:border-[var(--accent)]"
+          style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+          placeholder="lead, enterprise, inbound" />
       </div>
       <div>
-        <label className="block text-sm text-gray-400 mb-1.5 font-medium">Notes</label>
+        <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-muted)' }}>Notes</label>
         <textarea value={form.notes} onChange={(e) => set("notes", e.target.value)} rows={2}
-          className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30 resize-none" placeholder="Any additional notes..." />
+          className="w-full rounded-xl px-4 py-3 border resize-none outline-none transition-colors focus:border-[var(--accent)]"
+          style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+          placeholder="Any additional notes..." />
       </div>
       <div className="flex gap-3 pt-1">
         <Button size="sm" onClick={() => onSubmit({ ...form, tags: form.tags ? form.tags.split(",").map(t => t.trim()) : [] })}
@@ -138,31 +151,33 @@ function CSVImportDialog({ open, onOpenChange }) {
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl" style={{ background: 'var(--surface-raised)', borderColor: 'var(--border)' }}>
         <DialogHeader>
-          <DialogTitle>Import Contacts from CSV</DialogTitle>
+          <DialogTitle style={{ color: 'var(--text-primary)' }}>Import Contacts from CSV</DialogTitle>
         </DialogHeader>
 
         {step === "upload" && (
-          <div {...getRootProps()} className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all duration-200 ${isDragActive ? "border-blue-500 bg-blue-500/5 shadow-lg shadow-blue-500/10" : "border-gray-700/50 hover:border-gray-500/50 hover:bg-gray-800/20"}`}>
+          <div {...getRootProps()} className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all duration-200`}
+            style={{ borderColor: isDragActive ? 'var(--accent)' : 'var(--border)', background: isDragActive ? 'var(--accent-subtle)' : 'transparent' }}>
             <input {...getInputProps()} />
-            <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center mx-auto mb-4">
-              <FileSpreadsheet size={22} className="text-blue-400" />
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4" style={{ background: 'var(--accent-subtle)' }}>
+              <FileSpreadsheet size={22} style={{ color: 'var(--accent)' }} />
             </div>
-            <p className="text-sm text-gray-300">{isDragActive ? "Drop your CSV file here..." : "Drag & drop a CSV file, or click to browse"}</p>
-            <p className="text-xs text-gray-600 mt-1.5">Supports .csv files up to 5MB</p>
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{isDragActive ? "Drop your CSV file here..." : "Drag & drop a CSV file, or click to browse"}</p>
+            <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>Supports .csv files up to 5MB</p>
           </div>
         )}
 
         {step === "map" && (
           <div className="space-y-4">
-            <p className="text-sm text-gray-400">Found {csvData.length} rows. Map your CSV columns:</p>
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Found {csvData.length} rows. Map your CSV columns:</p>
             <div className="space-y-3">
               {FIELDS.map(({ key, label, required }) => (
                 <div key={key} className="flex items-center gap-3">
-                  <span className="w-28 text-sm text-gray-300 font-medium">{label} {required && <span className="text-red-400">*</span>}</span>
+                  <span className="w-28 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>{label} {required && <span style={{ color: 'var(--danger)' }}>*</span>}</span>
                   <select value={mapping[key] || ""} onChange={(e) => setMapping({ ...mapping, [key]: e.target.value })}
-                    className="flex-1 glass-card rounded-xl px-4 py-2.5 text-sm border border-gray-700/30 bg-gray-800/30">
+                    className="flex-1 rounded-xl px-4 py-2.5 text-sm border outline-none transition-colors focus:border-[var(--accent)]"
+                    style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                     <option value="">-- Select column --</option>
                     {headers.map((h) => <option key={h} value={h}>{h}</option>)}
                   </select>
@@ -170,17 +185,17 @@ function CSVImportDialog({ open, onOpenChange }) {
               ))}
             </div>
 
-            <div className="glass-card rounded-xl p-4 max-h-40 overflow-auto">
-              <p className="text-xs text-gray-500 mb-2 font-medium">Preview (first 3 rows):</p>
+            <div className="rounded-xl border p-4 max-h-40 overflow-auto" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+              <p className="text-xs mb-2 font-medium" style={{ color: 'var(--text-muted)' }}>Preview (first 3 rows):</p>
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-gray-500">
+                  <tr style={{ color: 'var(--text-muted)' }}>
                     {FIELDS.filter(f => mapping[f.key]).map(f => <th key={f.key} className="text-left p-1">{f.label}</th>)}
                   </tr>
                 </thead>
                 <tbody>
                   {csvData.slice(0, 3).map((row, i) => (
-                    <tr key={i} className="text-gray-300">
+                    <tr key={i} style={{ color: 'var(--text-secondary)' }}>
                       {FIELDS.filter(f => mapping[f.key]).map(f => <td key={f.key} className="p-1">{row[mapping[f.key]] || "--"}</td>)}
                     </tr>
                   ))}
@@ -199,12 +214,12 @@ function CSVImportDialog({ open, onOpenChange }) {
 
         {step === "done" && importResult && (
           <div className="space-y-4 text-center py-6">
-            <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto">
-              <span className="text-3xl text-emerald-400">✓</span>
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto" style={{ background: 'var(--accent-subtle)' }}>
+              <span className="text-3xl" style={{ color: 'var(--success)' }}>&#10003;</span>
             </div>
-            <p className="text-lg font-semibold text-white">{importResult.imported} contacts imported</p>
+            <p className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{importResult.imported} contacts imported</p>
             {importResult.duplicates > 0 && (
-              <p className="text-sm text-yellow-400 flex items-center justify-center gap-1.5">
+              <p className="text-sm flex items-center justify-center gap-1.5" style={{ color: 'var(--warning)' }}>
                 <AlertTriangle size={14} /> {importResult.duplicates} duplicates skipped
               </p>
             )}
@@ -253,123 +268,145 @@ export default function Contacts() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h2 className="text-2xl font-bold gradient-text">Contacts</h2>
-          <p className="text-sm text-gray-500 mt-1">Manage your contact database</p>
-        </div>
-        <div className="flex gap-3">
-          <Button size="sm" variant="outline" onClick={() => setShowImport(true)}>
-            <Upload size={14} /> Import CSV
-          </Button>
-          <Button size="sm" onClick={() => setShowAdd(true)}>
-            <Plus size={14} /> Add Contact
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Contacts"
+        description="Manage your contact database"
+        action={
+          <div className="flex gap-3">
+            <Button size="sm" variant="outline" onClick={() => setShowImport(true)}>
+              <Upload size={14} /> Import CSV
+            </Button>
+            <Button size="sm" onClick={() => setShowAdd(true)}>
+              <Plus size={14} /> Add Contact
+            </Button>
+          </div>
+        }
+      />
 
-      {showAdd && (
-        <div className="glass-card rounded-xl p-6 mb-5 animate-fade-in border border-blue-500/20">
-          <h3 className="text-sm font-medium mb-4 text-white">Add Contact</h3>
-          <ContactForm onSubmit={(data) => createMut.mutate(data)} onCancel={() => setShowAdd(false)} />
-          {createMut.isError && <p className="text-red-400 text-xs mt-3 bg-red-500/5 rounded-lg px-3 py-2 border border-red-500/10">Failed to create contact</p>}
-        </div>
-      )}
+      <div className="px-8 py-6">
+        {showAdd && (
+          <div className="rounded-xl border p-6 mb-5 animate-fade-in" style={{ background: 'var(--surface)', borderColor: 'var(--accent)' }}>
+            <h3 className="text-sm font-medium mb-4" style={{ color: 'var(--text-primary)' }}>Add Contact</h3>
+            <ContactForm onSubmit={(data) => createMut.mutate(data)} onCancel={() => setShowAdd(false)} />
+            {createMut.isError && <p className="text-xs mt-3 rounded-lg px-3 py-2 border" style={{ color: 'var(--danger)', background: 'var(--surface)', borderColor: 'var(--danger)' }}>Failed to create contact</p>}
+          </div>
+        )}
 
-      <div className="flex gap-3 mb-5">
-        <div className="relative flex-1">
-          <Search size={14} className="absolute left-3.5 top-3 text-gray-500" />
-          <input type="text" placeholder="Search by name, phone, or company..."
-            value={search} onChange={(e) => setSearch(e.target.value)}
-            className="w-full glass-card rounded-xl pl-10 pr-4 py-2.5 text-sm input-glow border border-gray-700/30 bg-gray-900/50" />
+        <div className="flex gap-3 mb-5">
+          <div className="relative flex-1">
+            <Search size={14} className="absolute left-3.5 top-3" style={{ color: 'var(--text-muted)' }} />
+            <input type="text" placeholder="Search by name, phone, or company..."
+              value={search} onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-xl pl-10 pr-4 py-2.5 text-sm border outline-none transition-colors focus:border-[var(--accent)]"
+              style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
+          </div>
         </div>
-      </div>
 
-      {allTags.length > 0 && (
-        <div className="flex gap-2 mb-5 flex-wrap">
-          <button onClick={() => setTagFilter("")}
-            className={`text-xs px-3 py-1.5 rounded-lg transition-all duration-200 ${!tagFilter ? "btn-gradient text-white shadow-md" : "glass-card text-gray-400 hover:text-gray-200"}`}>
-            All
-          </button>
-          {allTags.map(tag => (
-            <button key={tag} onClick={() => setTagFilter(tagFilter === tag ? "" : tag)}
-              className={`text-xs px-3 py-1.5 rounded-lg transition-all duration-200 ${tagFilter === tag ? "btn-gradient text-white shadow-md" : "glass-card text-gray-400 hover:text-gray-200"}`}>
-              {tag}
+        {allTags.length > 0 && (
+          <div className="flex gap-2 mb-5 flex-wrap">
+            <button onClick={() => setTagFilter("")}
+              className={`text-xs px-3 py-1.5 rounded-lg transition-all duration-200 border ${!tagFilter ? "text-white shadow-md" : ""}`}
+              style={!tagFilter
+                ? { background: 'var(--accent)', borderColor: 'var(--accent)', color: '#fff' }
+                : { background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
+              All
             </button>
-          ))}
-        </div>
-      )}
-
-      <div className="glass-card rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-800/50 text-gray-500 text-xs uppercase tracking-wider">
-              <th className="text-left p-4">Name</th>
-              <th className="text-left p-4">Phone</th>
-              <th className="text-left p-4">Company</th>
-              <th className="text-left p-4">Tags</th>
-              <th className="text-left p-4">Calls</th>
-              <th className="text-left p-4">Status</th>
-              <th className="text-left p-4">Last Call</th>
-              <th className="p-4"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((c) => (
-              <tr key={c.id} className="border-b border-gray-800/30 table-row-hover cursor-pointer group"
-                onClick={() => navigate(`/dashboard/contacts/${c.id}`)}>
-                <td className="p-4 flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-violet-500/10 flex items-center justify-center">
-                    <User size={13} className="text-violet-400" />
-                  </div>
-                  <span className="font-medium">{c.name || <span className="text-gray-600">Unknown</span>}</span>
-                </td>
-                <td className="p-4 font-mono text-xs text-gray-300">{c.phone_number}</td>
-                <td className="p-4 text-gray-400 text-xs">{c.company || "--"}</td>
-                <td className="p-4">
-                  <div className="flex gap-1 flex-wrap">
-                    {(c.tags || []).slice(0, 3).map(tag => (
-                      <Badge key={tag} variant="outline" className="text-[10px] px-1.5 py-0">{tag}</Badge>
-                    ))}
-                  </div>
-                </td>
-                <td className="p-4 text-gray-400">{c.total_calls || 0}</td>
-                <td className="p-4">
-                  {dncSet.has(c.phone_number) ? (
-                    <Badge variant="destructive">DNC</Badge>
-                  ) : (
-                    <Badge variant="success">Active</Badge>
-                  )}
-                </td>
-                <td className="p-4 text-gray-500 text-xs">
-                  {c.last_call_at ? new Date(c.last_call_at).toLocaleDateString() : "--"}
-                </td>
-                <td className="p-4">
-                  <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/call?phone=${encodeURIComponent(c.phone_number)}`); }}
-                      className="text-blue-400 hover:text-blue-300 p-1 rounded-lg hover:bg-blue-500/10 transition-all"><Phone size={14} /></button>
-                    <button onClick={(e) => { e.stopPropagation(); if (confirm("Delete this contact?")) deleteMut.mutate(c.id); }}
-                      className="text-gray-500 hover:text-red-400 p-1 rounded-lg hover:bg-red-500/10 transition-all"><Trash2 size={14} /></button>
-                  </div>
-                </td>
-              </tr>
+            {allTags.map(tag => (
+              <button key={tag} onClick={() => setTagFilter(tagFilter === tag ? "" : tag)}
+                className={`text-xs px-3 py-1.5 rounded-lg transition-all duration-200 border ${tagFilter === tag ? "text-white shadow-md" : ""}`}
+                style={tagFilter === tag
+                  ? { background: 'var(--accent)', borderColor: 'var(--accent)', color: '#fff' }
+                  : { background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
+                {tag}
+              </button>
             ))}
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={8} className="p-12 text-center text-gray-600">
-                  {contacts.length === 0 ? "No contacts yet. Add one or import a CSV." : "No contacts match the filter."}
-                </td>
+          </div>
+        )}
+
+        <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-xs uppercase tracking-wider" style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
+                <th className="text-left p-4">Name</th>
+                <th className="text-left p-4">Phone</th>
+                <th className="text-left p-4">Company</th>
+                <th className="text-left p-4">Tags</th>
+                <th className="text-left p-4">Calls</th>
+                <th className="text-left p-4">Status</th>
+                <th className="text-left p-4">Last Call</th>
+                <th className="p-4"></th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filtered.map((c) => (
+                <tr key={c.id} className="border-b cursor-pointer group transition-colors"
+                  style={{ borderColor: 'var(--border)' }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-muted)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  onClick={() => navigate(`/dashboard/contacts/${c.id}`)}>
+                  <td className="p-4 flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'var(--accent-subtle)' }}>
+                      <User size={13} style={{ color: 'var(--accent)' }} />
+                    </div>
+                    <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{c.name || <span style={{ color: 'var(--text-muted)' }}>Unknown</span>}</span>
+                  </td>
+                  <td className="p-4 font-mono text-xs" style={{ color: 'var(--text-secondary)' }}>{c.phone_number}</td>
+                  <td className="p-4 text-xs" style={{ color: 'var(--text-muted)' }}>{c.company || "--"}</td>
+                  <td className="p-4">
+                    <div className="flex gap-1 flex-wrap">
+                      {(c.tags || []).slice(0, 3).map(tag => (
+                        <Badge key={tag} variant="outline" className="text-[10px] px-1.5 py-0">{tag}</Badge>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="p-4" style={{ color: 'var(--text-muted)' }}>{c.total_calls || 0}</td>
+                  <td className="p-4">
+                    {dncSet.has(c.phone_number) ? (
+                      <Badge variant="destructive">DNC</Badge>
+                    ) : (
+                      <Badge variant="success">Active</Badge>
+                    )}
+                  </td>
+                  <td className="p-4 text-xs" style={{ color: 'var(--text-muted)' }}>
+                    {c.last_call_at ? new Date(c.last_call_at).toLocaleDateString() : "--"}
+                  </td>
+                  <td className="p-4">
+                    <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/call?phone=${encodeURIComponent(c.phone_number)}`); }}
+                        className="p-1 rounded-lg transition-all" style={{ color: 'var(--accent)' }}><Phone size={14} /></button>
+                      <button onClick={(e) => { e.stopPropagation(); if (confirm("Delete this contact?")) deleteMut.mutate(c.id); }}
+                        className="p-1 rounded-lg transition-all" style={{ color: 'var(--text-muted)' }}><Trash2 size={14} /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="p-12 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--accent-subtle)' }}>
+                        <User size={18} style={{ color: 'var(--accent)' }} />
+                      </div>
+                      <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                        {contacts.length === 0 ? "No contacts yet" : "No contacts match the filter"}
+                      </p>
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        {contacts.length === 0 ? "Add one or import a CSV to get started." : "Try adjusting your search or filter."}
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <p className="text-xs mt-4 text-right font-mono" style={{ color: 'var(--text-muted)' }}>
+          Showing {filtered.length} of {contacts.length} contacts
+        </p>
+
+        <CSVImportDialog open={showImport} onOpenChange={setShowImport} />
       </div>
-
-      <p className="text-xs text-gray-600 mt-4 text-right font-mono">
-        Showing {filtered.length} of {contacts.length} contacts
-      </p>
-
-      <CSVImportDialog open={showImport} onOpenChange={setShowImport} />
     </div>
   );
 }

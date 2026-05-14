@@ -175,4 +175,30 @@ export const api = {
     }),
   removeMember: (orgId, email) =>
     request(`/api/organizations/${orgId}/members/${encodeURIComponent(email)}`, { method: "DELETE" }),
+
+  // Admin: Tenant Management
+  adminGetTenants: () => request("/admin/tenants"),
+  adminGetTenant: (id) => request(`/admin/tenants/${id}`),
+  adminCreateTenant: (data) =>
+    request("/admin/tenants", { method: "POST", body: JSON.stringify(data) }),
+  adminUpdateTenant: (id, data) =>
+    request(`/admin/tenants/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  adminSuspendTenant: (id) =>
+    request(`/admin/tenants/${id}/suspend`, { method: "POST" }),
+  adminGetBilling: () => request("/admin/billing"),
+
+  // Tenant: API Keys
+  getApiKeys: () => request("/api/keys"),
+  createApiKey: (data) =>
+    request("/api/keys", { method: "POST", body: JSON.stringify(data) }),
+  revokeApiKey: (id) => request(`/api/keys/${id}`, { method: "DELETE" }),
+
+  // API Hub
+  getProviders: () => request("/api/providers"),
+
+  // Tenant: Usage & Billing
+  getUsage: (month) =>
+    request(`/api/usage${month ? `?month=${month}` : ""}`),
+  getUsageHistory: () => request("/api/usage/history"),
+  getLiveUsage: () => request("/api/usage/live"),
 };

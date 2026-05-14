@@ -40,8 +40,8 @@ class DeepgramSTT:
         params = (
             f"?encoding=mulaw&sample_rate={self.sample_rate}&channels=1"
             f"&model=nova-3&language={self.language}"
-            f"&punctuate=true&interim_results=true&endpointing=400"
-            f"&vad_events=true&smart_format=true&utterance_end_ms=1200"
+            f"&punctuate=true&interim_results=true&endpointing=200"
+            f"&vad_events=true&smart_format=true&utterance_end_ms=1000"
         )
         headers = {"Authorization": f"Token {settings.deepgram_api_key}"}
         self._ws = await websockets.connect(

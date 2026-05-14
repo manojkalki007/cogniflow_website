@@ -49,7 +49,7 @@ class SarvamSTT:
         self._running = False
         self._flush_task = None
         self._buffer_duration_ms = 0
-        self._flush_threshold_ms = 2000
+        self._flush_threshold_ms = 500
 
     async def connect(self):
         self._running = True
@@ -87,6 +87,8 @@ class SarvamSTT:
             data = {
                 "model": "saaras:v3",
                 "language_code": self.language,
+                "with_disfluencies": "false",
+                "debug_mode": "false",
             }
             resp = await self._client.post(
                 SARVAM_STT_URL, files=files, data=data, headers=self._headers

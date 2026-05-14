@@ -4,16 +4,17 @@ import { cva } from "class-variance-authority";
 import { cn } from "../../lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98]",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98] cursor-pointer",
   {
     variants: {
       variant: {
-        default: "btn-gradient text-white shadow-md",
-        destructive: "bg-red-600/90 text-white hover:bg-red-600 shadow-md hover:shadow-red-600/20",
-        outline: "border border-gray-700/80 bg-gray-800/30 backdrop-blur-sm hover:bg-gray-800/60 hover:border-gray-600 text-gray-300",
-        secondary: "bg-gray-800/80 text-gray-300 hover:bg-gray-700/80 backdrop-blur-sm",
-        ghost: "hover:bg-gray-800/60 text-gray-400 hover:text-white",
-        link: "text-blue-400 underline-offset-4 hover:underline",
+        default: "text-white shadow-sm hover:opacity-90 hover:shadow-md",
+        destructive: "bg-[var(--danger)] text-white hover:opacity-90 shadow-sm",
+        outline: "border border-[var(--border-glass)] hover:border-[var(--border-strong)] text-[var(--text-secondary)] bg-[var(--surface-glass)] backdrop-blur-sm hover:bg-[var(--surface-raised)]",
+        secondary: "bg-[var(--bg-muted)] text-[var(--text-secondary)] hover:bg-[var(--border)]",
+        ghost: "hover:bg-[var(--bg-muted)] text-[var(--text-secondary)]",
+        link: "text-[var(--accent)] underline-offset-4 hover:underline",
+        glass: "bg-[var(--surface-glass)] backdrop-blur-md border border-[var(--border-glass)] text-[var(--text-primary)] hover:bg-[var(--surface-raised)] shadow-[var(--shadow-glass)]",
       },
       size: {
         default: "h-9 px-4 py-2",
@@ -31,7 +32,17 @@ const buttonVariants = cva(
 
 const Button = forwardRef(({ className, variant, size, asChild = false, ...props }, ref) => {
   const Comp = asChild ? Slot : "button";
-  return <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props} />;
+  return (
+    <Comp
+      className={cn(buttonVariants({ variant, size, className }))}
+      style={variant === "default" || !variant ? {
+        background: "linear-gradient(135deg, var(--accent), var(--accent-hover))",
+        boxShadow: "0 4px 14px var(--accent-glow)",
+      } : undefined}
+      ref={ref}
+      {...props}
+    />
+  );
 });
 Button.displayName = "Button";
 

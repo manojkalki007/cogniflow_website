@@ -35,6 +35,7 @@ import uuid as _uuid
 from contextlib import asynccontextmanager
 from typing import Optional
 
+import httpx
 from fastapi import Depends, FastAPI, HTTPException, Header, Request, WebSocket
 from fastapi.responses import JSONResponse, Response
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -54,6 +55,7 @@ from cogniflow_home.integrations.hubspot import get_caller_context
 from cogniflow_home.pipeline import VoicePipeline
 from cogniflow_home.telephony.base import CallInfo
 from cogniflow_home.telephony.registry import get_provider
+from cogniflow_home.tenants.auth import AuthContext, get_auth_context, generate_api_key
 
 logger = logging.getLogger("cogniflow_home")
 
@@ -66,15 +68,6 @@ _UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f
 
 def _valid_uuid(val: str) -> bool:
     return bool(_UUID_RE.match(val))
-
-
-# ─── Authentication ───
-
-async def verify_api_key(x_api_key: str = Header(default="")):
-    if not settings.api_secret_key:
-        return
-    if x_api_key != settings.api_secret_key:
-        raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
 
 # ─── Rate Limiting ───
@@ -226,11 +219,8 @@ async def health():
         },
         "llm": {
             "groq": "configured" if settings.groq_api_key else "not_configured",
-            "openai": "configured" if settings.openai_api_key else "not_configured",
         },
         "tts": {
-            "cartesia": "configured" if settings.cartesia_api_key else "not_configured",
-            "elevenlabs": "configured" if settings.elevenlabs_api_key else "not_configured",
             "sarvam": "configured" if settings.sarvam_api_key else "not_configured",
             "smallest": "configured" if settings.smallest_ai_api_key else "not_configured",
         },
@@ -239,6 +229,7 @@ async def health():
     checks["telephony"] = {
         "twilio": "configured" if settings.twilio_account_sid else "not_configured",
         "exotel": "configured" if settings.exotel_api_key else "not_configured",
+        "vobiz": "configured" if settings.vobiz_auth_id else "not_configured",
     }
 
     checks["integrations"] = {
@@ -262,6 +253,172 @@ async def health():
         status = "error"
 
     return {"status": status, **checks}
+
+
+# ─── API Hub: Provider status, usage tracking ───
+
+@app.get("/api/providers")
+async def api_provider_status(auth: AuthContext = Depends(get_auth_context)):
+    """Full provider inventory with status, category, pricing links, and usage."""
+    from datetime import datetime, timezone
+
+    providers = [
+        {
+            "id": "deepgram", "name": "Deepgram", "category": "stt",
+            "configured": bool(settings.deepgram_api_key),
+            "docs": "https://console.deepgram.com",
+            "pricing": "https://deepgram.com/pricing",
+            "description": "Speech-to-text (Nova-2). Pay-per-minute.",
+            "unit": "min", "rate_per_unit": 0.36,
+        },
+        {
+            "id": "sarvam_stt", "name": "Sarvam AI (STT)", "category": "stt",
+            "configured": bool(settings.sarvam_api_key),
+            "docs": "https://dashboard.sarvam.ai",
+            "pricing": "https://www.sarvam.ai/pricing",
+            "description": "Indian language STT. Hindi, Tamil, Telugu + 7 more.",
+            "unit": "min", "rate_per_unit": 0.20,
+        },
+        {
+            "id": "groq", "name": "Groq", "category": "llm",
+            "configured": bool(settings.groq_api_key),
+            "docs": "https://console.groq.com",
+            "pricing": "https://groq.com/pricing",
+            "description": "Ultra-fast LLM inference. Llama 3.3 70B.",
+            "unit": "1K tokens", "rate_per_unit": 0.06,
+        },
+        {
+            "id": "sarvam_tts", "name": "Sarvam AI (TTS)", "category": "tts",
+            "configured": bool(settings.sarvam_api_key),
+            "docs": "https://dashboard.sarvam.ai",
+            "pricing": "https://www.sarvam.ai/pricing",
+            "description": "Indian language TTS. Native Hindi, Tamil, Telugu voices.",
+            "unit": "1K chars", "rate_per_unit": 0.08,
+        },
+        {
+            "id": "smallest", "name": "Smallest AI", "category": "tts",
+            "configured": bool(settings.smallest_ai_api_key),
+            "docs": "https://smallest.ai",
+            "pricing": "https://smallest.ai/pricing",
+            "description": "Lightning TTS with emotion control. Low-latency streaming.",
+            "unit": "1K chars", "rate_per_unit": 0.05,
+        },
+        {
+            "id": "twilio", "name": "Twilio", "category": "telephony",
+            "configured": bool(settings.twilio_account_sid),
+            "docs": "https://console.twilio.com",
+            "pricing": "https://www.twilio.com/en-us/voice/pricing",
+            "description": "Global telephony. Inbound + outbound voice calls.",
+            "unit": "min", "rate_per_unit": 1.30,
+        },
+        {
+            "id": "exotel", "name": "Exotel", "category": "telephony",
+            "configured": bool(settings.exotel_api_key),
+            "docs": "https://my.exotel.com",
+            "pricing": "https://exotel.com/pricing",
+            "description": "India telephony. Local DIDs, IVR, call recording.",
+            "unit": "min", "rate_per_unit": 0.50,
+        },
+        {
+            "id": "vobiz", "name": "Vobiz", "category": "telephony",
+            "configured": bool(settings.vobiz_auth_id),
+            "docs": "https://console.vobiz.ai",
+            "pricing": "https://www.docs.vobiz.ai",
+            "description": "India-first telephony. ₹0.45/min voice, INR billing, TRAI compliant.",
+            "unit": "min", "rate_per_unit": 0.45,
+        },
+        {
+            "id": "supabase", "name": "Supabase", "category": "database",
+            "configured": bool(settings.supabase_url),
+            "docs": "https://supabase.com/dashboard",
+            "pricing": "https://supabase.com/pricing",
+            "description": "PostgreSQL database + auth + realtime + storage.",
+            "unit": "GB", "rate_per_unit": 0.0,
+        },
+        {
+            "id": "hubspot", "name": "HubSpot", "category": "crm",
+            "configured": bool(settings.hubspot_api_key),
+            "docs": "https://app.hubspot.com",
+            "pricing": "https://www.hubspot.com/pricing",
+            "description": "CRM sync. Auto-log calls, contacts, deals.",
+            "unit": "api calls", "rate_per_unit": 0.0,
+        },
+        {
+            "id": "salesforce", "name": "Salesforce", "category": "crm",
+            "configured": bool(settings.salesforce_client_id),
+            "docs": "https://login.salesforce.com",
+            "pricing": "https://www.salesforce.com/pricing",
+            "description": "Enterprise CRM integration. Leads, contacts, activities.",
+            "unit": "api calls", "rate_per_unit": 0.0,
+        },
+        {
+            "id": "whatsapp", "name": "WhatsApp Business", "category": "messaging",
+            "configured": bool(settings.whatsapp_api_key),
+            "docs": "https://business.facebook.com",
+            "pricing": "https://developers.facebook.com/docs/whatsapp/pricing",
+            "description": "WhatsApp Business API for follow-ups & notifications.",
+            "unit": "msg", "rate_per_unit": 0.05,
+        },
+        {
+            "id": "razorpay", "name": "Razorpay", "category": "payments",
+            "configured": bool(settings.razorpay_key_id),
+            "docs": "https://dashboard.razorpay.com",
+            "pricing": "https://razorpay.com/pricing",
+            "description": "Payment gateway for INR billing & subscriptions.",
+            "unit": "txn", "rate_per_unit": 0.0,
+        },
+        {
+            "id": "google_calendar", "name": "Google Calendar", "category": "scheduling",
+            "configured": bool(settings.google_service_account_json or settings.google_service_account_path),
+            "docs": "https://console.cloud.google.com",
+            "pricing": "https://workspace.google.com/pricing",
+            "description": "Calendar booking & appointment scheduling.",
+            "unit": "api calls", "rate_per_unit": 0.0,
+        },
+        {
+            "id": "smtp", "name": "Email (SMTP)", "category": "messaging",
+            "configured": bool(settings.smtp_user and settings.smtp_password),
+            "docs": "",
+            "pricing": "",
+            "description": f"Outbound email via {settings.smtp_host}. Sender: {settings.smtp_from_email}",
+            "unit": "email", "rate_per_unit": 0.0,
+        },
+    ]
+
+    # Pull usage from usage_records if tenant-scoped
+    usage_by_provider = {}
+    if auth.tenant_id:
+        month = datetime.now(timezone.utc).strftime("%Y-%m")
+        records = await db.select("usage_records", {"tenant_id": auth.tenant_id}, limit=5000)
+        for r in records:
+            if (r.get("recorded_at") or "")[:7] == month:
+                p = r.get("provider", "")
+                usage_by_provider[p] = usage_by_provider.get(p, 0) + r.get("duration_seconds", 0)
+
+    # Count calls by provider this month
+    month_start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0).isoformat()
+    call_match = {"created_at": f"gte.{month_start}"}
+    if auth.tenant_id:
+        call_match["tenant_id"] = auth.tenant_id
+    calls = await db.select("calls", call_match, limit=10000)
+
+    total_calls = len(calls)
+    total_minutes = sum(c.get("duration_seconds", 0) for c in calls) / 60
+    calls_by_provider = {}
+    for c in calls:
+        p = c.get("provider", "twilio")
+        calls_by_provider[p] = calls_by_provider.get(p, 0) + 1
+
+    summary = {
+        "total_providers": len(providers),
+        "configured": sum(1 for p in providers if p["configured"]),
+        "not_configured": sum(1 for p in providers if not p["configured"]),
+        "this_month_calls": total_calls,
+        "this_month_minutes": round(total_minutes, 1),
+        "calls_by_provider": calls_by_provider,
+    }
+
+    return {"providers": providers, "summary": summary}
 
 
 # ─── Telephony webhooks (no API key — use Twilio signature validation) ───
@@ -306,6 +463,78 @@ async def exotel_outbound(request: Request):
     return {"websocket_url": ws_url}
 
 
+# ─── Vobiz XML webhooks ───
+
+@app.post("/voice/vobiz/inbound")
+async def vobiz_inbound(request: Request):
+    """Vobiz inbound call → return <Stream> XML to start audio WebSocket."""
+    form = await request.form()
+    call_uuid = form.get("CallUUID", "")
+    caller = form.get("From", "unknown")
+    ws_url = settings.public_url.replace("https://", "wss://").replace("http://", "ws://")
+    ws_url = f"{ws_url}/voice/vobiz/ws"
+    provider = get_provider("vobiz")
+    xml = provider.get_twiml_or_response(ws_url, caller)
+    return Response(content=xml, media_type="application/xml")
+
+
+@app.post("/voice/vobiz/outbound")
+async def vobiz_outbound(request: Request):
+    """Vobiz outbound call answered → return <Stream> XML."""
+    form = await request.form()
+    called = form.get("To", "unknown")
+    ws_url = settings.public_url.replace("https://", "wss://").replace("http://", "ws://")
+    ws_url = f"{ws_url}/voice/vobiz/ws"
+    provider = get_provider("vobiz")
+    xml = provider.get_twiml_or_response(ws_url, called)
+    return Response(content=xml, media_type="application/xml")
+
+
+@app.post("/voice/vobiz/hangup")
+async def vobiz_hangup(request: Request):
+    """Vobiz hangup callback — log call end."""
+    form = await request.form()
+    call_uuid = form.get("CallUUID", "")
+    duration = form.get("Duration", "0")
+    hangup_cause = form.get("HangupCause", "NORMAL_CLEARING")
+    logger.info(f"[VOBIZ] Call ended: {call_uuid} | Duration: {duration}s | Cause: {hangup_cause}")
+    return Response(content="OK", status_code=200)
+
+
+@app.post("/voice/vobiz/ring")
+async def vobiz_ring(request: Request):
+    """Vobiz ring callback — outbound call is ringing."""
+    form = await request.form()
+    logger.info(f"[VOBIZ] Call ringing: {form.get('CallUUID', '')}")
+    return Response(content="OK", status_code=200)
+
+
+@app.post("/voice/vobiz/stream-status")
+async def vobiz_stream_status(request: Request):
+    """Vobiz stream status callback."""
+    form = await request.form()
+    logger.info(f"[VOBIZ] Stream event: {form.get('Event', '')} | Call: {form.get('CallUUID', '')}")
+    return Response(content="OK", status_code=200)
+
+
+@app.get("/api/vobiz/numbers")
+async def api_vobiz_numbers(auth: AuthContext = Depends(get_auth_context)):
+    """List available Vobiz DID numbers for purchase."""
+    if not settings.vobiz_auth_id:
+        return {"numbers": [], "error": "Vobiz not configured"}
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            f"https://api.vobiz.ai/api/v1/Account/{settings.vobiz_auth_id}/PhoneNumber/",
+            headers={
+                "X-Auth-ID": settings.vobiz_auth_id,
+                "X-Auth-Token": settings.vobiz_auth_token,
+            },
+            params={"country_iso": "IN", "type": "local"},
+        )
+        data = response.json()
+    return {"numbers": data.get("objects", [])}
+
+
 @app.post("/voice/{provider_name}/inbound")
 async def generic_inbound(provider_name: str):
     ws_url = settings.public_url.replace("https://", "wss://").replace("http://", "ws://")
@@ -344,6 +573,9 @@ async def voice_ws(websocket: WebSocket, provider_name: str):
             greeting_override=agent_config.greeting,
             language=agent_config.language,
             voice_id=agent_config.voice_id,
+            tenant_id=agent_config.tenant_id,
+            emotion_profile=agent_config.emotion_profile,
+            voice_gender=agent_config.voice_gender,
         )
 
         crm_context = await get_caller_context(call_info.caller_number)
@@ -373,10 +605,10 @@ async def browser_voice_test(websocket: WebSocket):
 
     agent_id = websocket.query_params.get("agent_id", "")
 
-    if not settings.groq_api_key and not settings.openai_api_key:
+    if not settings.groq_api_key:
         await websocket.accept()
         import json as _json
-        await websocket.send_text(_json.dumps({"event": "error", "message": "No LLM provider configured. Add GROQ_API_KEY or OPENAI_API_KEY to .env"}))
+        await websocket.send_text(_json.dumps({"event": "error", "message": "No LLM provider configured. Add GROQ_API_KEY to .env"}))
         await websocket.close()
         return
 
@@ -402,12 +634,20 @@ async def browser_voice_test(websocket: WebSocket):
             language=agent_config.language,
             voice_id=agent_config.voice_id,
             sample_rate=16000,
+            tenant_id=agent_config.tenant_id,
+            emotion_profile=agent_config.emotion_profile,
+            voice_gender=agent_config.voice_gender,
         )
 
         async def _send_transcript(role: str, text: str):
             await provider.send_event("transcript", {"role": role, "text": text})
 
         pipeline.on_transcript = _send_transcript
+
+        async def _send_latency(data: dict):
+            await provider.send_event("latency", data)
+
+        pipeline.on_latency = _send_latency
         active_calls[call_info.call_sid] = pipeline
         await pipeline.start()
 
@@ -424,8 +664,8 @@ async def browser_voice_test(websocket: WebSocket):
 
 # ─── Outbound Calls ───
 
-@app.post("/api/call", dependencies=[Depends(verify_api_key)])
-async def make_outbound_call(request: Request):
+@app.post("/api/call")
+async def make_outbound_call(request: Request, auth: AuthContext = Depends(get_auth_context)):
     body = await request.json()
     to_number = body.get("to_number")
     provider_name = body.get("provider", "twilio")
@@ -452,31 +692,38 @@ async def make_outbound_call(request: Request):
         return {"error": "Failed to initiate call. Check server logs for details."}
 
 
-@app.post("/api/call/{call_id}/hangup", dependencies=[Depends(verify_api_key)])
-async def hangup_call(call_id: str):
+@app.post("/api/call/{call_id}/hangup")
+async def hangup_call(call_id: str, auth: AuthContext = Depends(get_auth_context)):
     if not _valid_uuid(call_id):
         return {"error": "Invalid call ID format"}
     pipeline = active_calls.get(call_id)
     if not pipeline:
+        return {"error": "Call not found or already ended"}
+    if auth.tenant_id and getattr(pipeline.state, "tenant_id", "") != auth.tenant_id:
         return {"error": "Call not found or already ended"}
     await pipeline.stop()
     active_calls.pop(call_id, None)
     return {"status": "ended", "call_id": call_id}
 
 
-@app.get("/api/call/{call_id}/status", dependencies=[Depends(verify_api_key)])
-async def call_status(call_id: str):
+@app.get("/api/call/{call_id}/status")
+async def call_status(call_id: str, auth: AuthContext = Depends(get_auth_context)):
     if not _valid_uuid(call_id):
         return {"error": "Invalid call ID format"}
     pipeline = active_calls.get(call_id)
     if pipeline:
+        if auth.tenant_id and getattr(pipeline.state, "tenant_id", "") != auth.tenant_id:
+            return {"error": "Call not found"}
         return {
             "call_id": call_id,
             "status": "active",
             "duration": int(time.time() - pipeline.state.started_at),
             "turns": len(pipeline.state.transcript),
         }
-    calls = await db.select("calls", {"id": call_id})
+    match = {"id": call_id}
+    if auth.tenant_id:
+        match["tenant_id"] = auth.tenant_id
+    calls = await db.select("calls", match)
     if calls:
         return calls[0]
     return {"error": "Call not found"}
@@ -484,15 +731,18 @@ async def call_status(call_id: str):
 
 # ─── Calls API ───
 
-@app.get("/api/calls", dependencies=[Depends(verify_api_key)])
+@app.get("/api/calls")
 async def list_calls(
     direction: str | None = None,
     status: str | None = None,
     caller: str | None = None,
     limit: int = 50,
     offset: int = 0,
+    auth: AuthContext = Depends(get_auth_context),
 ):
     match = {}
+    if auth.tenant_id:
+        match["tenant_id"] = auth.tenant_id
     if direction:
         match["direction"] = direction
     if status:
@@ -504,11 +754,14 @@ async def list_calls(
     return {"calls": calls, "count": len(calls)}
 
 
-@app.get("/api/calls/{call_id}", dependencies=[Depends(verify_api_key)])
-async def get_call(call_id: str):
+@app.get("/api/calls/{call_id}")
+async def get_call(call_id: str, auth: AuthContext = Depends(get_auth_context)):
     if not _valid_uuid(call_id):
         return {"error": "Invalid call ID format"}
-    calls = await db.select("calls", {"id": call_id})
+    match = {"id": call_id}
+    if auth.tenant_id:
+        match["tenant_id"] = auth.tenant_id
+    calls = await db.select("calls", match)
     if not calls:
         return {"error": "Call not found"}
     return calls[0]
@@ -516,9 +769,12 @@ async def get_call(call_id: str):
 
 # ─── Contacts API ───
 
-@app.get("/api/contacts", dependencies=[Depends(verify_api_key)])
-async def list_contacts(limit: int = 50, search: str | None = None):
-    contacts = await db.select("contacts", order="last_call_at.desc.nullslast", limit=limit)
+@app.get("/api/contacts")
+async def list_contacts(limit: int = 50, search: str | None = None, auth: AuthContext = Depends(get_auth_context)):
+    match = {}
+    if auth.tenant_id:
+        match["tenant_id"] = auth.tenant_id
+    contacts = await db.select("contacts", match or None, order="last_call_at.desc.nullslast", limit=limit)
     if search:
         search_lower = search.lower()
         contacts = [c for c in contacts if
@@ -528,11 +784,14 @@ async def list_contacts(limit: int = 50, search: str | None = None):
     return {"contacts": contacts, "count": len(contacts)}
 
 
-@app.get("/api/contacts/{contact_id}", dependencies=[Depends(verify_api_key)])
-async def get_contact(contact_id: str):
+@app.get("/api/contacts/{contact_id}")
+async def get_contact(contact_id: str, auth: AuthContext = Depends(get_auth_context)):
     if not _valid_uuid(contact_id):
         return {"error": "Invalid contact ID format"}
-    contacts = await db.select("contacts", {"id": contact_id})
+    match = {"id": contact_id}
+    if auth.tenant_id:
+        match["tenant_id"] = auth.tenant_id
+    contacts = await db.select("contacts", match)
     if not contacts:
         return {"error": "Contact not found"}
     contact = contacts[0]
@@ -542,8 +801,8 @@ async def get_contact(contact_id: str):
     return contact
 
 
-@app.patch("/api/contacts/{contact_id}", dependencies=[Depends(verify_api_key)])
-async def update_contact(contact_id: str, request: Request):
+@app.patch("/api/contacts/{contact_id}")
+async def update_contact(contact_id: str, request: Request, auth: AuthContext = Depends(get_auth_context)):
     if not _valid_uuid(contact_id):
         return {"error": "Invalid contact ID format"}
     body = await request.json()
@@ -551,52 +810,67 @@ async def update_contact(contact_id: str, request: Request):
     updates = {k: v for k, v in body.items() if k in allowed}
     if not updates:
         return {"error": "No valid fields to update"}
-    result = await db.update("contacts", {"id": contact_id}, updates)
+    match = {"id": contact_id}
+    if auth.tenant_id:
+        match["tenant_id"] = auth.tenant_id
+    result = await db.update("contacts", match, updates)
     return result or {"error": "Contact not found"}
 
 
 # ─── Webhooks API ───
 
-@app.post("/api/webhooks", dependencies=[Depends(verify_api_key)])
-async def create_webhook(request: Request):
+@app.post("/api/webhooks")
+async def create_webhook(request: Request, auth: AuthContext = Depends(get_auth_context)):
     body = await request.json()
     url = body.get("url")
     events = body.get("events", ["call.completed"])
     if not url:
         return {"error": "url is required"}
-    result = await db.insert("webhook_endpoints", {
+    data = {
         "url": url,
         "events": events,
         "secret": body.get("secret", settings.webhook_secret),
         "is_active": True,
-    })
+    }
+    if auth.tenant_id:
+        data["tenant_id"] = auth.tenant_id
+    result = await db.insert("webhook_endpoints", data)
     return result or {"error": "Failed to create webhook"}
 
 
-@app.get("/api/webhooks", dependencies=[Depends(verify_api_key)])
-async def list_webhooks():
-    webhooks = await db.select("webhook_endpoints")
+@app.get("/api/webhooks")
+async def list_webhooks(auth: AuthContext = Depends(get_auth_context)):
+    match = {}
+    if auth.tenant_id:
+        match["tenant_id"] = auth.tenant_id
+    webhooks = await db.select("webhook_endpoints", match or None)
     return {"webhooks": webhooks}
 
 
-@app.delete("/api/webhooks/{webhook_id}", dependencies=[Depends(verify_api_key)])
-async def delete_webhook(webhook_id: str):
+@app.delete("/api/webhooks/{webhook_id}")
+async def delete_webhook(webhook_id: str, auth: AuthContext = Depends(get_auth_context)):
     if not _valid_uuid(webhook_id):
         return {"error": "Invalid webhook ID format"}
-    await db.update("webhook_endpoints", {"id": webhook_id}, {"is_active": False})
+    match = {"id": webhook_id}
+    if auth.tenant_id:
+        match["tenant_id"] = auth.tenant_id
+    await db.update("webhook_endpoints", match, {"is_active": False})
     return {"status": "deleted", "id": webhook_id}
 
 
 # ─── Stats API ───
 
-@app.get("/api/stats", dependencies=[Depends(verify_api_key)])
-async def get_stats():
+@app.get("/api/stats")
+async def get_stats(auth: AuthContext = Depends(get_auth_context)):
     from datetime import date
 
     today_iso = date.today().isoformat()
+    match = {"created_at": f"gte.{today_iso}T00:00:00"}
+    if auth.tenant_id:
+        match["tenant_id"] = auth.tenant_id
     today_calls = await db.select(
         "calls",
-        {"created_at": f"gte.{today_iso}T00:00:00"},
+        match,
         order="created_at.desc",
         limit=500,
     )
@@ -607,7 +881,10 @@ async def get_stats():
     durations = [c.get("duration_seconds", 0) for c in today_calls if c.get("duration_seconds")]
     avg_duration = sum(durations) / len(durations) if durations else 0
 
-    all_time_count = await db.count("calls")
+    count_match = {}
+    if auth.tenant_id:
+        count_match["tenant_id"] = auth.tenant_id
+    all_time_count = await db.count("calls", count_match or None)
 
     return {
         "today": {
@@ -625,14 +902,16 @@ async def get_stats():
 
 # ─── Agents API ───
 
-@app.get("/api/agents", dependencies=[Depends(verify_api_key)])
-async def api_list_agents():
+@app.get("/api/agents")
+async def api_list_agents(auth: AuthContext = Depends(get_auth_context)):
     agents = await list_agents()
+    if auth.tenant_id:
+        agents = [a for a in agents if a.get("tenant_id") == auth.tenant_id]
     return {"agents": agents}
 
 
-@app.post("/api/agents", dependencies=[Depends(verify_api_key)])
-async def api_create_agent(request: Request):
+@app.post("/api/agents")
+async def api_create_agent(request: Request, auth: AuthContext = Depends(get_auth_context)):
     body = await request.json()
     name = body.get("name")
     instructions = body.get("instructions")
@@ -650,7 +929,7 @@ async def api_create_agent(request: Request):
         "guardrails": body.get("guardrails", {}),
         "llm_provider": body.get("llm_provider", "groq"),
         "llm_model": body.get("llm_model", "llama-3.3-70b-versatile"),
-        "tts_provider": body.get("tts_provider", "cartesia"),
+        "tts_provider": body.get("tts_provider", "smallest"),
         "temperature": body.get("temperature", 0.7),
         "tools_enabled": body.get("tools_enabled", []),
         "max_call_duration": body.get("max_call_duration", 600),
@@ -659,22 +938,31 @@ async def api_create_agent(request: Request):
         "enable_emotion": body.get("enable_emotion", True),
         "enable_language_switch": body.get("enable_language_switch", True),
         "enable_rag": body.get("enable_rag", False),
+        "emotion_profile": body.get("emotion_profile", "friendly"),
+        "voice_gender": body.get("voice_gender", "female"),
     }
+    if auth.tenant_id:
+        agent_data["tenant_id"] = auth.tenant_id
     result = await create_agent(agent_data)
     if not result:
         return JSONResponse({"error": "Failed to create agent"}, status_code=500)
     return result
 
 
-@app.patch("/api/agents/{agent_id}", dependencies=[Depends(verify_api_key)])
-async def api_update_agent(agent_id: str, request: Request):
+@app.patch("/api/agents/{agent_id}")
+async def api_update_agent(agent_id: str, request: Request, auth: AuthContext = Depends(get_auth_context)):
     if not _valid_uuid(agent_id):
         return {"error": "Invalid agent ID format"}
+    if auth.tenant_id:
+        agents = await db.select("agents", {"id": agent_id, "tenant_id": auth.tenant_id})
+        if not agents:
+            return {"error": "Agent not found"}
     body = await request.json()
     allowed = {"name", "instructions", "voice_id", "language", "phone_numbers", "is_active", "metadata",
                "greeting", "guardrails", "llm_provider", "llm_model", "tts_provider", "tts_voice_name",
                "max_call_duration", "enable_memory", "enable_prediction", "enable_emotion",
-               "enable_language_switch", "enable_rag", "temperature", "tools_enabled"}
+               "enable_language_switch", "enable_rag", "temperature", "tools_enabled",
+               "emotion_profile", "voice_gender"}
     updates = {k: v for k, v in body.items() if k in allowed}
     result = await update_agent(agent_id, updates)
     return result or {"error": "Agent not found"}
@@ -682,54 +970,69 @@ async def api_update_agent(agent_id: str, request: Request):
 
 # ─── Campaigns API ───
 
-@app.get("/api/campaigns", dependencies=[Depends(verify_api_key)])
-async def api_list_campaigns():
+@app.get("/api/campaigns")
+async def api_list_campaigns(auth: AuthContext = Depends(get_auth_context)):
     campaigns = await list_campaigns()
+    if auth.tenant_id:
+        campaigns = [c for c in campaigns if c.get("tenant_id") == auth.tenant_id]
     return {"campaigns": campaigns}
 
 
-@app.get("/api/campaigns/{campaign_id}", dependencies=[Depends(verify_api_key)])
-async def api_get_campaign(campaign_id: str):
+@app.get("/api/campaigns/{campaign_id}")
+async def api_get_campaign(campaign_id: str, auth: AuthContext = Depends(get_auth_context)):
     if not _valid_uuid(campaign_id):
         return {"error": "Invalid campaign ID format"}
     campaign = await get_campaign(campaign_id)
     if not campaign:
         return {"error": "Campaign not found"}
+    if auth.tenant_id and campaign.get("tenant_id") != auth.tenant_id:
+        return {"error": "Campaign not found"}
     return campaign
 
 
-@app.post("/api/campaigns", dependencies=[Depends(verify_api_key)])
-async def api_create_campaign(request: Request):
+@app.post("/api/campaigns")
+async def api_create_campaign(request: Request, auth: AuthContext = Depends(get_auth_context)):
     body = await request.json()
     name = body.get("name")
     phone_numbers = body.get("phone_numbers", [])
     if not name or not phone_numbers:
         return {"error": "name and phone_numbers are required"}
-    result = await create_campaign(
+    campaign_data = dict(
         name=name,
         agent_id=body.get("agent_id"),
         phone_numbers=phone_numbers,
         max_concurrent=body.get("max_concurrent", 1),
     )
+    if auth.tenant_id:
+        campaign_data["tenant_id"] = auth.tenant_id
+    result = await create_campaign(**campaign_data)
     return result or {"error": "Failed to create campaign"}
 
 
-@app.post("/api/campaigns/{campaign_id}/start", dependencies=[Depends(verify_api_key)])
-async def api_start_campaign(campaign_id: str):
+@app.post("/api/campaigns/{campaign_id}/start")
+async def api_start_campaign(campaign_id: str, auth: AuthContext = Depends(get_auth_context)):
     if not _valid_uuid(campaign_id):
         return {"error": "Invalid campaign ID format"}
+    if auth.tenant_id:
+        campaign = await get_campaign(campaign_id)
+        if not campaign or campaign.get("tenant_id") != auth.tenant_id:
+            return {"error": "Campaign not found"}
     return await start_campaign(campaign_id)
 
 
-@app.post("/api/campaigns/{campaign_id}/pause", dependencies=[Depends(verify_api_key)])
-async def api_pause_campaign(campaign_id: str):
+@app.post("/api/campaigns/{campaign_id}/pause")
+async def api_pause_campaign(campaign_id: str, auth: AuthContext = Depends(get_auth_context)):
     if not _valid_uuid(campaign_id):
         return {"error": "Invalid campaign ID format"}
+    if auth.tenant_id:
+        campaign = await get_campaign(campaign_id)
+        if not campaign or campaign.get("tenant_id") != auth.tenant_id:
+            return {"error": "Campaign not found"}
     return await pause_campaign(campaign_id)
 
 
-@app.post("/api/campaigns/upload", dependencies=[Depends(verify_api_key)])
-async def api_upload_campaign(request: Request):
+@app.post("/api/campaigns/upload")
+async def api_upload_campaign(request: Request, auth: AuthContext = Depends(get_auth_context)):
     form = await request.form()
     name = form.get("name", "Uploaded Campaign")
     agent_id = form.get("agent_id")
@@ -742,13 +1045,16 @@ async def api_upload_campaign(request: Request):
     numbers = parse_csv(content)
     if not numbers:
         return {"error": "No valid phone numbers found in CSV"}
-    result = await create_campaign(
+    campaign_kwargs = dict(
         name=name,
         agent_id=agent_id,
         phone_numbers=numbers,
         max_concurrent=int(form.get("max_concurrent", "1")),
         provider=form.get("provider", "twilio"),
     )
+    if auth.tenant_id:
+        campaign_kwargs["tenant_id"] = auth.tenant_id
+    result = await create_campaign(**campaign_kwargs)
     return result or {"error": "Failed to create campaign"}
 
 
@@ -785,15 +1091,15 @@ async def recording_status(request: Request):
 
 # ─── DNC List API ───
 
-@app.get("/api/dnc", dependencies=[Depends(verify_api_key)])
-async def list_dnc():
+@app.get("/api/dnc")
+async def list_dnc(auth: AuthContext = Depends(get_auth_context)):
     from cogniflow_home.campaigns.dnc import get_list
     numbers = await get_list()
     return {"dnc_list": numbers, "count": len(numbers)}
 
 
-@app.post("/api/dnc", dependencies=[Depends(verify_api_key)])
-async def add_dnc(request: Request):
+@app.post("/api/dnc")
+async def add_dnc(request: Request, auth: AuthContext = Depends(get_auth_context)):
     from cogniflow_home.campaigns.dnc import add_number
     body = await request.json()
     phone = body.get("phone_number")
@@ -803,8 +1109,8 @@ async def add_dnc(request: Request):
     return result or {"error": "Failed to add to DNC list"}
 
 
-@app.delete("/api/dnc/{phone_number}", dependencies=[Depends(verify_api_key)])
-async def remove_dnc(phone_number: str):
+@app.delete("/api/dnc/{phone_number}")
+async def remove_dnc(phone_number: str, auth: AuthContext = Depends(get_auth_context)):
     from cogniflow_home.campaigns.dnc import remove_number
     await remove_number(phone_number)
     return {"status": "removed"}
@@ -812,8 +1118,8 @@ async def remove_dnc(phone_number: str):
 
 # ─── Contact Import ───
 
-@app.post("/api/contacts/import", dependencies=[Depends(verify_api_key)])
-async def import_contacts(request: Request):
+@app.post("/api/contacts/import")
+async def import_contacts(request: Request, auth: AuthContext = Depends(get_auth_context)):
     import csv, io
     form = await request.form()
     file = form.get("file")
@@ -831,12 +1137,15 @@ async def import_contacts(request: Request):
             continue
         if not phone.startswith("+"):
             phone = f"+{phone}"
-        result = await db.upsert("contacts", {
+        contact_data = {
             "phone_number": phone,
             "name": (row.get("name") or "").strip() or None,
             "email": (row.get("email") or "").strip() or None,
             "company": (row.get("company") or "").strip() or None,
-        })
+        }
+        if auth.tenant_id:
+            contact_data["tenant_id"] = auth.tenant_id
+        result = await db.upsert("contacts", contact_data)
         if result:
             imported += 1
         else:
@@ -846,14 +1155,14 @@ async def import_contacts(request: Request):
 
 # ─── Revenue Attribution API ───
 
-@app.get("/api/revenue", dependencies=[Depends(verify_api_key)])
-async def api_revenue_summary(period_days: int = 30):
+@app.get("/api/revenue")
+async def api_revenue_summary(period_days: int = 30, auth: AuthContext = Depends(get_auth_context)):
     from cogniflow_home.revenue.tracker import get_revenue_summary
     return await get_revenue_summary(period_days)
 
 
-@app.post("/api/revenue/deal-closed", dependencies=[Depends(verify_api_key)])
-async def api_deal_closed(request: Request):
+@app.post("/api/revenue/deal-closed")
+async def api_deal_closed(request: Request, auth: AuthContext = Depends(get_auth_context)):
     from cogniflow_home.revenue.tracker import handle_deal_closed
     body = await request.json()
     deal_id = body.get("deal_id")
@@ -867,8 +1176,8 @@ async def api_deal_closed(request: Request):
 
 # ─── Agent Cloning API ───
 
-@app.post("/api/agents/clone", dependencies=[Depends(verify_api_key)])
-async def api_clone_agent(request: Request):
+@app.post("/api/agents/clone")
+async def api_clone_agent(request: Request, auth: AuthContext = Depends(get_auth_context)):
     from cogniflow_home.cloning.cloner import AgentCloner
     body = await request.json()
     recording_urls = body.get("recording_urls", [])
@@ -878,12 +1187,15 @@ async def api_clone_agent(request: Request):
     cloner = AgentCloner()
     try:
         system_prompt = await cloner.clone_from_recordings(recording_urls, agent_name)
-        result = await create_agent({
+        agent_data = {
             "name": agent_name,
             "instructions": system_prompt,
             "is_active": True,
             "metadata": {"cloned": True, "source_recordings": len(recording_urls)},
-        })
+        }
+        if auth.tenant_id:
+            agent_data["tenant_id"] = auth.tenant_id
+        result = await create_agent(agent_data)
         return result or {"error": "Failed to save cloned agent"}
     except Exception:
         logger.exception("Agent cloning failed")
@@ -894,10 +1206,14 @@ async def api_clone_agent(request: Request):
 
 # ─── Knowledge Base API ───
 
-@app.post("/api/agents/{agent_id}/knowledge", dependencies=[Depends(verify_api_key)])
-async def upload_knowledge(agent_id: str, request: Request):
+@app.post("/api/agents/{agent_id}/knowledge")
+async def upload_knowledge(agent_id: str, request: Request, auth: AuthContext = Depends(get_auth_context)):
     if not _valid_uuid(agent_id):
         return {"error": "Invalid agent ID format"}
+    if auth.tenant_id:
+        agents = await db.select("agents", {"id": agent_id})
+        if not agents or agents[0].get("tenant_id") != auth.tenant_id:
+            return {"error": "Agent not found"}
     from cogniflow_home.knowledge.base import kb
     form = await request.form()
     file = form.get("file")
@@ -910,20 +1226,28 @@ async def upload_knowledge(agent_id: str, request: Request):
     return {"status": "ingested", "source": file.filename}
 
 
-@app.post("/api/agents/{agent_id}/knowledge/query", dependencies=[Depends(verify_api_key)])
-async def query_knowledge(agent_id: str, request: Request):
+@app.post("/api/agents/{agent_id}/knowledge/query")
+async def query_knowledge(agent_id: str, request: Request, auth: AuthContext = Depends(get_auth_context)):
     if not _valid_uuid(agent_id):
         return {"error": "Invalid agent ID format"}
+    if auth.tenant_id:
+        agents = await db.select("agents", {"id": agent_id})
+        if not agents or agents[0].get("tenant_id") != auth.tenant_id:
+            return {"error": "Agent not found"}
     from cogniflow_home.knowledge.base import kb
     body = await request.json()
     results = await kb.query(agent_id, body.get("question", ""))
     return {"results": results}
 
 
-@app.delete("/api/agents/{agent_id}/knowledge/{source}", dependencies=[Depends(verify_api_key)])
-async def delete_knowledge(agent_id: str, source: str):
+@app.delete("/api/agents/{agent_id}/knowledge/{source}")
+async def delete_knowledge(agent_id: str, source: str, auth: AuthContext = Depends(get_auth_context)):
     if not _valid_uuid(agent_id):
         return {"error": "Invalid agent ID format"}
+    if auth.tenant_id:
+        agents = await db.select("agents", {"id": agent_id})
+        if not agents or agents[0].get("tenant_id") != auth.tenant_id:
+            return {"error": "Agent not found"}
     from cogniflow_home.knowledge.base import kb
     await kb.delete_source(agent_id, source)
     return {"status": "deleted"}
@@ -931,10 +1255,14 @@ async def delete_knowledge(agent_id: str, source: str):
 
 # ─── A/B Testing API ───
 
-@app.post("/api/campaigns/{campaign_id}/ab-test", dependencies=[Depends(verify_api_key)])
-async def create_ab_test(campaign_id: str, request: Request):
+@app.post("/api/campaigns/{campaign_id}/ab-test")
+async def create_ab_test(campaign_id: str, request: Request, auth: AuthContext = Depends(get_auth_context)):
     if not _valid_uuid(campaign_id):
         return {"error": "Invalid campaign ID format"}
+    if auth.tenant_id:
+        campaign = await get_campaign(campaign_id)
+        if not campaign or campaign.get("tenant_id") != auth.tenant_id:
+            return {"error": "Campaign not found"}
     from cogniflow_home.campaigns.ab_test import ab_test_manager
     body = await request.json()
     variants = body.get("variants", [])
@@ -944,18 +1272,22 @@ async def create_ab_test(campaign_id: str, request: Request):
     return result
 
 
-@app.get("/api/campaigns/{campaign_id}/ab-test/results", dependencies=[Depends(verify_api_key)])
-async def get_ab_test_results(campaign_id: str):
+@app.get("/api/campaigns/{campaign_id}/ab-test/results")
+async def get_ab_test_results(campaign_id: str, auth: AuthContext = Depends(get_auth_context)):
     if not _valid_uuid(campaign_id):
         return {"error": "Invalid campaign ID format"}
+    if auth.tenant_id:
+        campaign = await get_campaign(campaign_id)
+        if not campaign or campaign.get("tenant_id") != auth.tenant_id:
+            return {"error": "Campaign not found"}
     from cogniflow_home.campaigns.ab_test import ab_test_manager
     return await ab_test_manager.get_results(campaign_id)
 
 
 # ─── Latency Measurement ───
 
-@app.get("/api/latency", dependencies=[Depends(verify_api_key)])
-async def api_measure_latency():
+@app.get("/api/latency")
+async def api_measure_latency(auth: AuthContext = Depends(get_auth_context)):
     from cogniflow_home.latency.measure import measure_service_latency
     results = await measure_service_latency()
     return {"latency_ms": results}
@@ -963,10 +1295,14 @@ async def api_measure_latency():
 
 # ─── Compliance Events ───
 
-@app.get("/api/compliance/events", dependencies=[Depends(verify_api_key)])
-async def api_compliance_events(call_id: str | None = None):
-    calls = await db.select("calls", {"id": call_id} if call_id else None,
-                            order="created_at.desc", limit=50)
+@app.get("/api/compliance/events")
+async def api_compliance_events(call_id: str | None = None, auth: AuthContext = Depends(get_auth_context)):
+    match = {}
+    if call_id:
+        match["id"] = call_id
+    if auth.tenant_id:
+        match["tenant_id"] = auth.tenant_id
+    calls = await db.select("calls", match or None, order="created_at.desc", limit=50)
     events = []
     for call in calls:
         meta = call.get("metadata", {})
@@ -979,15 +1315,18 @@ async def api_compliance_events(call_id: str | None = None):
 
 # ─── Contacts CRUD ───
 
-@app.post("/api/contacts", dependencies=[Depends(verify_api_key)])
-async def create_contact(request: Request):
+@app.post("/api/contacts")
+async def create_contact(request: Request, auth: AuthContext = Depends(get_auth_context)):
     body = await request.json()
     phone = body.get("phone_number", "").strip()
     if not phone:
         return {"error": "phone_number is required"}
     if not phone.startswith("+"):
         phone = f"+{phone}"
-    existing = await db.select("contacts", {"phone_number": phone})
+    match = {"phone_number": phone}
+    if auth.tenant_id:
+        match["tenant_id"] = auth.tenant_id
+    existing = await db.select("contacts", match)
     if existing:
         return {"error": "Contact with this phone number already exists", "existing": existing[0]}
     contact = {
@@ -998,12 +1337,14 @@ async def create_contact(request: Request):
         "notes": body.get("notes", ""),
         "tags": body.get("tags", []),
     }
+    if auth.tenant_id:
+        contact["tenant_id"] = auth.tenant_id
     result = await db.insert("contacts", contact)
     return result or {"error": "Failed to create contact"}
 
 
-@app.post("/api/contacts/import-mapped", dependencies=[Depends(verify_api_key)])
-async def import_contacts_mapped(request: Request):
+@app.post("/api/contacts/import-mapped")
+async def import_contacts_mapped(request: Request, auth: AuthContext = Depends(get_auth_context)):
     body = await request.json()
     contacts_data = body.get("contacts", [])
     if not contacts_data:
@@ -1016,54 +1357,73 @@ async def import_contacts_mapped(request: Request):
             continue
         if not phone.startswith("+"):
             phone = f"+{phone}"
-        existing = await db.select("contacts", {"phone_number": phone})
+        dup_match = {"phone_number": phone}
+        if auth.tenant_id:
+            dup_match["tenant_id"] = auth.tenant_id
+        existing = await db.select("contacts", dup_match)
         if existing:
             duplicates += 1
             continue
-        await db.insert("contacts", {
+        contact_row = {
             "phone_number": phone,
             "name": (row.get("name") or "").strip(),
             "email": (row.get("email") or "").strip(),
             "company": (row.get("company") or "").strip(),
             "tags": row.get("tags", []),
             "notes": row.get("notes", ""),
-        })
+        }
+        if auth.tenant_id:
+            contact_row["tenant_id"] = auth.tenant_id
+        await db.insert("contacts", contact_row)
         imported += 1
     return {"imported": imported, "duplicates": duplicates, "total": len(contacts_data)}
 
 
-@app.delete("/api/contacts/{contact_id}", dependencies=[Depends(verify_api_key)])
-async def delete_contact(contact_id: str):
+@app.delete("/api/contacts/{contact_id}")
+async def delete_contact(contact_id: str, auth: AuthContext = Depends(get_auth_context)):
     if not _valid_uuid(contact_id):
         return {"error": "Invalid contact ID format"}
-    result = await db.delete("contacts", {"id": contact_id})
+    match = {"id": contact_id}
+    if auth.tenant_id:
+        match["tenant_id"] = auth.tenant_id
+    result = await db.delete("contacts", match)
     return {"status": "deleted"} if result else {"error": "Contact not found"}
 
 
 # ─── Agent Details & Performance ───
 
-@app.get("/api/agents/{agent_id}", dependencies=[Depends(verify_api_key)])
-async def api_get_agent(agent_id: str):
+@app.get("/api/agents/{agent_id}")
+async def api_get_agent(agent_id: str, auth: AuthContext = Depends(get_auth_context)):
     if not _valid_uuid(agent_id):
         return {"error": "Invalid agent ID format"}
-    agents = await db.select("agents", {"id": agent_id})
+    match = {"id": agent_id}
+    if auth.tenant_id:
+        match["tenant_id"] = auth.tenant_id
+    agents = await db.select("agents", match)
     if not agents:
         return {"error": "Agent not found"}
     return agents[0]
 
 
-@app.delete("/api/agents/{agent_id}", dependencies=[Depends(verify_api_key)])
-async def api_delete_agent(agent_id: str):
+@app.delete("/api/agents/{agent_id}")
+async def api_delete_agent(agent_id: str, auth: AuthContext = Depends(get_auth_context)):
     if not _valid_uuid(agent_id):
         return {"error": "Invalid agent ID format"}
-    result = await db.delete("agents", {"id": agent_id})
+    match = {"id": agent_id}
+    if auth.tenant_id:
+        match["tenant_id"] = auth.tenant_id
+    result = await db.delete("agents", match)
     return {"status": "deleted"} if result else {"error": "Agent not found"}
 
 
-@app.get("/api/agents/{agent_id}/performance", dependencies=[Depends(verify_api_key)])
-async def api_agent_performance(agent_id: str):
+@app.get("/api/agents/{agent_id}/performance")
+async def api_agent_performance(agent_id: str, auth: AuthContext = Depends(get_auth_context)):
     if not _valid_uuid(agent_id):
         return {"error": "Invalid agent ID format"}
+    if auth.tenant_id:
+        agent_rows = await db.select("agents", {"id": agent_id, "tenant_id": auth.tenant_id})
+        if not agent_rows:
+            return {"error": "Agent not found"}
     calls = await db.select("calls", {"agent_id": agent_id}, order="created_at.desc", limit=200)
     total = len(calls)
     if total == 0:
@@ -1084,11 +1444,14 @@ async def api_agent_performance(agent_id: str):
     }
 
 
-@app.post("/api/agents/{agent_id}/test-chat", dependencies=[Depends(verify_api_key)])
-async def api_test_agent_chat(agent_id: str, request: Request):
+@app.post("/api/agents/{agent_id}/test-chat")
+async def api_test_agent_chat(agent_id: str, request: Request, auth: AuthContext = Depends(get_auth_context)):
     if not _valid_uuid(agent_id):
         return JSONResponse({"error": "Invalid agent ID format"}, status_code=400)
-    agents = await db.select("agents", {"id": agent_id})
+    match = {"id": agent_id}
+    if auth.tenant_id:
+        match["tenant_id"] = auth.tenant_id
+    agents = await db.select("agents", match)
     if not agents:
         return JSONResponse({"error": "Agent not found"}, status_code=404)
     agent = agents[0]
@@ -1105,24 +1468,17 @@ async def api_test_agent_chat(agent_id: str, request: Request):
     if greeting:
         system_prompt += f"\n\nYour greeting when starting a conversation: {greeting}"
 
-    provider = agent.get("llm_provider", "openai")
-    model = agent.get("llm_model", "gpt-4o-mini")
+    model = agent.get("llm_model", "llama-3.3-70b-versatile")
     temperature = agent.get("temperature", 0.7)
 
     try:
         from openai import AsyncOpenAI
-        if provider == "groq" and settings.groq_api_key:
-            client = AsyncOpenAI(
-                api_key=settings.groq_api_key,
-                base_url="https://api.groq.com/openai/v1",
-            )
-        elif settings.openai_api_key:
-            client = AsyncOpenAI(api_key=settings.openai_api_key)
-            if provider == "groq":
-                model = "gpt-4o-mini"
-                provider = "openai"
-        else:
-            return JSONResponse({"error": "No LLM provider configured"}, status_code=500)
+        if not settings.groq_api_key:
+            return JSONResponse({"error": "No LLM provider configured. Add GROQ_API_KEY to .env"}, status_code=500)
+        client = AsyncOpenAI(
+            api_key=settings.groq_api_key,
+            base_url="https://api.groq.com/openai/v1",
+        )
 
         resp = await client.chat.completions.create(
             model=model,
@@ -1131,7 +1487,7 @@ async def api_test_agent_chat(agent_id: str, request: Request):
             max_tokens=500,
         )
         reply = resp.choices[0].message.content
-        return {"reply": reply, "model": model, "provider": provider}
+        return {"reply": reply, "model": model, "provider": "groq"}
     except Exception as e:
         logger.error(f"Test chat error: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
@@ -1139,8 +1495,8 @@ async def api_test_agent_chat(agent_id: str, request: Request):
 
 # ─── Integrations ───
 
-@app.get("/api/integrations", dependencies=[Depends(verify_api_key)])
-async def api_list_integrations():
+@app.get("/api/integrations")
+async def api_list_integrations(auth: AuthContext = Depends(get_auth_context)):
     integrations = await db.select("integrations", order="created_at.desc")
     if not integrations:
         defaults = [
@@ -1155,8 +1511,8 @@ async def api_list_integrations():
     return {"integrations": integrations}
 
 
-@app.patch("/api/integrations/{integration_id}", dependencies=[Depends(verify_api_key)])
-async def api_update_integration(integration_id: str, request: Request):
+@app.patch("/api/integrations/{integration_id}")
+async def api_update_integration(integration_id: str, request: Request, auth: AuthContext = Depends(get_auth_context)):
     body = await request.json()
     if _valid_uuid(integration_id):
         result = await db.update("integrations", {"id": integration_id}, body)
@@ -1170,8 +1526,8 @@ async def api_update_integration(integration_id: str, request: Request):
     return result or {"error": "Failed to update integration"}
 
 
-@app.post("/api/integrations/{integration_id}/test", dependencies=[Depends(verify_api_key)])
-async def api_test_integration(integration_id: str):
+@app.post("/api/integrations/{integration_id}/test")
+async def api_test_integration(integration_id: str, auth: AuthContext = Depends(get_auth_context)):
     checks = {
         "hubspot": lambda: bool(settings.hubspot_api_key),
         "salesforce": lambda: bool(settings.salesforce_client_id),
@@ -1191,11 +1547,14 @@ async def api_test_integration(integration_id: str):
 
 # ─── Analytics Trends & Agent Comparison ───
 
-@app.get("/api/analytics/trends", dependencies=[Depends(verify_api_key)])
-async def api_analytics_trends(days: int = 30):
+@app.get("/api/analytics/trends")
+async def api_analytics_trends(days: int = 30, auth: AuthContext = Depends(get_auth_context)):
     from datetime import datetime, timedelta, timezone
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-    calls = await db.select("calls", {"created_at": f"gte.{cutoff}"}, order="created_at.asc", limit=5000)
+    match = {"created_at": f"gte.{cutoff}"}
+    if auth.tenant_id:
+        match["tenant_id"] = auth.tenant_id
+    calls = await db.select("calls", match, order="created_at.asc", limit=5000)
     daily = {}
     for c in calls:
         day = (c.get("created_at") or "")[:10]
@@ -1228,11 +1587,13 @@ async def api_analytics_trends(days: int = 30):
     return {"trends": trends}
 
 
-@app.get("/api/analytics/agents", dependencies=[Depends(verify_api_key)])
-async def api_analytics_agents(days: int = 30):
+@app.get("/api/analytics/agents")
+async def api_analytics_agents(days: int = 30, auth: AuthContext = Depends(get_auth_context)):
     from cogniflow_home.agents import list_agents
 
     agents = await list_agents()
+    if auth.tenant_id:
+        agents = [a for a in agents if a.get("tenant_id") == auth.tenant_id]
     if not agents:
         return {"agents": []}
 
@@ -1289,10 +1650,14 @@ async def api_analytics_agents(days: int = 30):
 
 # ─── Campaign Analytics ───
 
-@app.get("/api/campaigns/{campaign_id}/analytics", dependencies=[Depends(verify_api_key)])
-async def api_campaign_analytics(campaign_id: str):
+@app.get("/api/campaigns/{campaign_id}/analytics")
+async def api_campaign_analytics(campaign_id: str, auth: AuthContext = Depends(get_auth_context)):
     if not _valid_uuid(campaign_id):
         return {"error": "Invalid campaign ID format"}
+    if auth.tenant_id:
+        campaign = await get_campaign(campaign_id)
+        if not campaign or campaign.get("tenant_id") != auth.tenant_id:
+            return {"error": "Campaign not found"}
     calls = await db.select("calls", {"campaign_id": campaign_id}, limit=2000)
     total = len(calls)
     if total == 0:
@@ -1320,14 +1685,14 @@ async def api_campaign_analytics(campaign_id: str):
 
 # ─── Templates ───
 
-@app.get("/api/templates", dependencies=[Depends(verify_api_key)])
-async def api_list_templates():
+@app.get("/api/templates")
+async def api_list_templates(auth: AuthContext = Depends(get_auth_context)):
     from cogniflow_home.templates.registry import list_templates
     return {"templates": list_templates()}
 
 
-@app.get("/api/templates/{template_id}", dependencies=[Depends(verify_api_key)])
-async def api_get_template(template_id: str):
+@app.get("/api/templates/{template_id}")
+async def api_get_template(template_id: str, auth: AuthContext = Depends(get_auth_context)):
     from cogniflow_home.templates.registry import get_template
     tpl = get_template(template_id)
     if not tpl:
@@ -1335,8 +1700,8 @@ async def api_get_template(template_id: str):
     return tpl
 
 
-@app.post("/api/templates/{template_id}/deploy", dependencies=[Depends(verify_api_key)])
-async def api_deploy_template(template_id: str, request: Request):
+@app.post("/api/templates/{template_id}/deploy")
+async def api_deploy_template(template_id: str, request: Request, auth: AuthContext = Depends(get_auth_context)):
     from cogniflow_home.templates.registry import get_template
     tpl = get_template(template_id)
     if not tpl:
@@ -1356,28 +1721,19 @@ async def api_deploy_template(template_id: str, request: Request):
     if instructions_extra:
         instructions += f"\n\nADDITIONAL INSTRUCTIONS:\n{instructions_extra}"
 
-    if settings.groq_api_key:
-        llm_provider, llm_model = "groq", "llama-3.3-70b-versatile"
-    elif settings.openai_api_key:
-        llm_provider, llm_model = "openai", "gpt-4o-mini"
-    else:
-        llm_provider, llm_model = "openai", "gpt-4o-mini"
+    llm_provider, llm_model = "groq", "llama-3.3-70b-versatile"
 
     lang = tpl["languages"][0] if tpl["languages"] else "en"
     indian_langs = {"hi", "ta", "te", "kn", "ml", "bn", "mr", "gu", "pa", "od"}
 
     if lang in indian_langs and settings.sarvam_api_key:
         tts_provider = "sarvam"
-    elif settings.cartesia_api_key:
-        tts_provider = "cartesia"
-    elif settings.elevenlabs_api_key:
-        tts_provider = "elevenlabs"
     elif settings.smallest_ai_api_key:
         tts_provider = "smallest"
     elif settings.sarvam_api_key:
         tts_provider = "sarvam"
     else:
-        tts_provider = "cartesia"
+        tts_provider = "smallest"
 
     llm_provider = body.get("llm_provider", llm_provider)
     llm_model = body.get("llm_model", llm_model)
@@ -1395,6 +1751,8 @@ async def api_deploy_template(template_id: str, request: Request):
         "tools_enabled": tpl.get("tools_used", []),
         "metadata": {"template_id": template_id},
     }
+    if auth.tenant_id:
+        agent_data["tenant_id"] = auth.tenant_id
     agent = await create_agent(agent_data)
     if not agent:
         return JSONResponse({"error": "Failed to deploy template agent"}, status_code=500)
@@ -1409,8 +1767,8 @@ async def api_deploy_template(template_id: str, request: Request):
 
 # ─── Benchmarks API ───
 
-@app.post("/api/benchmarks/run", dependencies=[Depends(verify_api_key)])
-async def api_run_benchmarks():
+@app.post("/api/benchmarks/run")
+async def api_run_benchmarks(auth: AuthContext = Depends(get_auth_context)):
     from cogniflow_home.monitoring.voice_quality import VoiceQualityEvaluator
     from cogniflow_home.monitoring.scorecard import ScorecardGenerator
 
@@ -1504,8 +1862,8 @@ async def api_run_benchmarks():
     return scorecard
 
 
-@app.get("/api/benchmarks/latest", dependencies=[Depends(verify_api_key)])
-async def api_latest_benchmark():
+@app.get("/api/benchmarks/latest")
+async def api_latest_benchmark(auth: AuthContext = Depends(get_auth_context)):
     try:
         results = await db.select("benchmarks", order="created_at.desc", limit=1)
         if results:
@@ -1515,8 +1873,8 @@ async def api_latest_benchmark():
     return {"error": "No benchmark results yet. Run POST /api/benchmarks/run first."}
 
 
-@app.get("/api/benchmarks/pipeline", dependencies=[Depends(verify_api_key)])
-async def api_pipeline_metrics():
+@app.get("/api/benchmarks/pipeline")
+async def api_pipeline_metrics(auth: AuthContext = Depends(get_auth_context)):
     from cogniflow_home.monitoring.pipeline_integrity import PipelineIntegrityChecker
     checker = PipelineIntegrityChecker()
     memory = await checker.check_memory_usage(active_calls)
@@ -1538,8 +1896,8 @@ async def api_pipeline_metrics():
     }
 
 
-@app.get("/api/benchmarks/drift", dependencies=[Depends(verify_api_key)])
-async def api_behaviour_drift():
+@app.get("/api/benchmarks/drift")
+async def api_behaviour_drift(auth: AuthContext = Depends(get_auth_context)):
     from cogniflow_home.monitoring.drift import BehaviourDriftDetector
     detector = BehaviourDriftDetector()
     try:
@@ -1549,10 +1907,174 @@ async def api_behaviour_drift():
         return {"status": "insufficient_data"}
 
 
+# ─── Admin: Tenant Management (master key only) ───
+
+@app.post("/admin/tenants")
+async def admin_create_tenant(request: Request, auth: AuthContext = Depends(get_auth_context)):
+    if auth.tenant_id:
+        raise HTTPException(403, "Admin only")
+    body = await request.json()
+    from cogniflow_home.tenants.manager import create_tenant
+    result = await create_tenant(
+        name=body["name"],
+        email=body["email"],
+        plan=body.get("plan", "starter"),
+        phone=body.get("phone", ""),
+    )
+    return result
+
+
+@app.get("/admin/tenants")
+async def admin_list_tenants(auth: AuthContext = Depends(get_auth_context)):
+    if auth.tenant_id:
+        raise HTTPException(403, "Admin only")
+    tenants = await db.select("tenants", order="created_at.desc", limit=200)
+    return {"tenants": tenants}
+
+
+@app.get("/admin/tenants/{tenant_id}")
+async def admin_get_tenant(tenant_id: str, auth: AuthContext = Depends(get_auth_context)):
+    if auth.tenant_id:
+        raise HTTPException(403, "Admin only")
+    rows = await db.select("tenants", {"id": tenant_id})
+    if not rows:
+        raise HTTPException(404, "Tenant not found")
+    return rows[0]
+
+
+@app.patch("/admin/tenants/{tenant_id}")
+async def admin_update_tenant(tenant_id: str, request: Request, auth: AuthContext = Depends(get_auth_context)):
+    if auth.tenant_id:
+        raise HTTPException(403, "Admin only")
+    body = await request.json()
+    allowed = {"plan", "status", "monthly_minutes_limit", "max_agents",
+               "max_concurrent_calls", "name", "email"}
+    updates = {k: v for k, v in body.items() if k in allowed}
+    await db.update("tenants", {"id": tenant_id}, updates)
+    return {"ok": True}
+
+
+@app.post("/admin/tenants/{tenant_id}/suspend")
+async def admin_suspend_tenant(tenant_id: str, auth: AuthContext = Depends(get_auth_context)):
+    if auth.tenant_id:
+        raise HTTPException(403, "Admin only")
+    await db.update("tenants", {"id": tenant_id}, {"status": "suspended"})
+    return {"ok": True}
+
+
+@app.get("/admin/billing")
+async def admin_billing_overview(auth: AuthContext = Depends(get_auth_context)):
+    if auth.tenant_id:
+        raise HTTPException(403, "Admin only")
+    from cogniflow_home.tenants.billing import get_all_tenants_summary
+    summaries = await get_all_tenants_summary()
+    total_revenue = sum(s.get("total_bill_paise", 0) for s in summaries)
+    total_cost = sum(s.get("infrastructure_cost_paise", 0) for s in summaries)
+    return {
+        "month": summaries[0]["month"] if summaries else "",
+        "total_tenants": len(summaries),
+        "total_revenue_paise": total_revenue,
+        "total_cost_paise": total_cost,
+        "total_margin_paise": total_revenue - total_cost,
+        "tenants": summaries,
+    }
+
+
+# ─── Tenant API Keys ───
+
+@app.get("/api/keys")
+async def list_api_keys(auth: AuthContext = Depends(get_auth_context)):
+    keys = await db.select("api_keys", {"tenant_id": auth.tenant_id})
+    safe_keys = [{
+        "id": k["id"],
+        "name": k["name"],
+        "key_prefix": k["key_prefix"],
+        "scopes": k.get("scopes", []),
+        "is_active": k["is_active"],
+        "last_used_at": k.get("last_used_at"),
+        "total_requests": k.get("total_requests", 0),
+        "created_at": k["created_at"],
+        "expires_at": k.get("expires_at"),
+    } for k in keys]
+    return {"keys": safe_keys}
+
+
+@app.post("/api/keys")
+async def create_api_key_endpoint(
+    request: Request,
+    auth: AuthContext = Depends(get_auth_context),
+):
+    body = await request.json()
+    raw_key, key_hash, key_prefix = generate_api_key()
+    await db.insert("api_keys", {
+        "tenant_id": auth.tenant_id,
+        "name": body.get("name", "New Key"),
+        "key_hash": key_hash,
+        "key_prefix": key_prefix,
+        "scopes": body.get("scopes", ["calls:read", "calls:write"]),
+        "rate_limit_rpm": body.get("rate_limit_rpm", 60),
+        "expires_at": body.get("expires_at"),
+    })
+    return {
+        "key": raw_key,
+        "prefix": key_prefix,
+        "message": "Save this key now. It will not be shown again.",
+    }
+
+
+@app.delete("/api/keys/{key_id}")
+async def revoke_api_key(
+    key_id: str,
+    auth: AuthContext = Depends(get_auth_context),
+):
+    keys = await db.select("api_keys", {"id": key_id, "tenant_id": auth.tenant_id})
+    if not keys:
+        raise HTTPException(404, "Key not found")
+    await db.update("api_keys", {"id": key_id}, {"is_active": False})
+    return {"ok": True, "message": "Key revoked"}
+
+
+# ─── Tenant Usage + Billing ───
+
+@app.get("/api/usage")
+async def get_usage(
+    month: str = None,
+    auth: AuthContext = Depends(get_auth_context),
+):
+    from cogniflow_home.tenants.billing import get_billing_summary
+    return await get_billing_summary(auth.tenant_id, month)
+
+
+@app.get("/api/usage/history")
+async def get_usage_history(auth: AuthContext = Depends(get_auth_context)):
+    records = await db.select(
+        "usage_records",
+        {"tenant_id": auth.tenant_id},
+        order="recorded_at.desc",
+        limit=5000,
+    )
+    return {"records": records, "count": len(records)}
+
+
+@app.get("/api/usage/live")
+async def get_live_usage(auth: AuthContext = Depends(get_auth_context)):
+    tenant_calls = [
+        cid for cid, p in active_calls.items()
+        if getattr(p.state, "tenant_id", None) == auth.tenant_id
+    ]
+    return {
+        "active_calls": len(tenant_calls),
+        "max_concurrent": auth.max_concurrent_calls,
+        "this_month_minutes": auth.current_month_minutes,
+        "monthly_limit": auth.monthly_minutes_limit,
+        "usage_pct": round(auth.current_month_minutes / max(auth.monthly_minutes_limit, 1) * 100, 1),
+    }
+
+
 # ─── Multi-Tenant / Organizations ───
 
-@app.post("/api/organizations", dependencies=[Depends(verify_api_key)])
-async def api_create_organization(request: Request):
+@app.post("/api/organizations")
+async def api_create_organization(request: Request, auth: AuthContext = Depends(get_auth_context)):
     from cogniflow_home.db.tenant import create_organization
     body = await request.json()
     name = body.get("name", "").strip()
@@ -1578,14 +2100,14 @@ async def api_create_organization(request: Request):
     return org
 
 
-@app.get("/api/organizations", dependencies=[Depends(verify_api_key)])
-async def api_list_organizations(email: str = ""):
+@app.get("/api/organizations")
+async def api_list_organizations(email: str = "", auth: AuthContext = Depends(get_auth_context)):
     from cogniflow_home.db.tenant import list_organizations
     return await list_organizations(email or None)
 
 
-@app.get("/api/organizations/{org_id}", dependencies=[Depends(verify_api_key)])
-async def api_get_organization(org_id: str):
+@app.get("/api/organizations/{org_id}")
+async def api_get_organization(org_id: str, auth: AuthContext = Depends(get_auth_context)):
     from cogniflow_home.db.tenant import get_organization
     if not _valid_uuid(org_id):
         raise HTTPException(400, "Invalid org ID")
@@ -1595,16 +2117,16 @@ async def api_get_organization(org_id: str):
     return org
 
 
-@app.get("/api/organizations/{org_id}/members", dependencies=[Depends(verify_api_key)])
-async def api_list_members(org_id: str):
+@app.get("/api/organizations/{org_id}/members")
+async def api_list_members(org_id: str, auth: AuthContext = Depends(get_auth_context)):
     from cogniflow_home.db.tenant import get_members
     if not _valid_uuid(org_id):
         raise HTTPException(400, "Invalid org ID")
     return await get_members(org_id)
 
 
-@app.post("/api/organizations/{org_id}/members", dependencies=[Depends(verify_api_key)])
-async def api_add_member(org_id: str, request: Request):
+@app.post("/api/organizations/{org_id}/members")
+async def api_add_member(org_id: str, request: Request, auth: AuthContext = Depends(get_auth_context)):
     from cogniflow_home.db.tenant import add_member
     if not _valid_uuid(org_id):
         raise HTTPException(400, "Invalid org ID")
@@ -1621,8 +2143,8 @@ async def api_add_member(org_id: str, request: Request):
     return member
 
 
-@app.delete("/api/organizations/{org_id}/members/{email}", dependencies=[Depends(verify_api_key)])
-async def api_remove_member(org_id: str, email: str):
+@app.delete("/api/organizations/{org_id}/members/{email}")
+async def api_remove_member(org_id: str, email: str, auth: AuthContext = Depends(get_auth_context)):
     from cogniflow_home.db.tenant import remove_member
     if not _valid_uuid(org_id):
         raise HTTPException(400, "Invalid org ID")

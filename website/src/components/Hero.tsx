@@ -1,101 +1,200 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { useEffect, useRef } from "react";
+import { motion } from "motion/react";
+import { Sparkles, ArrowRight } from "lucide-react";
 
-const ease = [0.16, 1, 0.3, 1] as const;
+const ease = [0.22, 1, 0.36, 1] as const;
+
+function BlurIn({
+  children,
+  delay = 0,
+  duration = 0.6,
+  className = "",
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  duration?: number;
+  className?: string;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, filter: "blur(10px)", y: 20 }}
+      animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
+      transition={{ delay, duration, ease }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function SplitText({
+  text,
+  startIndex = 0,
+  staggerDelay = 0.08,
+  duration = 0.6,
+}: {
+  text: string;
+  startIndex?: number;
+  staggerDelay?: number;
+  duration?: number;
+}) {
+  const words = text.split(" ");
+  return (
+    <>
+      {words.map((word, i) => (
+        <motion.span
+          key={i}
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            delay: (startIndex + i) * staggerDelay,
+            duration,
+            ease,
+          }}
+          className="inline-block"
+          style={{ marginRight: "0.3em" }}
+        >
+          {word}
+        </motion.span>
+      ))}
+    </>
+  );
+}
+
+const HLS_SRC =
+  "https://stream.mux.com/s8pMcOvMQXc4GD6AX4e1o01xFogFxipmuKltNfSYza0200.m3u8";
 
 export default function Hero() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    let hlsInstance: any = null;
+
+    // Safari supports HLS natively
+    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = HLS_SRC;
+      video.play().catch(() => {});
+      return;
+    }
+
+    // Dynamic import of bundled hls.js (runs client-side only inside useEffect)
+    import("hls.js")
+      .then((mod) => {
+        const Hls = mod.default;
+        if (!Hls.isSupported()) return;
+
+        hlsInstance = new Hls();
+        hlsInstance.loadSource(HLS_SRC);
+        hlsInstance.attachMedia(video);
+        hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+          video.play().catch(() => {});
+        });
+      })
+      .catch(() => {});
+
+    return () => {
+      hlsInstance?.destroy();
+    };
+  }, []);
+
   return (
-    <section className="relative min-h-screen flex items-center justify-center px-6">
-      <div className="max-w-5xl mx-auto text-center relative z-10">
-        <motion.p
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.2, ease }}
-          className="text-xs uppercase tracking-[0.2em] text-text-secondary mb-8 font-medium"
-        >
-          AI Calling Agent & AI SDR Platform
-        </motion.p>
+    <section
+      className="relative w-full h-screen overflow-hidden"
+      style={{ backgroundColor: "#070612" }}
+    >
+      {/* Background Video */}
+      <video
+        ref={videoRef}
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="absolute inset-0 h-full object-cover pointer-events-none"
+        style={{
+          zIndex: 0,
+          marginLeft: "200px",
+          width: "calc(100% - 200px)",
+          transform: "scale(1.2)",
+          transformOrigin: "left center",
+        }}
+      />
 
-        <motion.h1
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.35, ease }}
-          className="text-5xl md:text-7xl lg:text-[5.5rem] font-bold tracking-[-0.03em] leading-[1.05] mb-6"
-        >
-          Your AI Sales Team
-          <br />
-          <span className="gradient-text">That Never Sleeps</span>
-        </motion.h1>
+      {/* Bottom fade gradient */}
+      <div
+        className="absolute bottom-0 left-0 w-full h-40"
+        style={{
+          zIndex: 10,
+          background: "linear-gradient(to top, #070612, transparent)",
+        }}
+      />
 
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.5, ease }}
-          className="text-lg md:text-xl text-text-secondary max-w-2xl mx-auto mb-10 leading-relaxed"
-        >
-          Cogniflow makes and receives calls, qualifies leads, books meetings,
-          and closes deals — with sub-500ms response time across 30+ languages.
-        </motion.p>
+      {/* Content */}
+      <div
+        className="relative mx-auto max-w-7xl h-full flex flex-col justify-center px-6 lg:px-12"
+        style={{ zIndex: 20 }}
+      >
+        <div className="flex flex-col gap-12">
+          <div className="flex flex-col gap-6">
+            {/* Badge */}
+            <BlurIn delay={0} duration={0.6}>
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/20 backdrop-blur-sm px-4 py-2 w-fit">
+                <Sparkles className="w-3 h-3 text-white/80" />
+                <span className="text-sm font-medium text-white/80">
+                  New AI Automation Ally
+                </span>
+              </div>
+            </BlurIn>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.65, ease }}
-          className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16"
-        >
-          <a
-            href="#pricing"
-            className="px-8 py-3.5 rounded-xl text-sm font-semibold bg-brand text-white hover:bg-brand-light transition-all duration-200 hover:-translate-y-0.5 shadow-[0_0_30px_rgba(37,99,235,0.2)]"
-          >
-            Start Free Trial
-          </a>
-          <a
-            href="#demo"
-            className="px-8 py-3.5 rounded-xl text-sm font-semibold border border-white/[0.08] text-text-primary hover:border-white/[0.15] hover:bg-white/[0.03] transition-all duration-200 flex items-center gap-2"
-          >
-            Watch Demo
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <polygon points="5,3 19,12 5,21" />
-            </svg>
-          </a>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.8, ease }}
-          className="flex flex-col items-center gap-4"
-        >
-          <p className="text-xs text-text-tertiary uppercase tracking-wider">
-            Trusted by 200+ companies
-          </p>
-          <div className="flex items-center gap-8 opacity-40">
-            {["Freshworks", "Zoho", "Razorpay", "Chargebee", "Leadsquared"].map((name) => (
-              <span key={name} className="text-sm font-medium text-text-secondary tracking-wide">
-                {name}
+            {/* Heading */}
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-medium leading-tight lg:leading-[1.2] text-white">
+              <span className="block">
+                <SplitText text="The AI Employee That" startIndex={0} />
               </span>
-            ))}
-          </div>
-        </motion.div>
-      </div>
+              <SplitText text="Outperforms Your Best" startIndex={4} />
+              <motion.span
+                initial={{ opacity: 0, y: 40 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 7 * 0.08, duration: 0.6, ease }}
+                className="inline-block italic"
+                style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}
+              >
+                SDR.
+              </motion.span>
+            </h1>
 
-      <div className="absolute bottom-12 left-1/2 -translate-x-1/2">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.5, duration: 1 }}
-          className="flex flex-col items-center gap-2"
-        >
-          <span className="text-xs text-text-tertiary tracking-widest uppercase">Scroll</span>
-          <motion.div
-            animate={{ y: [0, 6, 0] }}
-            transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
-            className="w-5 h-8 rounded-full border border-white/[0.1] flex items-start justify-center p-1.5"
-          >
-            <div className="w-1 h-1.5 rounded-full bg-brand/60" />
-          </motion.div>
-        </motion.div>
+            {/* Subtitle */}
+            <BlurIn delay={0.4} duration={0.6}>
+              <p className="text-white/80 text-lg font-normal leading-relaxed max-w-xl">
+                It calls. It writes hyperpersonalized emails. It follows up on
+                WhatsApp. In under 500ms. While you sleep.
+              </p>
+            </BlurIn>
+          </div>
+
+          {/* CTA Buttons */}
+          <BlurIn delay={0.6} duration={0.6}>
+            <div className="flex flex-wrap gap-4">
+              <a
+                href="/book-call"
+                className="inline-flex items-center gap-2 rounded-full bg-[#0018FF] text-white px-5 py-3 font-medium transition-transform hover:scale-105"
+              >
+                Book A Free Call
+                <ArrowRight className="w-4 h-4" />
+              </a>
+              <a
+                href="#"
+                className="inline-flex items-center rounded-full bg-white/20 backdrop-blur-sm text-white px-8 py-3 font-medium transition-colors hover:bg-white/30"
+              >
+                Learn now
+              </a>
+            </div>
+          </BlurIn>
+        </div>
       </div>
     </section>
   );

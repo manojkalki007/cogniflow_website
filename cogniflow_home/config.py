@@ -6,12 +6,12 @@ class Settings(BaseSettings):
     deepgram_api_key: str = ""
 
     # LLM
-    openai_api_key: str = ""
-    gemini_api_key: str = ""
     groq_api_key: str = ""
 
+    # Embeddings (used by knowledge base RAG)
+    openai_api_key: str = ""
+
     # TTS
-    cartesia_api_key: str = ""
 
     # Twilio
     twilio_account_sid: str = ""
@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     exotel_account_sid: str = ""
     exotel_subdomain: str = ""
     exotel_caller_id: str = ""
+
+    # Vobiz (India)
+    vobiz_auth_id: str = ""
+    vobiz_auth_token: str = ""
+    vobiz_phone_number: str = ""
 
     # Supabase
     supabase_url: str = ""
@@ -53,9 +58,6 @@ class Settings(BaseSettings):
 
     # Smallest AI
     smallest_ai_api_key: str = ""
-
-    # ElevenLabs (European voices)
-    elevenlabs_api_key: str = ""
 
     # Salesforce
     salesforce_client_id: str = ""

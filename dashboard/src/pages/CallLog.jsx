@@ -1,15 +1,21 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import {
   PhoneIncoming, PhoneOutgoing, Clock, ChevronDown, ChevronUp,
-  Search, User, MessageSquare, BarChart3, Activity,
+  Search, MessageSquare, BarChart3, Phone, ArrowUpRight,
+  TrendingUp, Activity,
 } from "lucide-react";
 import { Badge } from "../components/ui/badge";
+import PageHeader from "../components/PageHeader";
 
 const DISPOSITION_VARIANT = {
-  interested: "success", not_interested: "destructive", callback_requested: "warning",
-  escalated: "warning", no_answer: "secondary", voicemail: "secondary",
+  interested: "success",
+  not_interested: "destructive",
+  callback_requested: "warning",
+  escalated: "warning",
+  no_answer: "secondary",
+  voicemail: "secondary",
 };
 
 const SENTIMENT_BADGE = (score) => {
@@ -19,32 +25,105 @@ const SENTIMENT_BADGE = (score) => {
   return { label: "Neutral", variant: "secondary" };
 };
 
-function StatCard({ label, value, icon: Icon, idx = 0 }) {
-  const colors = ["text-blue-400", "text-emerald-400", "text-violet-400", "text-amber-400"];
-  const bgs = ["bg-blue-500/10", "bg-emerald-500/10", "bg-violet-500/10", "bg-amber-500/10"];
+function AnimatedNumber({ value, suffix = "" }) {
+  const [display, setDisplay] = useState(0);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const target = typeof value === "number" ? value : parseInt(value) || 0;
+    if (target === 0) { setDisplay(0); return; }
+
+    let start = 0;
+    const duration = 800;
+    const startTime = performance.now();
+
+    function tick(now) {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      start = Math.round(eased * target);
+      setDisplay(start);
+      if (progress < 1) ref.current = requestAnimationFrame(tick);
+    }
+    ref.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(ref.current);
+  }, [value]);
+
+  return <>{display}{suffix}</>;
+}
+
+function StatCard({ label, value, icon: Icon, accent, trend, className = "" }) {
   return (
-    <div className="glass-card stat-card rounded-xl p-4">
-      <div className="flex items-center gap-2.5 mb-2">
-        <div className={`w-7 h-7 rounded-lg ${bgs[idx]} flex items-center justify-center`}>
-          <Icon size={14} className={colors[idx]} />
+    <div className={`stat-card ${className}`}>
+      <div className="flex items-center justify-between mb-4">
+        <span
+          className="text-[11px] font-semibold uppercase tracking-wider"
+          style={{ color: "var(--text-muted)" }}
+        >
+          {label}
+        </span>
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center"
+          style={{
+            background: `${accent}10`,
+            border: `1px solid ${accent}15`,
+          }}
+        >
+          <Icon size={17} style={{ color: accent }} />
         </div>
-        <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">{label}</p>
       </div>
-      <p className="text-2xl font-bold text-white">{value}</p>
+      <div className="flex items-end justify-between">
+        <div
+          className="text-[1.85rem] font-bold tracking-tight leading-none"
+          style={{ color: "var(--text-primary)", animation: "countUp 0.5s ease-out" }}
+        >
+          {typeof value === "number" ? (
+            <AnimatedNumber value={value} />
+          ) : typeof value === "string" && value.endsWith("s") ? (
+            <AnimatedNumber value={parseInt(value)} suffix="s" />
+          ) : (
+            value ?? <span className="text-sm font-normal" style={{ color: "var(--text-muted)" }}>—</span>
+          )}
+        </div>
+        {trend && (
+          <div
+            className="flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-lg"
+            style={{
+              color: trend > 0 ? "var(--success)" : "var(--danger)",
+              background: trend > 0 ? "rgba(16,185,129,0.08)" : "rgba(239,68,68,0.08)",
+            }}
+          >
+            <TrendingUp size={11} style={{ transform: trend < 0 ? "scaleY(-1)" : undefined }} />
+            {Math.abs(trend)}%
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
 function TranscriptView({ transcript }) {
-  if (!transcript || transcript.length === 0) return <p className="text-gray-500 text-sm">No transcript available</p>;
+  if (!transcript || transcript.length === 0) {
+    return (
+      <p className="text-sm py-4 text-center" style={{ color: "var(--text-muted)" }}>
+        No transcript available
+      </p>
+    );
+  }
   return (
-    <div className="space-y-2 max-h-64 overflow-y-auto">
+    <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
       {transcript.map((t, i) => (
-        <div key={i} className={`text-sm flex gap-3 ${t.role === "agent" ? "text-blue-300" : "text-gray-300"}`}>
-          <span className={`font-medium text-xs uppercase w-12 shrink-0 px-1.5 py-0.5 rounded text-center ${t.role === "agent" ? "bg-blue-500/10 text-blue-400" : "bg-gray-700/50 text-gray-400"}`}>
+        <div key={i} className="flex gap-3 text-sm">
+          <span
+            className={`text-[10px] font-semibold uppercase w-12 shrink-0 px-1.5 py-0.5 rounded-md text-center leading-relaxed ${
+              t.role === "agent"
+                ? "bg-[var(--accent-subtle)] text-[var(--accent-text)]"
+                : "bg-[var(--bg-muted)] text-[var(--text-muted)]"
+            }`}
+          >
             {t.role}
           </span>
-          <span>{t.text}</span>
+          <span style={{ color: "var(--text-secondary)" }}>{t.text}</span>
         </div>
       ))}
     </div>
@@ -52,7 +131,7 @@ function TranscriptView({ transcript }) {
 }
 
 function formatDuration(seconds) {
-  if (!seconds) return "—";
+  if (!seconds) return "0s";
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
@@ -69,7 +148,6 @@ export default function CallLog() {
     queryFn: api.getStats,
     refetchInterval: 15_000,
   });
-
   const { data: callsData } = useQuery({
     queryKey: ["calls", dirFilter],
     queryFn: () => api.getCalls(dirFilter ? { direction: dirFilter } : {}),
@@ -77,7 +155,6 @@ export default function CallLog() {
   });
 
   const allCalls = callsData?.calls || [];
-
   const calls = allCalls.filter((c) => {
     if (dispositionFilter && c.disposition !== dispositionFilter) return false;
     if (!searchQuery) return true;
@@ -90,135 +167,321 @@ export default function CallLog() {
   });
 
   const today = stats?.today || {};
-  const dispositions = [...new Set(allCalls.map(c => c.disposition).filter(Boolean))];
+  const dispositions = [
+    ...new Set(allCalls.map((c) => c.disposition).filter(Boolean)),
+  ];
 
   return (
     <div>
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold gradient-text">Call Log</h2>
-        <p className="text-sm text-gray-500 mt-1">Monitor and review all call activity</p>
-      </div>
+      <PageHeader
+        title="Call Log"
+        description="Monitor and review all call activity"
+        icon={Activity}
+      />
 
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <StatCard label="Today's Calls" value={today.total_calls ?? "—"} icon={BarChart3} idx={0} />
-        <StatCard label="Inbound" value={today.inbound ?? "—"} icon={PhoneIncoming} idx={1} />
-        <StatCard label="Outbound" value={today.outbound ?? "—"} icon={PhoneOutgoing} idx={2} />
-        <StatCard label="Avg Duration" value={today.avg_duration_seconds ? `${today.avg_duration_seconds}s` : "—"} icon={Clock} idx={3} />
-      </div>
-
-      <div className="flex gap-3 mb-5">
-        <div className="relative flex-1">
-          <Search size={14} className="absolute left-3.5 top-2.5 text-gray-500" />
-          <input type="text" placeholder="Search by caller, agent, or summary..."
-            value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full glass-card rounded-xl pl-10 pr-4 py-2.5 text-sm input-glow border border-gray-700/30 bg-gray-900/50" />
+      <div className="px-6 lg:px-8 py-6">
+        {/* Bento Stat Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <StatCard
+            label="Today's Calls"
+            value={today.total_calls ?? 0}
+            icon={BarChart3}
+            accent="var(--accent)"
+            trend={12}
+            className="stat-card-blue"
+          />
+          <StatCard
+            label="Inbound"
+            value={today.inbound ?? 0}
+            icon={PhoneIncoming}
+            accent="var(--success)"
+            trend={8}
+            className="stat-card-emerald"
+          />
+          <StatCard
+            label="Outbound"
+            value={today.outbound ?? 0}
+            icon={PhoneOutgoing}
+            accent="#8B5CF6"
+            trend={-3}
+            className="stat-card-violet"
+          />
+          <StatCard
+            label="Avg Duration"
+            value={
+              today.avg_duration_seconds
+                ? `${today.avg_duration_seconds}s`
+                : "0s"
+            }
+            icon={Clock}
+            accent="var(--warning)"
+            className="stat-card-amber"
+          />
         </div>
-        <select value={dirFilter} onChange={(e) => setDirFilter(e.target.value)}
-          className="glass-card rounded-xl px-4 py-2.5 text-sm border border-gray-700/30 bg-gray-900/50">
-          <option value="">All directions</option>
-          <option value="inbound">Inbound</option>
-          <option value="outbound">Outbound</option>
-        </select>
-        {dispositions.length > 0 && (
-          <select value={dispositionFilter} onChange={(e) => setDispositionFilter(e.target.value)}
-            className="glass-card rounded-xl px-4 py-2.5 text-sm border border-gray-700/30 bg-gray-900/50">
-            <option value="">All dispositions</option>
-            {dispositions.map(d => <option key={d} value={d}>{d}</option>)}
-          </select>
-        )}
-      </div>
 
-      <div className="glass-card rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-800/50 text-gray-500 text-xs uppercase tracking-wider">
-              <th className="text-left p-4 w-10"></th>
-              <th className="text-left p-4">Caller</th>
-              <th className="text-left p-4">Agent</th>
-              <th className="text-left p-4">Duration</th>
-              <th className="text-left p-4">Disposition</th>
-              <th className="text-left p-4">Sentiment</th>
-              <th className="text-left p-4">Summary</th>
-              <th className="text-left p-4">Date</th>
-              <th className="p-4 w-8"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {calls.map((call) => {
-              const sentiment = SENTIMENT_BADGE(call.sentiment_score);
-              const isExpanded = expandedId === call.id;
-              return (
-                <tr key={call.id} className="border-b border-gray-800/30 table-row-hover group">
-                  <td className="p-4">
-                    {call.direction === "inbound" ? (
-                      <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                        <PhoneIncoming size={13} className="text-emerald-400" />
-                      </div>
-                    ) : (
-                      <div className="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                        <PhoneOutgoing size={13} className="text-blue-400" />
-                      </div>
-                    )}
-                  </td>
-                  <td className="p-4">
-                    <span className="font-mono text-xs text-gray-300">{call.caller_number || "—"}</span>
-                  </td>
-                  <td className="p-4 text-gray-400 text-xs">{call.agent_name || "Default"}</td>
-                  <td className="p-4">
-                    <span className="flex items-center gap-1.5 text-gray-400">
-                      <Clock size={10} />
-                      {formatDuration(call.duration_seconds)}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    {call.disposition ? (
-                      <Badge variant={DISPOSITION_VARIANT[call.disposition] || "outline"} className="text-[10px]">
-                        {call.disposition}
-                      </Badge>
-                    ) : <span className="text-gray-600">—</span>}
-                  </td>
-                  <td className="p-4">
-                    {sentiment ? (
-                      <Badge variant={sentiment.variant} className="text-[10px]">{sentiment.label}</Badge>
-                    ) : <span className="text-gray-600">—</span>}
-                  </td>
-                  <td className="p-4 text-gray-400 max-w-xs truncate text-xs">{call.summary || "—"}</td>
-                  <td className="p-4 text-gray-500 text-xs whitespace-nowrap">
-                    {call.created_at ? new Date(call.created_at).toLocaleString() : call.started_at ? new Date(call.started_at).toLocaleString() : "—"}
-                  </td>
-                  <td className="p-4">
-                    <button onClick={() => setExpandedId(isExpanded ? null : call.id)}
-                      className="text-gray-500 hover:text-white p-1 rounded-lg hover:bg-gray-800/50 transition-all">
-                      {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-            {calls.length === 0 && (
-              <tr>
-                <td colSpan={9} className="p-12 text-center text-gray-600">No calls match your filters</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {expandedId && (
-        <div className="mt-3 glass-card rounded-xl p-5 animate-fade-in">
-          <div className="flex items-center gap-2.5 mb-4">
-            <div className="w-7 h-7 rounded-lg bg-violet-500/10 flex items-center justify-center">
-              <MessageSquare size={13} className="text-violet-400" />
-            </div>
-            <h3 className="text-sm font-medium">Transcript</h3>
+        {/* Filters */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-5">
+          <div className="relative flex-1">
+            <Search
+              size={14}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2"
+              style={{ color: "var(--text-muted)" }}
+            />
+            <input
+              type="text"
+              placeholder="Search by caller, agent, or summary..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="glass-input w-full pl-10 pr-4 py-2.5 rounded-xl text-sm"
+            />
           </div>
-          <TranscriptView transcript={calls.find(c => c.id === expandedId)?.transcript} />
+          <select
+            value={dirFilter}
+            onChange={(e) => setDirFilter(e.target.value)}
+            className="glass-input rounded-xl px-4 py-2.5 text-sm cursor-pointer"
+          >
+            <option value="">All directions</option>
+            <option value="inbound">Inbound</option>
+            <option value="outbound">Outbound</option>
+          </select>
+          {dispositions.length > 0 && (
+            <select
+              value={dispositionFilter}
+              onChange={(e) => setDispositionFilter(e.target.value)}
+              className="glass-input rounded-xl px-4 py-2.5 text-sm cursor-pointer"
+            >
+              <option value="">All dispositions</option>
+              {dispositions.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
-      )}
 
-      <p className="text-xs text-gray-600 mt-4 text-right font-mono">
-        Showing {calls.length} of {allCalls.length} calls
-      </p>
+        {/* Table */}
+        <div
+          className="glass-card rounded-2xl overflow-hidden"
+        >
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th style={{ width: 44 }}></th>
+                  <th>Caller</th>
+                  <th>Agent</th>
+                  <th>Duration</th>
+                  <th>Disposition</th>
+                  <th>Sentiment</th>
+                  <th>Summary</th>
+                  <th>Date</th>
+                  <th style={{ width: 40 }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {calls.map((call) => {
+                  const sentiment = SENTIMENT_BADGE(call.sentiment_score);
+                  const isExpanded = expandedId === call.id;
+                  return (
+                    <tr key={call.id}>
+                      <td>
+                        {call.direction === "inbound" ? (
+                          <div
+                            className="w-7 h-7 rounded-lg flex items-center justify-center"
+                            style={{
+                              background: "rgba(16,185,129,0.08)",
+                              border: "1px solid rgba(16,185,129,0.1)",
+                            }}
+                          >
+                            <PhoneIncoming
+                              size={13}
+                              style={{ color: "var(--success)" }}
+                            />
+                          </div>
+                        ) : (
+                          <div
+                            className="w-7 h-7 rounded-lg flex items-center justify-center"
+                            style={{
+                              background: "var(--accent-subtle)",
+                              border: "1px solid rgba(34,211,238,0.1)",
+                            }}
+                          >
+                            <PhoneOutgoing
+                              size={13}
+                              style={{ color: "var(--accent)" }}
+                            />
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        <span className="font-mono text-xs">
+                          {call.caller_number || "N/A"}
+                        </span>
+                      </td>
+                      <td>
+                        <span className="text-xs">
+                          {call.agent_name || "Default"}
+                        </span>
+                      </td>
+                      <td>
+                        <span className="flex items-center gap-1.5 text-xs">
+                          <Clock size={10} />
+                          {formatDuration(call.duration_seconds)}
+                        </span>
+                      </td>
+                      <td>
+                        {call.disposition ? (
+                          <Badge
+                            variant={
+                              DISPOSITION_VARIANT[call.disposition] || "outline"
+                            }
+                            className="text-[10px]"
+                          >
+                            {call.disposition}
+                          </Badge>
+                        ) : (
+                          <span style={{ color: "var(--text-muted)" }}>—</span>
+                        )}
+                      </td>
+                      <td>
+                        {sentiment ? (
+                          <Badge
+                            variant={sentiment.variant}
+                            className="text-[10px]"
+                          >
+                            {sentiment.label}
+                          </Badge>
+                        ) : (
+                          <span style={{ color: "var(--text-muted)" }}>—</span>
+                        )}
+                      </td>
+                      <td className="max-w-[200px]">
+                        <span className="text-xs truncate block">
+                          {call.summary || "—"}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap text-xs">
+                        {call.created_at
+                          ? new Date(call.created_at).toLocaleDateString()
+                          : call.started_at
+                            ? new Date(call.started_at).toLocaleDateString()
+                            : "—"}
+                      </td>
+                      <td>
+                        <button
+                          onClick={() =>
+                            setExpandedId(isExpanded ? null : call.id)
+                          }
+                          className="p-1.5 rounded-lg transition-all cursor-pointer"
+                          style={{ color: "var(--text-muted)" }}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.background =
+                              "var(--bg-muted)")
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.background = "transparent")
+                          }
+                        >
+                          {isExpanded ? (
+                            <ChevronUp size={14} />
+                          ) : (
+                            <ChevronDown size={14} />
+                          )}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+
+                {/* Empty State */}
+                {calls.length === 0 && (
+                  <tr>
+                    <td colSpan={9} style={{ border: "none" }}>
+                      <div className="flex flex-col items-center justify-center py-20 gap-3">
+                        <div
+                          className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                          style={{
+                            background: "var(--accent-subtle)",
+                            border: "1px solid rgba(34,211,238,0.1)",
+                          }}
+                        >
+                          <Phone
+                            size={22}
+                            style={{ color: "var(--accent)" }}
+                          />
+                        </div>
+                        <p
+                          className="font-semibold text-sm"
+                          style={{ color: "var(--text-primary)" }}
+                        >
+                          No calls yet
+                        </p>
+                        <p
+                          className="text-xs max-w-xs text-center"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          Calls will appear here once your agent starts
+                          receiving or making them
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Expanded Transcript */}
+        {expandedId && (
+          <div className="mt-3 glass-card rounded-2xl p-5 animate-fade-in">
+            <div className="flex items-center gap-2.5 mb-4">
+              <div
+                className="w-8 h-8 rounded-xl flex items-center justify-center"
+                style={{
+                  background: "rgba(139,92,246,0.08)",
+                  border: "1px solid rgba(139,92,246,0.1)",
+                }}
+              >
+                <MessageSquare size={14} style={{ color: "#8B5CF6" }} />
+              </div>
+              <h3
+                className="text-sm font-semibold"
+                style={{ color: "var(--text-primary)" }}
+              >
+                Transcript
+              </h3>
+            </div>
+            <TranscriptView
+              transcript={calls.find((c) => c.id === expandedId)?.transcript}
+            />
+          </div>
+        )}
+
+        {/* Footer count */}
+        <div className="flex items-center justify-between mt-4">
+          <p
+            className="text-xs font-mono"
+            style={{ color: "var(--text-muted)" }}
+          >
+            {calls.length} of {allCalls.length} calls
+          </p>
+          {allCalls.length > calls.length && (
+            <button
+              onClick={() => {
+                setSearchQuery("");
+                setDirFilter("");
+                setDispositionFilter("");
+              }}
+              className="text-xs font-medium flex items-center gap-1 cursor-pointer transition-colors"
+              style={{ color: "var(--accent)" }}
+            >
+              Clear filters <ArrowUpRight size={12} />
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

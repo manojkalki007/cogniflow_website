@@ -1,35 +1,39 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
-import ProductShowcase from "@/components/ProductShowcase";
-import LatencyVisual from "@/components/LatencyVisual";
-import FeaturesGrid from "@/components/FeaturesGrid";
+import DashboardScreenshot from "@/components/DashboardScreenshot";
+import ProblemStatement from "@/components/ProblemStatement";
+import MarqueeStrip from "@/components/MarqueeStrip";
+import IntelligenceSplit from "@/components/IntelligenceSplit";
+import PerformanceSplit from "@/components/PerformanceSplit";
+import LiveCallExperience from "@/components/LiveCallExperience";
+import ChannelReveal from "@/components/ChannelReveal";
 import HowItWorks from "@/components/HowItWorks";
-import SocialProof from "@/components/SocialProof";
-import Pricing from "@/components/Pricing";
+import FeatureGrid from "@/components/FeatureGrid";
 import FAQ from "@/components/FAQ";
+import FinalCTA from "@/components/FinalCTA";
 import Footer from "@/components/Footer";
-
-const VocalHero = dynamic(() => import("@/components/VocalHero"), {
-  ssr: false,
-});
 
 export default function Home() {
   return (
     <>
-      <VocalHero />
       <Navbar />
-      <main className="relative z-10">
+      <main>
         <Hero />
-        <ProductShowcase />
-        <LatencyVisual />
-        <FeaturesGrid />
+        <DashboardScreenshot />
+        <ProblemStatement />
+        <MarqueeStrip />
+        <section id="product">
+          <IntelligenceSplit />
+          <PerformanceSplit />
+        </section>
+        <LiveCallExperience />
+        <ChannelReveal />
         <HowItWorks />
-        <SocialProof />
-        <Pricing />
+        <FeatureGrid />
         <FAQ />
+        <FinalCTA />
       </main>
       <Footer />
     </>

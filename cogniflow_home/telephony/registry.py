@@ -9,10 +9,12 @@ from cogniflow_home.telephony.browser_provider import BrowserProvider
 from cogniflow_home.telephony.exotel_provider import ExotelProvider
 from cogniflow_home.telephony.generic_provider import GenericProvider
 from cogniflow_home.telephony.twilio_provider import TwilioProvider
+from cogniflow_home.telephony.vobiz_provider import VobizProvider
 
 PROVIDERS: dict[str, type[TelephonyProvider]] = {
     "twilio": TwilioProvider,
     "exotel": ExotelProvider,
+    "vobiz": VobizProvider,
     "generic": GenericProvider,
     "browser": BrowserProvider,
 }

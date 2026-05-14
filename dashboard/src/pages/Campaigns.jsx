@@ -9,6 +9,7 @@ import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
+import PageHeader from "../components/PageHeader";
 
 const STATUS_COLORS = {
   draft: "secondary", active: "success", paused: "warning", completed: "default", failed: "destructive",
@@ -67,21 +68,21 @@ function CampaignCreateDialog({ open, onOpenChange, agents }) {
 
         <div className="flex gap-2 mb-5">
           {[1, 2, 3].map(s => (
-            <div key={s} className={`flex-1 h-1.5 rounded-full transition-all duration-300 ${step >= s ? "btn-gradient shadow-sm shadow-blue-500/20" : "bg-gray-800"}`} />
+            <div key={s} className="flex-1 h-1.5 rounded-full transition-all duration-300" style={{ background: step >= s ? 'var(--accent)' : 'var(--bg-muted)' }} />
           ))}
         </div>
 
         {step === 1 && (
           <div className="space-y-4 text-sm">
             <div>
-              <label className="block text-sm text-gray-400 mb-1.5 font-medium">Campaign Name *</label>
+              <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Campaign Name *</label>
               <input value={form.name} onChange={(e) => set("name", e.target.value)}
-                className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30" placeholder="Q4 Lead Outreach" />
+                className="w-full rounded-xl px-4 py-3 border outline-none transition-colors" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} placeholder="Q4 Lead Outreach" />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1.5 font-medium">Select Agent</label>
+              <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Select Agent</label>
               <select value={form.agent_id} onChange={(e) => set("agent_id", e.target.value)}
-                className="w-full glass-card rounded-xl px-4 py-3 border border-gray-700/30 bg-gray-800/30">
+                className="w-full rounded-xl px-4 py-3 border outline-none" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                 <option value="">Default Agent</option>
                 {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
               </select>
@@ -96,21 +97,21 @@ function CampaignCreateDialog({ open, onOpenChange, agents }) {
           <div className="space-y-4 text-sm">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-1.5 font-medium">Phone Numbers (one per line)</label>
+                <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Phone Numbers (one per line)</label>
                 <textarea value={form.phone_numbers} onChange={(e) => set("phone_numbers", e.target.value)}
                   rows={6} placeholder={"+919876543210\n+918765432109"}
-                  className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30 resize-none font-mono text-xs" />
-                {numbers.length > 0 && <p className="text-xs text-gray-500 mt-1.5">{numbers.length} numbers entered</p>}
+                  className="w-full rounded-xl px-4 py-3 border outline-none resize-none font-mono text-xs transition-colors" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
+                {numbers.length > 0 && <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>{numbers.length} numbers entered</p>}
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1.5 font-medium">Or upload CSV</label>
-                <div className="border-2 border-dashed border-gray-700/50 rounded-xl p-6 text-center hover:border-gray-500/50 transition-all duration-200">
+                <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Or upload CSV</label>
+                <div className="border-2 border-dashed rounded-xl p-6 text-center transition-all duration-200" style={{ borderColor: 'var(--border)' }}>
                   <input ref={fileRef} type="file" accept=".csv" className="hidden" id="csv-upload" />
                   <label htmlFor="csv-upload" className="cursor-pointer">
-                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center mx-auto mb-2">
-                      <Upload size={18} className="text-blue-400" />
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{ background: 'var(--accent-subtle)' }}>
+                      <Upload size={18} style={{ color: 'var(--accent)' }} />
                     </div>
-                    <p className="text-xs text-gray-400">Click to select CSV</p>
+                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Click to select CSV</p>
                   </label>
                 </div>
                 <Button size="sm" variant="outline" onClick={handleUpload} className="mt-3 w-full">
@@ -129,41 +130,41 @@ function CampaignCreateDialog({ open, onOpenChange, agents }) {
           <div className="space-y-5 text-sm">
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-1.5 font-medium">Max Concurrent</label>
+                <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Max Concurrent</label>
                 <input type="number" min={1} max={20} value={form.max_concurrent}
                   onChange={(e) => set("max_concurrent", e.target.value)}
-                  className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30" />
+                  className="w-full rounded-xl px-4 py-3 border outline-none transition-colors" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1.5 font-medium">Max Retries</label>
+                <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Max Retries</label>
                 <input type="number" min={0} max={5} value={form.retry_max}
                   onChange={(e) => set("retry_max", e.target.value)}
-                  className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30" />
+                  className="w-full rounded-xl px-4 py-3 border outline-none transition-colors" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1.5 font-medium">Retry Delay (min)</label>
+                <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Retry Delay (min)</label>
                 <input type="number" min={5} value={form.retry_delay_minutes}
                   onChange={(e) => set("retry_delay_minutes", e.target.value)}
-                  className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30" />
+                  className="w-full rounded-xl px-4 py-3 border outline-none transition-colors" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
               </div>
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-1.5 font-medium">Call Window Start</label>
+                <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Call Window Start</label>
                 <input type="time" value={form.call_window_start}
                   onChange={(e) => set("call_window_start", e.target.value)}
-                  className="w-full glass-card rounded-xl px-4 py-3 border border-gray-700/30 bg-gray-800/30" />
+                  className="w-full rounded-xl px-4 py-3 border outline-none" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1.5 font-medium">Call Window End</label>
+                <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Call Window End</label>
                 <input type="time" value={form.call_window_end}
                   onChange={(e) => set("call_window_end", e.target.value)}
-                  className="w-full glass-card rounded-xl px-4 py-3 border border-gray-700/30 bg-gray-800/30" />
+                  className="w-full rounded-xl px-4 py-3 border outline-none" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1.5 font-medium">Timezone</label>
+                <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Timezone</label>
                 <select value={form.timezone} onChange={(e) => set("timezone", e.target.value)}
-                  className="w-full glass-card rounded-xl px-4 py-3 border border-gray-700/30 bg-gray-800/30">
+                  className="w-full rounded-xl px-4 py-3 border outline-none" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                   <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
                   <option value="America/New_York">America/New_York (EST)</option>
                   <option value="America/Los_Angeles">America/LA (PST)</option>
@@ -173,9 +174,9 @@ function CampaignCreateDialog({ open, onOpenChange, agents }) {
               </div>
             </div>
 
-            <div className="glass-card rounded-xl p-4">
-              <p className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1.5">Summary</p>
-              <p className="text-sm text-gray-300">{form.name} — {numbers.length} contacts, max {form.max_concurrent} concurrent, window {form.call_window_start}–{form.call_window_end}</p>
+            <div className="rounded-xl border p-4" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+              <p className="text-xs uppercase tracking-wider font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Summary</p>
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{form.name} — {numbers.length} contacts, max {form.max_concurrent} concurrent, window {form.call_window_start}–{form.call_window_end}</p>
             </div>
 
             <div className="flex gap-3">
@@ -198,10 +199,9 @@ function CampaignAnalytics({ campaignId }) {
     enabled: !!campaignId,
   });
 
-  if (!data || data.total_calls === 0) return <p className="text-xs text-gray-500 mt-2">No analytics yet</p>;
+  if (!data || data.total_calls === 0) return <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>No analytics yet</p>;
 
   const dispositions = data.dispositions || {};
-  const colors = ["text-blue-400", "text-emerald-400", "text-violet-400", "text-amber-400"];
 
   return (
     <div className="mt-4 space-y-3">
@@ -211,10 +211,10 @@ function CampaignAnalytics({ campaignId }) {
           { label: "Conversion", value: `${data.conversion_rate}%` },
           { label: "Avg Duration", value: `${data.avg_duration}s` },
           { label: "Unique Contacts", value: data.unique_contacts },
-        ].map(({ label, value }, i) => (
-          <div key={label} className="rounded-xl bg-gray-800/30 p-3 text-center">
-            <p className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">{label}</p>
-            <p className={`text-sm font-bold ${colors[i]}`}>{value}</p>
+        ].map(({ label, value }) => (
+          <div key={label} className="rounded-xl p-3 text-center" style={{ background: 'var(--bg-muted)' }}>
+            <p className="text-[10px] uppercase tracking-wider font-medium" style={{ color: 'var(--text-muted)' }}>{label}</p>
+            <p className="text-sm font-bold" style={{ color: 'var(--accent)' }}>{value}</p>
           </div>
         ))}
       </div>
@@ -255,28 +255,28 @@ function ABTestPanel({ campaignId }) {
     <div className="mt-4">
       {hasTest ? (
         <div>
-          <p className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-3">A/B Test Results</p>
+          <p className="text-xs uppercase tracking-wider font-medium mb-3" style={{ color: 'var(--text-muted)' }}>A/B Test Results</p>
           <div className="space-y-2">
             {(results.variants || []).map((v, i) => (
-              <div key={i} className="flex items-center gap-3 text-xs glass-card rounded-xl p-3">
-                <span className="font-medium w-24">{v.name}</span>
-                <span className="text-gray-500">Calls: {v.total_calls || 0}</span>
-                <span className="text-gray-500">Conv: {v.conversion_rate || 0}%</span>
+              <div key={i} className="flex items-center gap-3 text-xs rounded-xl border p-3" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+                <span className="font-medium w-24" style={{ color: 'var(--text-primary)' }}>{v.name}</span>
+                <span style={{ color: 'var(--text-muted)' }}>Calls: {v.total_calls || 0}</span>
+                <span style={{ color: 'var(--text-muted)' }}>Conv: {v.conversion_rate || 0}%</span>
                 {results.winner === v.name && <Badge variant="success" className="text-[10px]">Winner</Badge>}
               </div>
             ))}
           </div>
         </div>
       ) : showSetup ? (
-        <div className="glass-card rounded-xl p-4 space-y-3">
-          <p className="text-xs text-gray-400 font-medium">Configure A/B Test Variants</p>
+        <div className="rounded-xl border p-4 space-y-3" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+          <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Configure A/B Test Variants</p>
           {variants.map((v, i) => (
             <div key={i} className="flex gap-3 items-center">
               <input value={v.name} onChange={(e) => { const copy = [...variants]; copy[i].name = e.target.value; setVariants(copy); }}
-                className="flex-1 glass-card rounded-xl px-3 py-2 text-xs input-glow border border-gray-700/30 bg-gray-800/30" />
+                className="flex-1 rounded-xl px-3 py-2 text-xs border outline-none transition-colors" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
               <input type="number" value={v.weight} onChange={(e) => { const copy = [...variants]; copy[i].weight = parseInt(e.target.value) || 0; setVariants(copy); }}
-                className="w-16 glass-card rounded-xl px-3 py-2 text-xs input-glow border border-gray-700/30 bg-gray-800/30" />
-              <span className="text-[10px] text-gray-500">%</span>
+                className="w-16 rounded-xl px-3 py-2 text-xs border outline-none transition-colors" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
+              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>%</span>
             </div>
           ))}
           <div className="flex gap-3">
@@ -298,10 +298,10 @@ function ProgressBar({ dialed, total }) {
   const pct = total > 0 ? (dialed / total) * 100 : 0;
   return (
     <div className="flex items-center gap-3">
-      <div className="flex-1 bg-gray-800/50 rounded-full h-2.5 overflow-hidden">
-        <div className="btn-gradient h-full rounded-full transition-all duration-500 shadow-sm shadow-blue-500/20" style={{ width: `${pct}%` }} />
+      <div className="flex-1 rounded-full h-2.5 overflow-hidden" style={{ background: 'var(--bg-muted)' }}>
+        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: 'var(--accent)' }} />
       </div>
-      <span className="text-xs text-gray-500 font-mono">{dialed}/{total} ({Math.round(pct)}%)</span>
+      <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{dialed}/{total} ({Math.round(pct)}%)</span>
     </div>
   );
 }
@@ -323,10 +323,10 @@ function CampaignCard({ campaign }) {
   const c = campaign;
 
   return (
-    <div className="glass-card rounded-xl p-5 transition-all duration-200">
+    <div className="rounded-xl border p-5 transition-all duration-200" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-3">
-          <h3 className="text-base font-semibold text-white">{c.name}</h3>
+          <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{c.name}</h3>
           <Badge variant={STATUS_COLORS[c.status] || "secondary"}>{c.status}</Badge>
         </div>
         <div className="flex gap-2 items-center">
@@ -340,7 +340,9 @@ function CampaignCard({ campaign }) {
               <Pause size={12} /> Pause
             </Button>
           )}
-          <button onClick={() => setExpanded(!expanded)} className="text-gray-500 hover:text-white p-1.5 rounded-lg hover:bg-gray-800/50 transition-all">
+          <button onClick={() => setExpanded(!expanded)} className="p-1.5 rounded-lg transition-all" style={{ color: 'var(--text-muted)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-muted)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; }}>
             {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </button>
         </div>
@@ -348,15 +350,15 @@ function CampaignCard({ campaign }) {
 
       <ProgressBar dialed={c.dialed_count || 0} total={c.total_numbers || 0} />
 
-      <div className="flex gap-4 mt-3 text-xs text-gray-500">
+      <div className="flex gap-4 mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
         <span className="flex items-center gap-1.5"><Users size={11} /> {c.total_numbers || 0} total</span>
         <span className="flex items-center gap-1.5"><Phone size={11} /> {c.dialed_count || 0} dialed</span>
-        <span className="flex items-center gap-1.5"><CheckCircle size={11} className="text-emerald-500" /> {c.completed_count || 0} completed</span>
-        <span className="flex items-center gap-1.5"><XCircle size={11} className="text-red-400" /> {c.failed_count || 0} failed</span>
+        <span className="flex items-center gap-1.5"><CheckCircle size={11} style={{ color: 'var(--success)' }} /> {c.completed_count || 0} completed</span>
+        <span className="flex items-center gap-1.5"><XCircle size={11} style={{ color: 'var(--danger)' }} /> {c.failed_count || 0} failed</span>
       </div>
 
       {expanded && (
-        <div className="mt-4 pt-4 border-t border-gray-800/30 animate-fade-in">
+        <div className="mt-4 pt-4 border-t animate-fade-in" style={{ borderColor: 'var(--border)' }}>
           <Tabs defaultValue="analytics">
             <TabsList>
               <TabsTrigger value="analytics">Analytics</TabsTrigger>
@@ -394,43 +396,53 @@ export default function Campaigns() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h2 className="text-2xl font-bold gradient-text">Campaigns</h2>
-          <p className="text-sm text-gray-500 mt-1">Manage outbound calling campaigns</p>
-        </div>
-        <Button size="sm" onClick={() => setShowCreate(true)}>
-          <Plus size={14} /> New Campaign
-        </Button>
-      </div>
+      <PageHeader
+        title="Campaigns"
+        description="Manage outbound calling campaigns"
+        action={
+          <button
+            onClick={() => setShowCreate(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors"
+            style={{ background: 'var(--accent)' }}
+          >
+            <Plus size={14} /> New Campaign
+          </button>
+        }
+      />
 
-      {active.length > 0 && (
-        <div className="mb-6">
-          <h3 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Live Campaigns
-          </h3>
-          <div className="space-y-4">
-            {active.map(c => <CampaignCard key={c.id} campaign={c} />)}
+      <div className="px-8 py-6">
+        {active.length > 0 && (
+          <div className="mb-6">
+            <h3 className="text-sm font-medium mb-3 flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
+              <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: 'var(--accent)' }} /> Live Campaigns
+            </h3>
+            <div className="space-y-4">
+              {active.map(c => <CampaignCard key={c.id} campaign={c} />)}
+            </div>
           </div>
+        )}
+
+        <div className="space-y-4">
+          {other.map(c => <CampaignCard key={c.id} campaign={c} />)}
         </div>
-      )}
 
-      <div className="space-y-4">
-        {other.map(c => <CampaignCard key={c.id} campaign={c} />)}
-      </div>
-
-      {campaigns.length === 0 && (
-        <div className="text-center py-16 glass-card rounded-xl">
-          <div className="w-14 h-14 rounded-2xl bg-blue-500/10 flex items-center justify-center mx-auto mb-4">
-            <BarChart3 size={24} className="text-blue-400" />
+        {campaigns.length === 0 && (
+          <div className="text-center py-16 rounded-xl border" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'var(--accent-subtle)' }}>
+              <BarChart3 size={24} style={{ color: 'var(--accent)' }} />
+            </div>
+            <p className="mb-1" style={{ color: 'var(--text-primary)' }}>No campaigns yet</p>
+            <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>Create your first outbound campaign to get started.</p>
+            <button
+              onClick={() => setShowCreate(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors"
+              style={{ background: 'var(--accent)' }}
+            >
+              <Plus size={14} /> Create Your First Campaign
+            </button>
           </div>
-          <p className="text-gray-400 mb-1">No campaigns yet</p>
-          <p className="text-gray-600 text-sm mb-4">Create your first outbound campaign to get started.</p>
-          <Button size="sm" onClick={() => setShowCreate(true)}>
-            <Plus size={14} /> Create Your First Campaign
-          </Button>
-        </div>
-      )}
+        )}
+      </div>
 
       <CampaignCreateDialog open={showCreate} onOpenChange={setShowCreate} agents={agents} />
     </div>

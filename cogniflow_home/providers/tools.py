@@ -1,6 +1,6 @@
 """Agent tools — functions the AI can call during a conversation.
 
-The LLM can invoke these tools via OpenAI function calling.
+The LLM can invoke these tools via function calling.
 Add new tools by defining the function and adding it to TOOL_REGISTRY.
 """
 

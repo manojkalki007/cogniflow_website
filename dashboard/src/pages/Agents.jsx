@@ -13,13 +13,13 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "../components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
+import PageHeader from "../components/PageHeader";
 
 const LLM_MODELS = {
   groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"],
-  openai: ["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"],
 };
 
-const TTS_PROVIDERS = ["cartesia", "smallest", "elevenlabs", "sarvam"];
+const TTS_PROVIDERS = ["smallest", "sarvam"];
 
 const AVAILABLE_TOOLS = [
   { id: "book_appointment", label: "Book Appointment", icon: "📅" },
@@ -46,11 +46,13 @@ function AgentFormDialog({ open, onOpenChange, agent, onSave }) {
     instructions: agent?.instructions || "",
     greeting: agent?.greeting || "",
     language: agent?.language || "en",
+    emotion_profile: agent?.emotion_profile || "friendly",
+    voice_gender: agent?.voice_gender || "female",
     voice_id: agent?.voice_id || "",
     phone_numbers: (agent?.phone_numbers || []).join(", "),
     llm_provider: agent?.llm_provider || "groq",
     llm_model: agent?.llm_model || "llama-3.3-70b-versatile",
-    tts_provider: agent?.tts_provider || "cartesia",
+    tts_provider: agent?.tts_provider || "smallest",
     temperature: agent?.temperature ?? 0.7,
     max_call_duration: agent?.max_call_duration || 600,
     enable_memory: agent?.enable_memory ?? true,
@@ -98,34 +100,57 @@ function AgentFormDialog({ open, onOpenChange, agent, onSave }) {
           <TabsContent value="basic">
             <div className="space-y-4 text-sm">
               <div>
-                <label className="block text-sm text-gray-400 mb-1.5 font-medium">Agent Name *</label>
+                <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Agent Name *</label>
                 <input value={form.name} onChange={(e) => set("name", e.target.value)}
-                  className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30" placeholder="Lead Qualifier" />
+                  className="w-full rounded-xl px-4 py-3 border focus:border-[var(--accent)]" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} placeholder="Lead Qualifier" />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1.5 font-medium">System Prompt *</label>
+                <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>System Prompt *</label>
                 <textarea value={form.instructions} onChange={(e) => set("instructions", e.target.value)}
-                  rows={6} className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30 resize-none font-mono text-xs"
+                  rows={6} className="w-full rounded-xl px-4 py-3 border focus:border-[var(--accent)] resize-none font-mono text-xs"
+                  style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
                   placeholder="You are a professional sales agent..." />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1.5 font-medium">Greeting Message</label>
+                <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Greeting Message</label>
                 <input value={form.greeting} onChange={(e) => set("greeting", e.target.value)}
-                  className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30"
+                  className="w-full rounded-xl px-4 py-3 border focus:border-[var(--accent)]"
+                  style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
                   placeholder="Hello! Thanks for calling Cogniflow. How can I help you today?" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1.5 font-medium">Language</label>
+                  <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Language</label>
                   <select value={form.language} onChange={(e) => set("language", e.target.value)}
-                    className="w-full glass-card rounded-xl px-4 py-3 border border-gray-700/30 bg-gray-800/30">
+                    className="w-full rounded-xl px-4 py-3 border outline-none" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                     {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1.5 font-medium">Phone Numbers</label>
+                  <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Phone Numbers</label>
                   <input value={form.phone_numbers} onChange={(e) => set("phone_numbers", e.target.value)}
-                    className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30 font-mono" placeholder="+1234, +5678" />
+                    className="w-full rounded-xl px-4 py-3 border focus:border-[var(--accent)] font-mono" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} placeholder="+1234, +5678" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Emotion Profile</label>
+                  <select value={form.emotion_profile} onChange={(e) => set("emotion_profile", e.target.value)}
+                    className="w-full rounded-xl px-4 py-3 border outline-none" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+                    <option value="friendly">Friendly & Efficient (General)</option>
+                    <option value="empathetic">Warm & Empathetic (Healthcare, Support)</option>
+                    <option value="energetic">Energetic & Persuasive (Sales, EdTech)</option>
+                    <option value="professional">Calm & Professional (Finance, Legal)</option>
+                    <option value="hinglish_friendly">Hinglish Natural (Desi, Casual)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Voice Gender</label>
+                  <select value={form.voice_gender} onChange={(e) => set("voice_gender", e.target.value)}
+                    className="w-full rounded-xl px-4 py-3 border outline-none" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+                    <option value="female">Female</option>
+                    <option value="male">Male</option>
+                  </select>
                 </div>
               </div>
             </div>
@@ -135,69 +160,73 @@ function AgentFormDialog({ open, onOpenChange, agent, onSave }) {
             <div className="space-y-5 text-sm">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1.5 font-medium">LLM Provider</label>
+                  <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>LLM Provider</label>
                   <select value={form.llm_provider} onChange={(e) => {
                     set("llm_provider", e.target.value);
                     set("llm_model", (LLM_MODELS[e.target.value] || [])[0] || "");
-                  }} className="w-full glass-card rounded-xl px-4 py-3 border border-gray-700/30 bg-gray-800/30">
+                  }} className="w-full rounded-xl px-4 py-3 border" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                     {Object.keys(LLM_MODELS).map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1.5 font-medium">Model</label>
+                  <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Model</label>
                   <select value={form.llm_model} onChange={(e) => set("llm_model", e.target.value)}
-                    className="w-full glass-card rounded-xl px-4 py-3 border border-gray-700/30 bg-gray-800/30">
+                    className="w-full rounded-xl px-4 py-3 border" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                     {(LLM_MODELS[form.llm_provider] || []).map(m => <option key={m} value={m}>{m}</option>)}
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm text-gray-400 mb-1.5 font-medium">Temperature: {form.temperature}</label>
+                <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Temperature: {form.temperature}</label>
                 <input type="range" min="0" max="2" step="0.1" value={form.temperature}
                   onChange={(e) => set("temperature", e.target.value)}
                   className="w-full accent-blue-500" />
-                <div className="flex justify-between text-[10px] text-gray-600 mt-1">
+                <div className="flex justify-between text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
                   <span>Precise (0)</span><span>Creative (2)</span>
                 </div>
               </div>
 
-              <div className="h-px bg-gradient-to-r from-transparent via-gray-700/50 to-transparent" />
+              <div className="h-px" style={{ background: 'var(--border)' }} />
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1.5 font-medium">TTS Provider</label>
+                  <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>TTS Provider</label>
                   <select value={form.tts_provider} onChange={(e) => set("tts_provider", e.target.value)}
-                    className="w-full glass-card rounded-xl px-4 py-3 border border-gray-700/30 bg-gray-800/30">
+                    className="w-full rounded-xl px-4 py-3 border" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                     {TTS_PROVIDERS.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1.5 font-medium">Voice ID</label>
+                  <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Voice ID</label>
                   <input value={form.voice_id} onChange={(e) => set("voice_id", e.target.value)}
-                    className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30 font-mono" placeholder="Voice ID" />
+                    className="w-full rounded-xl px-4 py-3 border focus:border-[var(--accent)] font-mono" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} placeholder="Voice ID" />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm text-gray-400 mb-1.5 font-medium">Max Call Duration (seconds)</label>
+                <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Max Call Duration (seconds)</label>
                 <input type="number" value={form.max_call_duration} onChange={(e) => set("max_call_duration", e.target.value)}
-                  className="w-32 glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30" />
+                  className="w-32 rounded-xl px-4 py-3 border focus:border-[var(--accent)]" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
               </div>
             </div>
           </TabsContent>
 
           <TabsContent value="tools">
             <div className="space-y-3">
-              <p className="text-sm text-gray-400">Enable the tools this agent can use during calls:</p>
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Enable the tools this agent can use during calls:</p>
               <div className="grid grid-cols-2 gap-3">
                 {AVAILABLE_TOOLS.map(tool => (
                   <button key={tool.id} onClick={() => toggleTool(tool.id)}
                     className={`flex items-center gap-3 p-4 rounded-xl border text-sm text-left transition-all duration-200 ${
                       form.tools_enabled.includes(tool.id)
-                        ? "border-blue-500/50 bg-blue-500/10 text-white shadow-md shadow-blue-500/5"
-                        : "border-gray-700/30 bg-gray-800/30 text-gray-400 hover:border-gray-600/50"
-                    }`}>
+                        ? "border-blue-500/50 bg-blue-500/10 shadow-md shadow-blue-500/5"
+                        : "hover:border-gray-600/50"
+                    }`}
+                    style={form.tools_enabled.includes(tool.id)
+                      ? { color: 'var(--text-primary)' }
+                      : { borderColor: 'var(--border)', background: 'var(--bg-muted)', color: 'var(--text-secondary)' }
+                    }>
                     <span className="text-lg">{tool.icon}</span>
                     <span>{tool.label}</span>
                   </button>
@@ -208,7 +237,7 @@ function AgentFormDialog({ open, onOpenChange, agent, onSave }) {
 
           <TabsContent value="features">
             <div className="space-y-3">
-              <p className="text-sm text-gray-400">Toggle AI features for this agent:</p>
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Toggle AI features for this agent:</p>
               {[
                 { key: "enable_memory", label: "Caller Memory", desc: "Remember callers across sessions", icon: Brain },
                 { key: "enable_prediction", label: "Pre-Call Prediction", desc: "Predict caller intent before answering", icon: BarChart3 },
@@ -216,14 +245,14 @@ function AgentFormDialog({ open, onOpenChange, agent, onSave }) {
                 { key: "enable_language_switch", label: "Language Switching", desc: "Auto-detect and switch languages mid-call", icon: Wrench },
                 { key: "enable_rag", label: "Knowledge Base (RAG)", desc: "Use uploaded documents during calls", icon: Shield },
               ].map(({ key, label, desc, icon: Icon }) => (
-                <div key={key} className="flex items-center justify-between p-4 glass-card rounded-xl">
+                <div key={key} className="flex items-center justify-between p-4 rounded-xl border" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                      <Icon size={15} className="text-blue-400" />
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--accent-subtle)' }}>
+                      <Icon size={15} style={{ color: 'var(--accent)' }} />
                     </div>
                     <div>
-                      <p className="text-sm font-medium">{label}</p>
-                      <p className="text-xs text-gray-500">{desc}</p>
+                      <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{label}</p>
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{desc}</p>
                     </div>
                   </div>
                   <button onClick={() => set(key, !form[key])}
@@ -244,6 +273,45 @@ function AgentFormDialog({ open, onOpenChange, agent, onSave }) {
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function LatencyBar({ eot_ms, llm_ms, tts_ms, total_ms }) {
+  const wrapStyles = total_ms < 600
+    ? "bg-emerald-500/5 border-emerald-500/15"
+    : total_ms < 1000
+      ? "bg-amber-500/5 border-amber-500/15"
+      : "bg-red-500/5 border-red-500/15";
+  const totalLabel = total_ms < 600
+    ? "text-emerald-400"
+    : total_ms < 1000
+      ? "text-amber-400"
+      : "text-red-400";
+  const segColor = (ms, good, ok) =>
+    ms < good ? "bg-emerald-500/60" : ms < ok ? "bg-amber-500/60" : "bg-red-500/60";
+  const total = eot_ms + llm_ms + tts_ms || 1;
+
+  return (
+    <div className="w-full px-2 py-1.5">
+      <div className={`rounded-lg border px-3 py-2 ${wrapStyles}`}>
+        <div className="flex items-center justify-between mb-1.5">
+          <span className={`text-[10px] font-bold tracking-wider uppercase ${totalLabel}`}>
+            {total_ms}ms
+          </span>
+          <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>Turn latency</span>
+        </div>
+        <div className="flex h-1.5 rounded-full overflow-hidden mb-1.5" style={{ background: 'var(--bg-muted)' }}>
+          <div className={`${segColor(eot_ms, 80, 150)} transition-all`} style={{ width: `${(eot_ms / total) * 100}%` }} />
+          <div className={`${segColor(llm_ms, 300, 500)} transition-all`} style={{ width: `${(llm_ms / total) * 100}%` }} />
+          <div className={`${segColor(tts_ms, 300, 500)} transition-all`} style={{ width: `${(tts_ms / total) * 100}%` }} />
+        </div>
+        <div className="flex gap-3 text-[9px]" style={{ color: 'var(--text-muted)' }}>
+          <span>EOT <span className="font-mono" style={{ color: 'var(--text-secondary)' }}>{eot_ms}ms</span></span>
+          <span>LLM <span className="font-mono" style={{ color: 'var(--text-secondary)' }}>{llm_ms}ms</span></span>
+          <span>TTS <span className="font-mono" style={{ color: 'var(--text-secondary)' }}>{tts_ms}ms</span></span>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -361,6 +429,15 @@ function TestCallPanel({ agent, onClose }) {
           scheduleAudioChunk(bytes);
         } else if (msg.event === "transcript") {
           setTranscript(prev => [...prev, { role: msg.role, text: msg.text }]);
+        } else if (msg.event === "latency") {
+          setTranscript(prev => [...prev, {
+            role: "latency",
+            turn: msg.turn,
+            eot_ms: msg.eot_ms,
+            llm_ms: msg.llm_ms,
+            tts_ms: msg.tts_ms,
+            total_ms: msg.total_ms,
+          }]);
         } else if (msg.event === "clear") {
           nextPlayTimeRef.current = 0;
         } else if (msg.event === "error") {
@@ -389,16 +466,16 @@ function TestCallPanel({ agent, onClose }) {
   const formatTime = (s) => `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
 
   return (
-    <div className="mt-4 pt-4 border-t border-gray-800/30 animate-fade-in">
+    <div className="mt-4 pt-4 border-t animate-fade-in" style={{ borderColor: 'var(--border)' }}>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-lg bg-emerald-500/10 flex items-center justify-center">
             <PhoneCall size={12} className="text-emerald-400" />
           </div>
-          <span className="text-xs font-medium text-gray-300">Voice Test</span>
-          <span className="text-[10px] text-gray-600">with {agent.name}</span>
+          <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Voice Test</span>
+          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>with {agent.name}</span>
         </div>
-        <button onClick={() => { cleanup(); onClose(); }} className="text-gray-500 hover:text-white p-1 rounded-lg hover:bg-gray-800/50 transition-all">
+        <button onClick={() => { cleanup(); onClose(); }} className="p-1 rounded-lg transition-all" style={{ color: 'var(--text-muted)' }}>
           <X size={14} />
         </button>
       </div>
@@ -415,24 +492,28 @@ function TestCallPanel({ agent, onClose }) {
             <div className="px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-400">{error}</div>
           )}
           {status === "ended" && transcript.length > 0 && (
-            <div className="max-h-48 overflow-y-auto rounded-xl bg-gray-900/50 border border-gray-800/30 p-3 space-y-2">
-              {transcript.map((t, i) => (
-                <div key={i} className={`flex gap-2 text-xs ${t.role === "user" ? "justify-end" : ""}`}>
-                  <div className={`max-w-[85%] px-3 py-1.5 rounded-xl ${
-                    t.role === "user"
-                      ? "bg-blue-500/15 text-blue-300 border border-blue-500/20"
-                      : "bg-gray-800/50 text-gray-300 border border-gray-700/20"
-                  }`}>
-                    <span className="font-medium text-[10px] uppercase tracking-wider opacity-60 block mb-0.5">
-                      {t.role === "user" ? "You" : agent.name}
-                    </span>
-                    {t.text}
+            <div className="max-h-48 overflow-y-auto rounded-xl border p-3 space-y-2" style={{ background: 'var(--bg-muted)', borderColor: 'var(--border)' }}>
+              {transcript.map((t, i) =>
+                t.role === "latency" ? (
+                  <LatencyBar key={i} eot_ms={t.eot_ms} llm_ms={t.llm_ms} tts_ms={t.tts_ms} total_ms={t.total_ms} />
+                ) : (
+                  <div key={i} className={`flex gap-2 text-xs ${t.role === "user" ? "justify-end" : ""}`}>
+                    <div className={`max-w-[85%] px-3 py-1.5 rounded-xl ${
+                      t.role === "user"
+                        ? "bg-blue-500/15 text-blue-300 border border-blue-500/20"
+                        : "border"
+                    }`} style={t.role === "user" ? {} : { background: 'var(--bg-muted)', color: 'var(--text-secondary)', borderColor: 'var(--border)' }}>
+                      <span className="font-medium text-[10px] uppercase tracking-wider opacity-60 block mb-0.5">
+                        {t.role === "user" ? "You" : agent.name}
+                      </span>
+                      {t.text}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              )}
             </div>
           )}
-          <p className="text-xs text-gray-500">Talk to this agent in real-time using your microphone. The agent will respond with voice.</p>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Talk to this agent in real-time using your microphone. The agent will respond with voice.</p>
           <Button size="sm" onClick={startCall} className="w-full gap-1.5">
             <Phone size={14} /> {status === "ended" ? "Call Again" : "Start Voice Conversation"}
           </Button>
@@ -442,7 +523,7 @@ function TestCallPanel({ agent, onClose }) {
           <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center bg-amber-500/10 animate-pulse">
             <Loader2 size={24} className="text-amber-400 animate-spin" />
           </div>
-          <p className="text-sm text-gray-400 mt-4">Connecting to agent...</p>
+          <p className="text-sm mt-4" style={{ color: 'var(--text-secondary)' }}>Connecting to agent...</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -455,7 +536,7 @@ function TestCallPanel({ agent, onClose }) {
               </div>
               <div>
                 <p className="text-sm font-medium text-emerald-400">Live — Speak now</p>
-                <p className="text-lg font-bold text-white font-mono">{formatTime(duration)}</p>
+                <p className="text-lg font-bold font-mono" style={{ color: 'var(--text-primary)' }}>{formatTime(duration)}</p>
               </div>
             </div>
             <Button variant="destructive" size="sm" onClick={endCall} className="gap-1.5">
@@ -464,26 +545,30 @@ function TestCallPanel({ agent, onClose }) {
           </div>
 
           {transcript.length > 0 && (
-            <div className="max-h-48 overflow-y-auto rounded-xl bg-gray-900/50 border border-gray-800/30 p-3 space-y-2">
-              {transcript.map((t, i) => (
-                <div key={i} className={`flex gap-2 text-xs ${t.role === "user" ? "justify-end" : ""}`}>
-                  <div className={`max-w-[85%] px-3 py-1.5 rounded-xl ${
-                    t.role === "user"
-                      ? "bg-blue-500/15 text-blue-300 border border-blue-500/20"
-                      : "bg-gray-800/50 text-gray-300 border border-gray-700/20"
-                  }`}>
-                    <span className="font-medium text-[10px] uppercase tracking-wider opacity-60 block mb-0.5">
-                      {t.role === "user" ? "You" : agent.name}
-                    </span>
-                    {t.text}
+            <div className="max-h-48 overflow-y-auto rounded-xl border p-3 space-y-2" style={{ background: 'var(--bg-muted)', borderColor: 'var(--border)' }}>
+              {transcript.map((t, i) =>
+                t.role === "latency" ? (
+                  <LatencyBar key={i} eot_ms={t.eot_ms} llm_ms={t.llm_ms} tts_ms={t.tts_ms} total_ms={t.total_ms} />
+                ) : (
+                  <div key={i} className={`flex gap-2 text-xs ${t.role === "user" ? "justify-end" : ""}`}>
+                    <div className={`max-w-[85%] px-3 py-1.5 rounded-xl ${
+                      t.role === "user"
+                        ? "bg-blue-500/15 text-blue-300 border border-blue-500/20"
+                        : "border"
+                    }`} style={t.role === "user" ? {} : { background: 'var(--bg-muted)', color: 'var(--text-secondary)', borderColor: 'var(--border)' }}>
+                      <span className="font-medium text-[10px] uppercase tracking-wider opacity-60 block mb-0.5">
+                        {t.role === "user" ? "You" : agent.name}
+                      </span>
+                      {t.text}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              )}
               <div ref={transcriptEndRef} />
             </div>
           )}
 
-          <p className="text-[10px] text-gray-600 text-center">Your mic is active. The agent will respond by voice.</p>
+          <p className="text-[10px] text-center" style={{ color: 'var(--text-muted)' }}>Your mic is active. The agent will respond by voice.</p>
         </div>
       )}
     </div>
@@ -499,20 +584,18 @@ function AgentPerformance({ agentId }) {
 
   if (!data || data.total_calls === 0) return null;
 
-  const colors = ["text-blue-400", "text-emerald-400", "text-violet-400", "text-amber-400"];
-  const bgs = ["bg-blue-500/10", "bg-emerald-500/10", "bg-violet-500/10", "bg-amber-500/10"];
-
   return (
-    <div className="grid grid-cols-4 gap-3 mt-4 pt-4 border-t border-gray-800/30">
+    <div className="grid grid-cols-4 gap-3 mt-4 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
       {[
         { label: "Calls", value: data.total_calls },
         { label: "Avg Duration", value: `${data.avg_duration}s` },
         { label: "Sentiment", value: data.avg_sentiment },
         { label: "Conversion", value: `${data.conversion_rate}%` },
       ].map(({ label, value }, i) => (
-        <div key={label} className="rounded-xl bg-gray-800/30 p-3 text-center">
-          <p className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">{label}</p>
-          <p className={`text-sm font-bold ${colors[i]}`}>{value}</p>
+        <div key={label} className="rounded-xl p-3 text-center" style={{ background: 'var(--bg-muted)' }}>
+          <p className="text-[10px] uppercase tracking-wider font-medium" style={{ color: 'var(--text-muted)' }}>{label}</p>
+          <p className={`text-sm font-bold ${i === 0 ? "" : ["", "text-emerald-400", "text-violet-400", "text-amber-400"][i]}`}
+            style={i === 0 ? { color: 'var(--accent)' } : {}}>{value}</p>
         </div>
       ))}
     </div>
@@ -523,14 +606,14 @@ function AgentCard({ agent, onEdit, onDelete, onClone }) {
   const [showTest, setShowTest] = useState(false);
 
   return (
-    <div className="glass-card rounded-xl p-5 transition-all duration-200">
+    <div className="rounded-xl border p-5 transition-all duration-200" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
       <div className="flex justify-between items-start mb-3">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center">
-            <Bot size={16} className="text-blue-400" />
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'var(--accent-subtle)' }}>
+            <Bot size={16} style={{ color: 'var(--accent)' }} />
           </div>
           <div>
-            <h3 className="text-base font-semibold text-white">{agent.name}</h3>
+            <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{agent.name}</h3>
             <div className="flex gap-2 mt-1">
               <Badge variant={agent.is_active ? "success" : "secondary"}>
                 {agent.is_active ? "Active" : "Inactive"}
@@ -550,13 +633,13 @@ function AgentCard({ agent, onEdit, onDelete, onClone }) {
         </div>
       </div>
 
-      <p className="text-sm text-gray-400 line-clamp-2 mb-3">{agent.instructions}</p>
+      <p className="text-sm line-clamp-2 mb-3" style={{ color: 'var(--text-secondary)' }}>{agent.instructions}</p>
 
-      <div className="flex gap-3 text-xs text-gray-500 flex-wrap mb-3">
-        <span className="px-2 py-1 rounded-lg bg-gray-800/50">{agent.llm_provider || "groq"} / {agent.llm_model || "llama-3.3-70b"}</span>
-        <span className="px-2 py-1 rounded-lg bg-gray-800/50">TTS: {agent.tts_provider || "cartesia"}</span>
-        <span className="px-2 py-1 rounded-lg bg-gray-800/50">Lang: {agent.language || "en"}</span>
-        <span className="px-2 py-1 rounded-lg bg-gray-800/50">Numbers: {(agent.phone_numbers || []).length}</span>
+      <div className="flex gap-3 text-xs flex-wrap mb-3" style={{ color: 'var(--text-muted)' }}>
+        <span className="px-2 py-1 rounded-lg" style={{ background: 'var(--bg-muted)' }}>{agent.llm_provider || "groq"} / {agent.llm_model || "llama-3.3-70b"}</span>
+        <span className="px-2 py-1 rounded-lg" style={{ background: 'var(--bg-muted)' }}>TTS: {agent.tts_provider || "smallest"}</span>
+        <span className="px-2 py-1 rounded-lg" style={{ background: 'var(--bg-muted)' }}>Lang: {agent.language || "en"}</span>
+        <span className="px-2 py-1 rounded-lg" style={{ background: 'var(--bg-muted)' }}>Numbers: {(agent.phone_numbers || []).length}</span>
       </div>
 
       <div className="flex gap-1.5 flex-wrap">
@@ -603,7 +686,7 @@ function CloneDialog({ open, onOpenChange, sourceAgent }) {
         {cloneResult ? (
           <div className="space-y-4">
             <Badge variant="success">Clone Generated</Badge>
-            <div className="glass-card rounded-xl p-4 text-sm text-gray-300 max-h-48 overflow-auto whitespace-pre-wrap">
+            <div className="rounded-xl border p-4 text-sm max-h-48 overflow-auto whitespace-pre-wrap" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-secondary)' }}>
               {cloneResult.instructions || "Agent cloned successfully"}
             </div>
             <Button onClick={handleClose} className="w-full">Done</Button>
@@ -611,16 +694,16 @@ function CloneDialog({ open, onOpenChange, sourceAgent }) {
         ) : (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm text-gray-400 mb-1.5 font-medium">New Agent Name</label>
+              <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>New Agent Name</label>
               <input value={agentName} onChange={(e) => setAgentName(e.target.value)}
                 placeholder={`Clone of ${sourceAgent?.name || "Agent"}`}
-                className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30 text-sm" />
+                className="w-full rounded-xl px-4 py-3 border focus:border-[var(--accent)] text-sm" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1.5 font-medium">Recording URLs (one per line)</label>
+              <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Recording URLs (one per line)</label>
               <textarea value={recordings} onChange={(e) => setRecordings(e.target.value)}
                 rows={4} placeholder="https://storage.example.com/call-1.mp3"
-                className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30 text-sm resize-none font-mono" />
+                className="w-full rounded-xl px-4 py-3 border focus:border-[var(--accent)] text-sm resize-none font-mono" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
             </div>
             <Button onClick={handleClone} disabled={cloneMut.isPending || !recordings.trim()} className="w-full">
               {cloneMut.isPending ? <><Loader2 size={14} className="animate-spin" /> Analyzing...</> : <><Upload size={14} /> Clone Agent</>}
@@ -665,40 +748,42 @@ export default function Agents() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h2 className="text-2xl font-bold gradient-text">Agents</h2>
-          <p className="text-sm text-gray-500 mt-1">Configure and manage your AI voice agents</p>
-        </div>
-        <div className="flex gap-3">
-          <Button variant="outline" size="sm" onClick={() => setCloneDialog({ open: true, source: null })}>
-            <Copy size={14} /> Clone from Recordings
-          </Button>
-          <Button size="sm" onClick={() => setFormDialog({ open: true, agent: null })}>
-            <Plus size={14} /> New Agent
-          </Button>
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        {agents.map((a) => (
-          <AgentCard key={a.id} agent={a}
-            onEdit={(agent) => setFormDialog({ open: true, agent })}
-            onDelete={(id) => deleteMut.mutate(id)}
-            onClone={(agent) => setCloneDialog({ open: true, source: agent })} />
-        ))}
-        {agents.length === 0 && (
-          <div className="text-center py-16 glass-card rounded-xl">
-            <div className="w-14 h-14 rounded-2xl bg-blue-500/10 flex items-center justify-center mx-auto mb-4">
-              <Bot size={24} className="text-blue-400" />
-            </div>
-            <p className="text-gray-400 mb-1">No agents configured</p>
-            <p className="text-gray-600 text-sm mb-4">Using default agent. Create one to get started.</p>
+      <PageHeader
+        title="Agents"
+        description="Configure and manage your AI voice agents"
+        action={
+          <div className="flex gap-3">
+            <Button variant="outline" size="sm" onClick={() => setCloneDialog({ open: true, source: null })}>
+              <Copy size={14} /> Clone from Recordings
+            </Button>
             <Button size="sm" onClick={() => setFormDialog({ open: true, agent: null })}>
-              <Plus size={14} /> Create Your First Agent
+              <Plus size={14} /> New Agent
             </Button>
           </div>
-        )}
+        }
+      />
+
+      <div className="px-8 py-6">
+        <div className="space-y-4">
+          {agents.map((a) => (
+            <AgentCard key={a.id} agent={a}
+              onEdit={(agent) => setFormDialog({ open: true, agent })}
+              onDelete={(id) => deleteMut.mutate(id)}
+              onClone={(agent) => setCloneDialog({ open: true, source: agent })} />
+          ))}
+          {agents.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-20 gap-3 rounded-xl border" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'var(--accent-subtle)' }}>
+                <Bot size={20} style={{ color: 'var(--accent)' }} />
+              </div>
+              <p className="font-medium" style={{ color: 'var(--text-primary)' }}>No agents configured</p>
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Using default agent. Create one to get started.</p>
+              <Button size="sm" onClick={() => setFormDialog({ open: true, agent: null })}>
+                <Plus size={14} /> Create Your First Agent
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       <AgentFormDialog open={formDialog.open} onOpenChange={(open) => setFormDialog({ open, agent: formDialog.agent })}

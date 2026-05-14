@@ -10,6 +10,7 @@ import { Button } from "../components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "../components/ui/dialog";
+import PageHeader from "../components/PageHeader";
 
 const BASE = import.meta.env.VITE_API_URL || "";
 const API_KEY = import.meta.env.VITE_API_KEY || "";
@@ -48,12 +49,15 @@ const TAG_FILTERS = [
 
 function TemplateCard({ template, onPreview }) {
   return (
-    <div className="glass-card rounded-xl p-5 flex flex-col transition-all duration-200 group">
+    <div
+      className="rounded-xl border p-5 flex flex-col transition-all duration-200 group"
+      style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+    >
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="flex items-center gap-3 min-w-0">
           <span className="text-3xl shrink-0">{template.icon}</span>
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-white leading-snug">{template.name}</h3>
+            <h3 className="text-sm font-semibold leading-snug" style={{ color: 'var(--text-primary)' }}>{template.name}</h3>
             <Badge variant="secondary" className="mt-1 text-[10px]">
               {template.industry}
             </Badge>
@@ -64,7 +68,7 @@ function TemplateCard({ template, onPreview }) {
         </Badge>
       </div>
 
-      <p className="text-sm text-gray-400 line-clamp-2 mb-3">{template.description}</p>
+      <p className="text-sm line-clamp-2 mb-3" style={{ color: 'var(--text-secondary)' }}>{template.description}</p>
 
       <div className="flex flex-wrap gap-1.5 mb-3">
         {template.languages.map((lang) => (
@@ -74,7 +78,7 @@ function TemplateCard({ template, onPreview }) {
         ))}
       </div>
 
-      <div className="flex items-center gap-3 text-xs text-gray-500 mb-4">
+      <div className="flex items-center gap-3 text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
         <span className="flex items-center gap-1">
           <Wrench size={12} />
           {template.tools_used.length} tools
@@ -86,7 +90,13 @@ function TemplateCard({ template, onPreview }) {
       </div>
 
       <div className="mt-auto">
-        <Button variant="outline" size="sm" className="w-full" onClick={() => onPreview(template)}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full"
+          style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}
+          onClick={() => onPreview(template)}
+        >
           <Eye size={14} /> Preview & Deploy
         </Button>
       </div>
@@ -145,17 +155,17 @@ function PreviewDialog({ open, onOpenChange, template }) {
 
         {deployResult ? (
           <div className="space-y-5 text-center py-6">
-            <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto">
-              <CheckCircle2 size={32} className="text-emerald-400" />
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto" style={{ background: 'var(--accent-subtle)' }}>
+              <CheckCircle2 size={32} style={{ color: 'var(--accent)' }} />
             </div>
             <div>
-              <p className="text-lg font-semibold text-white">Agent Deployed!</p>
-              <p className="text-sm text-gray-400 mt-1">
+              <p className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Agent Deployed!</p>
+              <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
                 {deployResult.agent_name || template.name} is ready to take calls.
               </p>
             </div>
             <div className="flex gap-3 justify-center">
-              <Button onClick={() => navigate("/dashboard/agents")}>
+              <Button onClick={() => navigate("/dashboard/agents")} style={{ background: 'var(--accent)', color: 'white' }}>
                 <ArrowRight size={14} /> Go to Agents
               </Button>
               <Button variant="outline" onClick={handleClose}>Close</Button>
@@ -163,18 +173,18 @@ function PreviewDialog({ open, onOpenChange, template }) {
           </div>
         ) : (
           <div className="space-y-5">
-            <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl px-4 py-3">
-              <p className="text-sm font-medium text-blue-400">{template.roi_headline}</p>
+            <div className="rounded-xl px-4 py-3 border" style={{ background: 'var(--accent-subtle)', borderColor: 'var(--accent)' }}>
+              <p className="text-sm font-medium" style={{ color: 'var(--accent)' }}>{template.roi_headline}</p>
             </div>
 
             <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1.5">Description</p>
-              <p className="text-sm text-gray-300">{template.description}</p>
+              <p className="text-xs uppercase tracking-wider font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Description</p>
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{template.description}</p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-2">Languages</p>
+                <p className="text-xs uppercase tracking-wider font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Languages</p>
                 <div className="flex flex-wrap gap-1.5">
                   {template.languages.map((lang) => (
                     <Badge key={lang} variant="outline" className="text-[10px]">
@@ -184,13 +194,13 @@ function PreviewDialog({ open, onOpenChange, template }) {
                 </div>
               </div>
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-2">Industry</p>
+                <p className="text-xs uppercase tracking-wider font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Industry</p>
                 <Badge variant="secondary">{template.industry}</Badge>
               </div>
             </div>
 
             <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-2">Tools Used</p>
+              <p className="text-xs uppercase tracking-wider font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Tools Used</p>
               <div className="flex flex-wrap gap-1.5">
                 {template.tools_used.map((tool) => (
                   <Badge key={tool} variant="default" className="text-[10px]">
@@ -201,21 +211,21 @@ function PreviewDialog({ open, onOpenChange, template }) {
             </div>
 
             <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-2">
+              <p className="text-xs uppercase tracking-wider font-medium mb-2" style={{ color: 'var(--text-muted)' }}>
                 <MessageSquare size={12} className="inline mr-1" />
                 Sample Questions
               </p>
               <ul className="space-y-2">
                 {template.sample_questions.map((q, i) => (
-                  <li key={i} className="text-sm text-gray-400 flex items-start gap-2.5 p-2.5 rounded-lg bg-gray-800/30">
-                    <span className="text-blue-400 mt-0.5 shrink-0 font-mono text-xs">{i + 1}</span>
+                  <li key={i} className="text-sm flex items-start gap-2.5 p-2.5 rounded-lg" style={{ color: 'var(--text-secondary)', background: 'var(--bg-muted)' }}>
+                    <span className="mt-0.5 shrink-0 font-mono text-xs" style={{ color: 'var(--accent)' }}>{i + 1}</span>
                     <span>{q}</span>
                   </li>
                 ))}
               </ul>
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-gray-500">
+            <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
               <Clock size={12} />
               Deploy time: {template.deploy_time}
               <span className="mx-1">·</span>
@@ -226,37 +236,46 @@ function PreviewDialog({ open, onOpenChange, template }) {
             </div>
 
             {showCustomise && (
-              <div className="space-y-4 glass-card rounded-xl p-5 animate-fade-in">
-                <p className="text-sm font-medium text-white">Customise Before Deploying</p>
+              <div className="space-y-4 rounded-xl border p-5 animate-fade-in" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Customise Before Deploying</p>
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1.5 font-medium">Company Name</label>
+                  <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Company Name</label>
                   <input
                     value={form.company_name}
                     onChange={(e) => setForm({ ...form, company_name: e.target.value })}
-                    className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30 text-sm"
+                    className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-colors"
+                    style={{ background: 'var(--bg-muted)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                    onFocus={(e) => e.target.style.borderColor = 'var(--accent)'}
+                    onBlur={(e) => e.target.style.borderColor = 'var(--border)'}
                     placeholder="Your Company Name"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1.5 font-medium">Agent Name</label>
+                  <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Agent Name</label>
                   <input
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30 text-sm"
+                    className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-colors"
+                    style={{ background: 'var(--bg-muted)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                    onFocus={(e) => e.target.style.borderColor = 'var(--accent)'}
+                    onBlur={(e) => e.target.style.borderColor = 'var(--border)'}
                     placeholder={template.name}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1.5 font-medium">Additional Instructions</label>
+                  <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Additional Instructions</label>
                   <textarea
                     value={form.instructions_extra}
                     onChange={(e) => setForm({ ...form, instructions_extra: e.target.value })}
                     rows={3}
-                    className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30 text-sm resize-none"
+                    className="w-full rounded-xl px-4 py-3 text-sm resize-none outline-none transition-colors"
+                    style={{ background: 'var(--bg-muted)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                    onFocus={(e) => e.target.style.borderColor = 'var(--accent)'}
+                    onBlur={(e) => e.target.style.borderColor = 'var(--border)'}
                     placeholder="Any extra instructions for this agent..."
                   />
                 </div>
-                <Button onClick={handleDeployCustom} disabled={deployMut.isPending} className="w-full">
+                <Button onClick={handleDeployCustom} disabled={deployMut.isPending} className="w-full" style={{ background: 'var(--accent)', color: 'white' }}>
                   {deployMut.isPending ? (
                     <><Loader2 size={14} className="animate-spin" /> Deploying...</>
                   ) : (
@@ -268,7 +287,7 @@ function PreviewDialog({ open, onOpenChange, template }) {
 
             {!showCustomise && (
               <div className="flex gap-3">
-                <Button onClick={handleDeployInstantly} disabled={deployMut.isPending} className="flex-1">
+                <Button onClick={handleDeployInstantly} disabled={deployMut.isPending} className="flex-1" style={{ background: 'var(--accent)', color: 'white' }}>
                   {deployMut.isPending ? (
                     <><Loader2 size={14} className="animate-spin" /> Deploying...</>
                   ) : (
@@ -303,57 +322,58 @@ export default function Templates() {
     : templates.filter((t) => t.tags.includes(activeFilter));
 
   return (
-    <div>
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold gradient-text">Agent Templates</h2>
-        <p className="text-sm text-gray-500 mt-1">
-          Prebuilt AI agent templates ready to deploy in minutes
-        </p>
-      </div>
+    <div style={{ background: 'var(--bg-subtle)' }}>
+      <PageHeader title="Templates" description="Pre-built agent templates for common use cases" />
 
-      <div className="flex gap-2 mb-6">
-        {TAG_FILTERS.map(({ key, label, icon: Icon }) => (
-          <Button
-            key={key}
-            variant={activeFilter === key ? "default" : "outline"}
-            size="sm"
-            onClick={() => setActiveFilter(key)}
-          >
-            <Icon size={14} /> {label}
-          </Button>
-        ))}
-      </div>
-
-      {isLoading && (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 size={24} className="animate-spin text-blue-400" />
-        </div>
-      )}
-
-      {!isLoading && filtered.length === 0 && (
-        <div className="text-center py-16 glass-card rounded-xl">
-          <div className="w-14 h-14 rounded-2xl bg-violet-500/10 flex items-center justify-center mx-auto mb-4">
-            <Sparkles size={24} className="text-violet-400" />
-          </div>
-          <p className="text-gray-400">
-            {templates.length === 0
-              ? "No templates available yet."
-              : "No templates match this filter."}
-          </p>
-        </div>
-      )}
-
-      {!isLoading && filtered.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filtered.map((template) => (
-            <TemplateCard
-              key={template.id}
-              template={template}
-              onPreview={setPreviewTemplate}
-            />
+      <div className="px-8 py-6">
+        <div className="flex gap-2 mb-6">
+          {TAG_FILTERS.map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+              style={
+                activeFilter === key
+                  ? { background: 'var(--accent)', color: 'white' }
+                  : { color: 'var(--text-muted)', background: 'transparent' }
+              }
+              onClick={() => setActiveFilter(key)}
+            >
+              <Icon size={14} /> {label}
+            </button>
           ))}
         </div>
-      )}
+
+        {isLoading && (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 size={24} className="animate-spin" style={{ color: 'var(--accent)' }} />
+          </div>
+        )}
+
+        {!isLoading && filtered.length === 0 && (
+          <div className="text-center py-16 rounded-xl border" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'var(--accent-subtle)' }}>
+              <Sparkles size={24} style={{ color: 'var(--accent)' }} />
+            </div>
+            <p style={{ color: 'var(--text-secondary)' }}>
+              {templates.length === 0
+                ? "No templates available yet."
+                : "No templates match this filter."}
+            </p>
+          </div>
+        )}
+
+        {!isLoading && filtered.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filtered.map((template) => (
+              <TemplateCard
+                key={template.id}
+                template={template}
+                onPreview={setPreviewTemplate}
+              />
+            ))}
+          </div>
+        )}
+      </div>
 
       <PreviewDialog
         open={!!previewTemplate}

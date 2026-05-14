@@ -10,6 +10,8 @@ import logging
 from openai import AsyncOpenAI
 
 from cogniflow_home.config import settings
+
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 from cogniflow_home.db.supabase import db
 from cogniflow_home.events import bus
 
@@ -52,7 +54,7 @@ Respond in JSON only:
 class FunnelTracker:
 
     def __init__(self):
-        self._client = AsyncOpenAI(api_key=settings.openai_api_key)
+        self._client = AsyncOpenAI(api_key=settings.groq_api_key, base_url=GROQ_BASE_URL)
 
     async def classify_call(self, call_id: str, transcript: list[dict], summary: str):
         transcript_text = "\n".join(
@@ -61,7 +63,7 @@ class FunnelTracker:
 
         try:
             resp = await self._client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="llama-3.3-70b-versatile",
                 messages=[
                     {
                         "role": "user",

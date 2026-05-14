@@ -5,6 +5,7 @@ import { api } from "../lib/api";
 import { ArrowLeft, Phone, Save, User, Clock } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
+import PageHeader from "../components/PageHeader";
 
 export default function ContactDetail() {
   const { id } = useParams();
@@ -27,7 +28,7 @@ export default function ContactDetail() {
   });
 
   if (!contact || contact.error) {
-    return <p className="text-gray-500">Contact not found</p>;
+    return <p style={{ color: 'var(--text-muted)' }}>Contact not found</p>;
   }
 
   const startEdit = () => {
@@ -41,119 +42,133 @@ export default function ContactDetail() {
   };
 
   return (
-    <div className="max-w-2xl">
-      <button onClick={() => navigate("/dashboard/contacts")} className="flex items-center gap-1.5 text-gray-500 hover:text-white text-sm mb-6 transition-colors">
-        <ArrowLeft size={14} /> Back to Contacts
-      </button>
+    <div>
+      <PageHeader title="Contact Details" description="View and edit contact information" />
 
-      <div className="glass-card rounded-xl p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center">
-              <User size={20} className="text-violet-400" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-white">{contact.name || "Unknown Contact"}</h2>
-              <p className="text-gray-500 font-mono text-sm">{contact.phone_number}</p>
-            </div>
-          </div>
-          <div className="flex gap-3">
-            <Button size="sm"
-              onClick={() => navigate(`/dashboard/call?phone=${encodeURIComponent(contact.phone_number)}`)}>
-              <Phone size={12} /> Call
-            </Button>
-            {!editing && (
-              <Button size="sm" variant="outline" onClick={startEdit}>Edit</Button>
-            )}
-          </div>
-        </div>
+      <div className="px-8 py-6">
+        <div className="max-w-2xl">
+          <button
+            onClick={() => navigate("/dashboard/contacts")}
+            className="flex items-center gap-1.5 text-sm mb-6 transition-colors"
+            style={{ color: 'var(--text-muted)' }}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+          >
+            <ArrowLeft size={14} /> Back to Contacts
+          </button>
 
-        {editing ? (
-          <div className="space-y-4 animate-fade-in">
-            {["name", "email", "company", "notes"].map((field) => (
-              <div key={field}>
-                <label className="block text-sm text-gray-400 mb-1.5 font-medium capitalize">{field}</label>
-                {field === "notes" ? (
-                  <textarea
-                    value={form[field]}
-                    onChange={(e) => setForm({ ...form, [field]: e.target.value })}
-                    rows={3}
-                    className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30 text-sm resize-none"
-                  />
-                ) : (
-                  <input
-                    value={form[field]}
-                    onChange={(e) => setForm({ ...form, [field]: e.target.value })}
-                    className="w-full glass-card rounded-xl px-4 py-3 input-glow border border-gray-700/30 bg-gray-800/30 text-sm"
-                  />
-                )}
-              </div>
-            ))}
-            <div className="flex gap-3 pt-1">
-              <Button size="sm" onClick={() => save.mutate(form)}>
-                <Save size={12} /> Save
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            {[
-              { label: "Email", value: contact.email },
-              { label: "Company", value: contact.company },
-              { label: "Total Calls", value: contact.total_calls || 0 },
-              { label: "Language", value: contact.language || "en" },
-            ].map(({ label, value }) => (
-              <div key={label} className="p-3 rounded-xl bg-gray-800/30">
-                <p className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1">{label}</p>
-                <p className="text-gray-200">{value || "--"}</p>
-              </div>
-            ))}
-            {contact.notes && (
-              <div className="col-span-2 p-3 rounded-xl bg-gray-800/30">
-                <p className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1">Notes</p>
-                <p className="text-gray-300">{contact.notes}</p>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {contact.calls && contact.calls.length > 0 && (
-        <div className="mt-6 animate-fade-in">
-          <div className="flex items-center gap-2.5 mb-4">
-            <div className="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center">
-              <Clock size={13} className="text-blue-400" />
-            </div>
-            <h3 className="text-sm font-medium">Call History</h3>
-          </div>
-          <div className="space-y-3">
-            {contact.calls.map((call) => (
-              <div key={call.id} className="glass-card rounded-xl p-4">
-                <div className="flex justify-between text-sm mb-2">
-                  <div className="flex gap-2">
-                    <Badge variant={call.direction === "inbound" ? "default" : "secondary"} className="text-[10px]">
-                      {call.direction}
-                    </Badge>
-                    <span className="text-gray-500 text-xs flex items-center gap-1">
-                      <Clock size={10} />
-                      {call.duration_seconds || 0}s
-                    </span>
-                    <span className="text-gray-600 text-xs">{call.provider || "twilio"}</span>
-                  </div>
-                  <span className="text-gray-600 text-xs">
-                    {call.started_at ? new Date(call.started_at).toLocaleString() : ""}
-                  </span>
+          <div className="rounded-xl border p-6" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'var(--accent-subtle)' }}>
+                  <User size={20} style={{ color: 'var(--accent)' }} />
                 </div>
-                {call.summary && <p className="text-sm text-gray-400">{call.summary}</p>}
-                {call.disposition && (
-                  <Badge variant="outline" className="mt-2 text-[10px]">{call.disposition}</Badge>
+                <div>
+                  <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{contact.name || "Unknown Contact"}</h2>
+                  <p className="font-mono text-sm" style={{ color: 'var(--text-muted)' }}>{contact.phone_number}</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <Button size="sm" className="text-white" style={{ background: 'var(--accent)' }}
+                  onClick={() => navigate(`/dashboard/call?phone=${encodeURIComponent(contact.phone_number)}`)}>
+                  <Phone size={12} /> Call
+                </Button>
+                {!editing && (
+                  <Button size="sm" variant="outline" onClick={startEdit}>Edit</Button>
                 )}
               </div>
-            ))}
+            </div>
+
+            {editing ? (
+              <div className="space-y-4 animate-fade-in">
+                {["name", "email", "company", "notes"].map((field) => (
+                  <div key={field}>
+                    <label className="block text-sm mb-1.5 font-medium capitalize" style={{ color: 'var(--text-secondary)' }}>{field}</label>
+                    {field === "notes" ? (
+                      <textarea
+                        value={form[field]}
+                        onChange={(e) => setForm({ ...form, [field]: e.target.value })}
+                        rows={3}
+                        className="w-full rounded-xl px-4 py-3 outline-none border text-sm resize-none"
+                        style={{ background: 'var(--bg-muted)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                      />
+                    ) : (
+                      <input
+                        value={form[field]}
+                        onChange={(e) => setForm({ ...form, [field]: e.target.value })}
+                        className="w-full rounded-xl px-4 py-3 outline-none border text-sm"
+                        style={{ background: 'var(--bg-muted)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                      />
+                    )}
+                  </div>
+                ))}
+                <div className="flex gap-3 pt-1">
+                  <Button size="sm" className="text-white" style={{ background: 'var(--accent)' }} onClick={() => save.mutate(form)}>
+                    <Save size={12} /> Save
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                {[
+                  { label: "Email", value: contact.email },
+                  { label: "Company", value: contact.company },
+                  { label: "Total Calls", value: contact.total_calls || 0 },
+                  { label: "Language", value: contact.language || "en" },
+                ].map(({ label, value }) => (
+                  <div key={label} className="p-3 rounded-xl" style={{ background: 'var(--bg-muted)' }}>
+                    <p className="text-xs uppercase tracking-wider font-medium mb-1" style={{ color: 'var(--text-muted)' }}>{label}</p>
+                    <p style={{ color: 'var(--text-secondary)' }}>{value || "--"}</p>
+                  </div>
+                ))}
+                {contact.notes && (
+                  <div className="col-span-2 p-3 rounded-xl" style={{ background: 'var(--bg-muted)' }}>
+                    <p className="text-xs uppercase tracking-wider font-medium mb-1" style={{ color: 'var(--text-muted)' }}>Notes</p>
+                    <p style={{ color: 'var(--text-secondary)' }}>{contact.notes}</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
+
+          {contact.calls && contact.calls.length > 0 && (
+            <div className="mt-6 animate-fade-in">
+              <div className="flex items-center gap-2.5 mb-4">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'var(--accent-subtle)' }}>
+                  <Clock size={13} style={{ color: 'var(--accent)' }} />
+                </div>
+                <h3 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Call History</h3>
+              </div>
+              <div className="space-y-3">
+                {contact.calls.map((call) => (
+                  <div key={call.id} className="rounded-xl border p-4" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+                    <div className="flex justify-between text-sm mb-2">
+                      <div className="flex gap-2">
+                        <Badge variant={call.direction === "inbound" ? "default" : "secondary"} className="text-[10px]">
+                          {call.direction}
+                        </Badge>
+                        <span className="text-xs flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                          <Clock size={10} />
+                          {call.duration_seconds || 0}s
+                        </span>
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{call.provider || "twilio"}</span>
+                      </div>
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        {call.started_at ? new Date(call.started_at).toLocaleString() : ""}
+                      </span>
+                    </div>
+                    {call.summary && <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{call.summary}</p>}
+                    {call.disposition && (
+                      <Badge variant="outline" className="mt-2 text-[10px]">{call.disposition}</Badge>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

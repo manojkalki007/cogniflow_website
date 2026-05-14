@@ -25,6 +25,9 @@ class AgentConfig:
     greeting: str
     voice_id: str
     language: str
+    tenant_id: str = ""
+    emotion_profile: str = "friendly"
+    voice_gender: str = "female"
 
 
 DEFAULT_AGENT = AgentConfig(
@@ -52,6 +55,9 @@ async def get_agent_for_number(called_number: str) -> AgentConfig:
                     greeting=agent.get("metadata", {}).get("greeting", GREETING),
                     voice_id=agent.get("voice_id", VOICE_ID),
                     language=agent.get("language", "en"),
+                    tenant_id=agent.get("tenant_id", ""),
+                    emotion_profile=agent.get("emotion_profile", "friendly"),
+                    voice_gender=agent.get("voice_gender", "female"),
                 )
     except Exception:
         logger.debug("Agent lookup failed, using default")
@@ -71,6 +77,9 @@ async def get_agent_by_id(agent_id: str) -> AgentConfig | None:
                 greeting=agent.get("greeting", "") or agent.get("metadata", {}).get("greeting", GREETING),
                 voice_id=agent.get("voice_id", VOICE_ID),
                 language=agent.get("language", "en"),
+                tenant_id=agent.get("tenant_id", ""),
+                emotion_profile=agent.get("emotion_profile", "friendly"),
+                voice_gender=agent.get("voice_gender", "female"),
             )
     except Exception:
         logger.debug(f"Agent lookup by ID failed: {agent_id}")

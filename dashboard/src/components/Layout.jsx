@@ -1,15 +1,19 @@
-import { useState, useEffect } from "react";
-import { NavLink, Outlet } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { api, setTenantId, getTenantId } from "../lib/api";
+import { useState, useEffect, createContext, useContext } from "react";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
-  Phone, PhoneOutgoing, Users, BarChart3, Bot, LayoutTemplate, Megaphone,
-  Settings, DollarSign, ShieldCheck, Gauge, MessageSquare, Plug, Zap, Activity,
-  Building2, ChevronDown,
+  Phone, PhoneOutgoing, Users, BarChart3, Bot,
+  LayoutTemplate, Megaphone, Settings, Sun, Moon,
+  UserCircle, ShieldAlert, Cable, MessageSquare,
+  Mail, DollarSign, ShieldCheck, Timer, Plug,
+  PanelLeftClose, PanelLeftOpen, Search, Bell,
+  ChevronRight, Command,
 } from "lucide-react";
 
-const NAV_MAIN = [
-  { to: "/dashboard", label: "Call Log", icon: Phone },
+const SidebarContext = createContext();
+export const useSidebar = () => useContext(SidebarContext);
+
+const NAV_CORE = [
+  { to: "/dashboard", label: "Call Log", icon: Phone, end: true },
   { to: "/dashboard/call", label: "Make a Call", icon: PhoneOutgoing },
   { to: "/dashboard/contacts", label: "Contacts", icon: Users },
   { to: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
@@ -18,157 +22,330 @@ const NAV_MAIN = [
   { to: "/dashboard/campaigns", label: "Campaigns", icon: Megaphone },
 ];
 
-const NAV_FEATURES = [
-  { to: "/dashboard/revenue", label: "Revenue", icon: DollarSign },
-  { to: "/dashboard/compliance", label: "Compliance", icon: ShieldCheck },
-  { to: "/dashboard/latency", label: "Latency", icon: Gauge },
+const NAV_CHANNELS = [
   { to: "/dashboard/whatsapp", label: "WhatsApp", icon: MessageSquare },
+  { to: "/dashboard/email", label: "Email", icon: Mail },
   { to: "/dashboard/integrations", label: "Integrations", icon: Plug },
-  { to: "/dashboard/benchmarks", label: "Benchmarks", icon: Activity },
 ];
 
-function NavItem({ to, label, icon: Icon, end }) {
+const NAV_INSIGHTS = [
+  { to: "/dashboard/revenue", label: "Revenue", icon: DollarSign },
+  { to: "/dashboard/compliance", label: "Compliance", icon: ShieldCheck },
+  { to: "/dashboard/latency", label: "Latency", icon: Timer },
+];
+
+const NAV_ACCOUNT = [
+  { to: "/dashboard/tenant", label: "My Account", icon: UserCircle },
+  { to: "/dashboard/admin", label: "Admin Panel", icon: ShieldAlert },
+  { to: "/dashboard/api-hub", label: "API Hub", icon: Cable },
+];
+
+const PAGE_TITLES = {
+  "/dashboard": "Call Log",
+  "/dashboard/call": "Make a Call",
+  "/dashboard/contacts": "Contacts",
+  "/dashboard/analytics": "Analytics",
+  "/dashboard/agents": "Agents",
+  "/dashboard/templates": "Templates",
+  "/dashboard/campaigns": "Campaigns",
+  "/dashboard/whatsapp": "WhatsApp",
+  "/dashboard/email": "Email",
+  "/dashboard/integrations": "Integrations",
+  "/dashboard/revenue": "Revenue",
+  "/dashboard/compliance": "Compliance",
+  "/dashboard/latency": "Latency",
+  "/dashboard/tenant": "My Account",
+  "/dashboard/admin": "Admin Panel",
+  "/dashboard/api-hub": "API Hub",
+  "/dashboard/settings": "Settings",
+};
+
+function NavItem({ to, label, icon: Icon, end, collapsed }) {
   return (
     <NavLink
       to={to}
       end={end}
+      title={collapsed ? label : undefined}
       className={({ isActive }) =>
-        `flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-200 ${
-          isActive
-            ? "nav-active text-white"
-            : "text-gray-500 hover:text-gray-200 hover:bg-white/[0.03]"
-        }`
+        `sidebar-nav-item ${isActive ? "active" : ""}`
       }
     >
-      <Icon size={16} strokeWidth={1.5} />
-      {label}
+      <Icon size={16} strokeWidth={1.8} className="flex-shrink-0" />
+      {!collapsed && (
+        <span className="truncate whitespace-nowrap">{label}</span>
+      )}
     </NavLink>
   );
 }
 
-function OrgSwitcher() {
-  const [open, setOpen] = useState(false);
-  const [currentId, setCurrentId] = useState(getTenantId());
-
-  const { data: orgs } = useQuery({
-    queryKey: ["organizations"],
-    queryFn: () => api.getOrganizations(),
-    staleTime: 60000,
-  });
-
-  const current = orgs?.find?.(o => o.id === currentId);
-  const orgList = Array.isArray(orgs) ? orgs : [];
-
-  function switchOrg(org) {
-    setTenantId(org.id);
-    setCurrentId(org.id);
-    setOpen(false);
-    window.location.reload();
+function SectionLabel({ children, collapsed }) {
+  if (collapsed) {
+    return <div className="mx-auto my-3 w-5 h-px" style={{ background: "var(--sidebar-border)" }} />;
   }
-
-  function clearOrg() {
-    setTenantId("");
-    setCurrentId("");
-    setOpen(false);
-    window.location.reload();
-  }
-
-  if (!orgList.length) return null;
-
   return (
-    <div className="relative px-3 mb-2">
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.03] border border-gray-800/50 hover:border-gray-700/50 transition-colors text-left"
-      >
-        <Building2 size={14} className="text-gray-500 shrink-0" />
-        <span className="text-[12px] text-gray-300 truncate flex-1">
-          {current?.name || "All Organizations"}
-        </span>
-        <ChevronDown size={12} className={`text-gray-600 transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-
-      {open && (
-        <div className="absolute left-3 right-3 top-full mt-1 z-50 rounded-lg bg-gray-900 border border-gray-800 shadow-xl overflow-hidden">
-          <button
-            onClick={clearOrg}
-            className={`w-full text-left px-3 py-2 text-[12px] hover:bg-white/[0.05] transition-colors ${
-              !currentId ? "text-blue-400" : "text-gray-400"
-            }`}
-          >
-            All Organizations
-          </button>
-          {orgList.map(org => (
-            <button
-              key={org.id}
-              onClick={() => switchOrg(org)}
-              className={`w-full text-left px-3 py-2 text-[12px] hover:bg-white/[0.05] transition-colors border-t border-gray-800/30 ${
-                currentId === org.id ? "text-blue-400" : "text-gray-400"
-              }`}
-            >
-              <span className="block truncate">{org.name}</span>
-              <span className="text-[10px] text-gray-600">{org.plan}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <p
+      className="px-2.5 pt-6 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]"
+      style={{ color: "var(--sidebar-text)", opacity: 0.5 }}
+    >
+      {children}
+    </p>
   );
 }
 
 export default function Layout() {
+  const [dark, setDark] = useState(
+    () => localStorage.getItem("theme") !== "light",
+  );
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem("sidebar_collapsed") === "true",
+  );
+  const location = useLocation();
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+    localStorage.setItem("theme", dark ? "dark" : "light");
+  }, [dark]);
+
+  useEffect(() => {
+    localStorage.setItem("sidebar_collapsed", collapsed);
+  }, [collapsed]);
+
+  const currentTitle = PAGE_TITLES[location.pathname] || "Dashboard";
+  const pathSegments = location.pathname.split("/").filter(Boolean);
+
   return (
-    <div className="flex h-screen overflow-hidden">
-      <aside className="w-60 sidebar-gradient border-r border-gray-800/50 flex flex-col">
-        <div className="p-5 pb-4">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg btn-gradient flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <Zap size={16} className="text-white" />
+    <SidebarContext.Provider value={{ collapsed, setCollapsed }}>
+      <div
+        className="flex h-screen overflow-hidden"
+        style={{ background: "var(--bg-subtle)" }}
+      >
+        {/* ──── Sidebar ──── */}
+        <aside
+          className={`sidebar-glass flex-shrink-0 flex flex-col transition-all duration-300 ease-in-out ${
+            collapsed ? "w-[60px] sidebar-collapsed" : "w-[220px]"
+          }`}
+        >
+          {/* Logo */}
+          <div
+            className="flex items-center gap-2.5 flex-shrink-0"
+            style={{
+              borderBottom: "1px solid var(--sidebar-border)",
+              padding: collapsed ? "16px 0" : "16px 14px",
+              justifyContent: collapsed ? "center" : "flex-start",
+            }}
+          >
+            <div
+              className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{
+                background: "linear-gradient(135deg, rgba(0,188,212,0.9), rgba(0,151,167,0.9))",
+                boxShadow: "0 4px 12px rgba(0,188,212,0.25), 0 0 1px rgba(255,255,255,0.15) inset",
+                border: "1px solid rgba(34,211,238,0.15)",
+              }}
+            >
+              <Phone size={14} className="text-white" />
             </div>
-            <div>
-              <h1 className="text-[15px] font-bold tracking-tight text-white">Cogniflow</h1>
-              <p className="text-[10px] text-gray-500 font-medium tracking-wide uppercase">AI Voice Agent</p>
+            {!collapsed && (
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-white leading-none truncate">
+                  Cogniflow
+                </p>
+                <p
+                  className="text-[9px] mt-0.5 uppercase tracking-wider font-medium"
+                  style={{ color: "var(--sidebar-text)" }}
+                >
+                  Voice AI
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Navigation */}
+          <nav
+            className="flex-1 overflow-y-auto overflow-x-hidden"
+            style={{ padding: collapsed ? "8px 6px" : "8px 8px" }}
+          >
+            <div className="space-y-0.5">
+              {NAV_CORE.map((item) => (
+                <NavItem key={item.to} {...item} collapsed={collapsed} />
+              ))}
+            </div>
+
+            <SectionLabel collapsed={collapsed}>Channels</SectionLabel>
+            <div className="space-y-0.5">
+              {NAV_CHANNELS.map((item) => (
+                <NavItem key={item.to} {...item} collapsed={collapsed} />
+              ))}
+            </div>
+
+            <SectionLabel collapsed={collapsed}>Insights</SectionLabel>
+            <div className="space-y-0.5">
+              {NAV_INSIGHTS.map((item) => (
+                <NavItem key={item.to} {...item} collapsed={collapsed} />
+              ))}
+            </div>
+
+            <SectionLabel collapsed={collapsed}>Account</SectionLabel>
+            <div className="space-y-0.5">
+              {NAV_ACCOUNT.map((item) => (
+                <NavItem key={item.to} {...item} collapsed={collapsed} />
+              ))}
+            </div>
+          </nav>
+
+          {/* Bottom Controls */}
+          <div
+            className="flex-shrink-0"
+            style={{
+              borderTop: "1px solid var(--sidebar-border)",
+              padding: collapsed ? "10px 6px" : "10px 8px",
+            }}
+          >
+            <NavLink
+              to="/dashboard/settings"
+              title={collapsed ? "Settings" : undefined}
+              className={({ isActive }) =>
+                `sidebar-nav-item ${isActive ? "active" : ""}`
+              }
+            >
+              <Settings size={16} strokeWidth={1.8} className="flex-shrink-0" />
+              {!collapsed && <span>Settings</span>}
+            </NavLink>
+
+            <div
+              className={`flex items-center mt-1.5 ${
+                collapsed ? "flex-col gap-1" : "gap-1"
+              }`}
+            >
+              <button
+                onClick={() => setDark((d) => !d)}
+                className="sidebar-nav-item flex-1"
+                style={{ justifyContent: "center" }}
+                title={dark ? "Light mode" : "Dark mode"}
+              >
+                {dark ? <Sun size={15} /> : <Moon size={15} />}
+              </button>
+              <button
+                onClick={() => setCollapsed((c) => !c)}
+                className="sidebar-nav-item flex-1"
+                style={{ justifyContent: "center" }}
+                title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              >
+                {collapsed ? (
+                  <PanelLeftOpen size={15} />
+                ) : (
+                  <PanelLeftClose size={15} />
+                )}
+              </button>
             </div>
           </div>
+        </aside>
+
+        {/* ──── Main Content ──── */}
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+          {/* Header */}
+          <header
+            className="header-glass flex items-center justify-between flex-shrink-0"
+            style={{
+              padding: "0 24px",
+              height: "54px",
+            }}
+          >
+            {/* Left: Breadcrumbs */}
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span
+                className="text-xs"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Dashboard
+              </span>
+              {pathSegments.length > 1 && (
+                <>
+                  <ChevronRight
+                    size={12}
+                    style={{ color: "var(--text-muted)" }}
+                  />
+                  <span
+                    className="text-xs font-medium truncate"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    {currentTitle}
+                  </span>
+                </>
+              )}
+            </div>
+
+            {/* Right: Search + Actions */}
+            <div className="flex items-center gap-3">
+              <div className="relative hidden md:block">
+                <Search
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2"
+                  style={{ color: "var(--text-muted)" }}
+                />
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  className="header-search pl-9 pr-14 py-1.5 rounded-lg text-xs w-48 focus:w-64 transition-all duration-200"
+                />
+                <div
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5"
+                >
+                  <kbd
+                    className="text-[9px] px-1.5 py-0.5 rounded font-mono flex items-center gap-0.5"
+                    style={{
+                      background: "var(--bg-muted)",
+                      color: "var(--text-muted)",
+                      border: "1px solid var(--border)",
+                    }}
+                  >
+                    <Command size={9} />K
+                  </kbd>
+                </div>
+              </div>
+
+              <button
+                className="relative p-2 rounded-lg transition-all duration-200 cursor-pointer"
+                style={{ color: "var(--text-muted)" }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = "var(--bg-muted)")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = "transparent")
+                }
+                title="Notifications"
+              >
+                <Bell size={16} />
+                <span
+                  className="absolute top-1 right-1 w-2 h-2 rounded-full"
+                  style={{
+                    background: "var(--accent)",
+                    boxShadow: "0 0 6px var(--accent-glow)",
+                  }}
+                />
+              </button>
+
+              <div
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-[11px] font-bold text-white cursor-pointer transition-all duration-200 hover:scale-105"
+                style={{
+                  background: "linear-gradient(135deg, rgba(0,188,212,0.9), rgba(0,151,167,0.9))",
+                  border: "1px solid rgba(34,211,238,0.15)",
+                  boxShadow: "0 2px 8px rgba(0,188,212,0.2)",
+                }}
+                title="Profile"
+              >
+                C
+              </div>
+            </div>
+          </header>
+
+          {/* Page Content */}
+          <main className="flex-1 overflow-auto">
+            <div className="animate-fade-in">
+              <Outlet />
+            </div>
+          </main>
         </div>
-
-        <div className="h-px bg-gradient-to-r from-transparent via-gray-700/50 to-transparent mx-4" />
-
-        <div className="pt-3">
-          <OrgSwitcher />
-        </div>
-
-        <nav className="flex-1 p-3 pt-1 space-y-0.5 overflow-y-auto">
-          {NAV_MAIN.map(({ to, label, icon }) => (
-            <NavItem key={to} to={to} label={label} icon={icon} end={to === "/dashboard"} />
-          ))}
-
-          <div className="h-px bg-gradient-to-r from-transparent via-gray-700/30 to-transparent my-4 mx-2" />
-          <p className="px-3 py-1.5 text-[10px] uppercase tracking-[0.15em] text-gray-600 font-semibold">
-            Edge Features
-          </p>
-
-          {NAV_FEATURES.map(({ to, label, icon }) => (
-            <NavItem key={to} to={to} label={label} icon={icon} />
-          ))}
-
-          <div className="h-px bg-gradient-to-r from-transparent via-gray-700/30 to-transparent my-4 mx-2" />
-          <NavItem to="/dashboard/settings" label="Settings" icon={Settings} />
-        </nav>
-
-        <div className="p-4 border-t border-gray-800/30">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-gray-600 font-mono">v2.1.0</span>
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="System online" />
-          </div>
-        </div>
-      </aside>
-
-      <main className="flex-1 overflow-auto page-bg p-8">
-        <div className="animate-fade-in">
-          <Outlet />
-        </div>
-      </main>
-    </div>
+      </div>
+    </SidebarContext.Provider>
   );
 }
