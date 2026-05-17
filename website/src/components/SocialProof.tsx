@@ -1,111 +1,132 @@
 "use client";
 
-import ScrollReveal from "./ScrollReveal";
-import AnimatedCounter from "./AnimatedCounter";
-import { motion, useInView } from "framer-motion";
-import { useRef } from "react";
+import { motion } from "motion/react";
+import { Clock, Globe, ShieldCheck } from "lucide-react";
 
-const TESTIMONIALS = [
-  {
-    quote: "We replaced 8 SDRs with Cogniflow and booked more meetings in the first month than the previous quarter. The AI handles objections better than most humans I've trained.",
-    name: "Priya Sharma",
-    title: "VP Sales",
-    company: "TechScale India",
-  },
-  {
-    quote: "The sub-500ms latency is real. Our customers genuinely can't tell they're talking to AI. We went from 2-hour response times to under 30 seconds.",
-    name: "Arjun Mehta",
-    title: "CTO",
-    company: "GrowthLoop",
-  },
-  {
-    quote: "Agent cloning was the killer feature for us. We uploaded our top closer's recordings and had an AI copy running the next day. Revenue attribution means I know exactly what ROI we're getting.",
-    name: "Neha Patel",
-    title: "Head of Revenue",
-    company: "CloudServe",
-  },
+const stats = [
+  { icon: Clock, label: "Sub-600ms Latency" },
+  { icon: Globe, label: "10+ Languages Supported" },
+  { icon: ShieldCheck, label: "Enterprise-Grade Security" },
 ];
 
-const STATS = [
-  { value: 2, suffix: "M+", label: "calls handled" },
-  { value: 200, suffix: "+", label: "companies" },
-  { value: 30, suffix: "+", label: "languages" },
-  { value: 350, suffix: "ms", label: "P50 latency", prefix: "< " },
+const companies = [
+  "Acme Corp",
+  "TechFlow",
+  "DataSync",
+  "CloudBase",
+  "NextGen AI",
+  "ScaleUp",
 ];
 
 export default function SocialProof() {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
-
   return (
-    <section className="relative py-32 px-6" ref={ref}>
-      <div className="max-w-6xl mx-auto relative z-10">
-        <ScrollReveal className="text-center mb-16">
-          <p className="text-xs uppercase tracking-[0.2em] text-text-secondary mb-4">
-            Social Proof
-          </p>
-          <h2 className="text-4xl md:text-5xl font-semibold tracking-[-0.02em]">
-            Trusted by <span className="gradient-text">revenue teams</span>
-          </h2>
-        </ScrollReveal>
+    <section className="relative w-full overflow-hidden py-20 px-4">
+      <style>{`
+        @keyframes marquee {
+          0% { transform: translateX(0%); }
+          100% { transform: translateX(-50%); }
+        }
+        .animate-marquee {
+          animation: marquee 25s linear infinite;
+        }
+        .liquid-glass {
+          background: rgba(255, 255, 255, 0.02);
+          backdrop-filter: blur(12px);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          box-shadow: inset 0 1px 1px rgba(255,255,255,0.06);
+          position: relative;
+          overflow: hidden;
+        }
+        .liquid-glass::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          padding: 1.4px;
+          background: linear-gradient(180deg,
+            rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 30%,
+            rgba(255,255,255,0) 50%,
+            rgba(255,255,255,0.05) 90%, rgba(255,255,255,0.12) 100%);
+          -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          -webkit-mask-composite: xor;
+          mask-composite: exclude;
+          pointer-events: none;
+        }
+      `}</style>
 
-        <div className="grid md:grid-cols-3 gap-6 mb-20">
-          {TESTIMONIALS.map((t, i) => (
-            <motion.div
-              key={t.name}
-              initial={{ opacity: 0, y: 30 }}
-              animate={isInView ? { opacity: 1, y: 0 } : {}}
-              transition={{
-                duration: 0.7,
-                delay: 0.2 + i * 0.15,
-                ease: [0.16, 1, 0.3, 1],
-              }}
-              className="glass-card rounded-2xl p-8"
-            >
-              <svg width="24" height="24" viewBox="0 0 24 24" className="text-brand/30 mb-4">
-                <path
-                  fill="currentColor"
-                  d="M4.583 17.321C3.553 16.227 3 15 3 13.011c0-3.5 2.457-6.637 6.03-8.188l.893 1.378c-3.335 1.804-3.987 4.145-4.247 5.621.537-.278 1.24-.375 1.929-.311 1.804.167 3.226 1.648 3.226 3.489a3.5 3.5 0 01-3.5 3.5c-1.073 0-2.099-.49-2.748-1.179zm10 0C13.553 16.227 13 15 13 13.011c0-3.5 2.457-6.637 6.03-8.188l.893 1.378c-3.335 1.804-3.987 4.145-4.247 5.621.537-.278 1.24-.375 1.929-.311 1.804.167 3.226 1.648 3.226 3.489a3.5 3.5 0 01-3.5 3.5c-1.073 0-2.099-.49-2.748-1.179z"
-                />
-              </svg>
-
-              <p className="text-sm text-text-secondary leading-relaxed mb-6">
-                &ldquo;{t.quote}&rdquo;
-              </p>
-
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center text-sm font-semibold text-brand">
-                  {t.name.split(" ").map((n) => n[0]).join("")}
-                </div>
-                <div>
-                  <p className="text-sm font-medium">{t.name}</p>
-                  <p className="text-xs text-text-tertiary">
-                    {t.title}, {t.company}
-                  </p>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-
+      <div className="relative z-10 flex flex-col items-center">
+        {/* Stats row */}
         <motion.div
+          className="flex items-center gap-8 md:gap-12 flex-wrap justify-center"
           initial={{ opacity: 0, y: 20 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.7, delay: 0.6 }}
-          className="grid grid-cols-2 md:grid-cols-4 gap-6"
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
         >
-          {STATS.map((stat) => (
-            <div key={stat.label} className="glass-card rounded-xl p-6 text-center">
-              <p className="text-3xl md:text-4xl font-bold font-mono gradient-text mb-1">
-                {stat.prefix}
-                <AnimatedCounter target={stat.value} suffix={stat.suffix} />
-              </p>
-              <p className="text-xs text-text-tertiary uppercase tracking-wider">
-                {stat.label}
-              </p>
-            </div>
-          ))}
+          {stats.map((stat) => {
+            const Icon = stat.icon;
+            return (
+              <div key={stat.label} className="flex items-center gap-3">
+                <div className="liquid-glass w-10 h-10 rounded-xl flex items-center justify-center">
+                  <Icon className="w-4 h-4 text-white/60" />
+                </div>
+                <span className="text-sm text-white/70 font-medium">
+                  {stat.label}
+                </span>
+              </div>
+            );
+          })}
         </motion.div>
+
+        {/* Spacer */}
+        <div className="h-16" />
+
+        {/* Logo marquee */}
+        <div className="w-full max-w-5xl mx-auto">
+          <div className="flex items-center gap-12">
+            {/* Left text */}
+            <span className="text-white/40 text-sm whitespace-nowrap shrink-0">
+              Trusted by teams across India &amp; Europe
+            </span>
+
+            {/* Right marquee */}
+            <div className="relative overflow-hidden flex-1">
+              <div className="flex animate-marquee gap-16 items-center">
+                {/* First set */}
+                {companies.map((company) => (
+                  <div
+                    key={company}
+                    className="shrink-0 flex items-center gap-2"
+                  >
+                    <div className="liquid-glass w-7 h-7 rounded-lg flex items-center justify-center">
+                      <span className="text-xs font-bold text-white/60">
+                        {company[0]}
+                      </span>
+                    </div>
+                    <span className="text-sm font-medium whitespace-nowrap text-white/50">
+                      {company}
+                    </span>
+                  </div>
+                ))}
+                {/* Duplicated set for seamless loop */}
+                {companies.map((company) => (
+                  <div
+                    key={`dup-${company}`}
+                    className="shrink-0 flex items-center gap-2"
+                  >
+                    <div className="liquid-glass w-7 h-7 rounded-lg flex items-center justify-center">
+                      <span className="text-xs font-bold text-white/60">
+                        {company[0]}
+                      </span>
+                    </div>
+                    <span className="text-sm font-medium whitespace-nowrap text-white/50">
+                      {company}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );

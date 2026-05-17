@@ -5,6 +5,8 @@ import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
 import { Check } from "lucide-react";
 
+const DASHBOARD_URL = process.env.NEXT_PUBLIC_DASHBOARD_URL || "http://localhost:3000";
+
 const PLANS = [
   {
     name: "Starter",
@@ -17,7 +19,7 @@ const PLANS = [
       "Basic analytics",
     ],
     cta: "Start Free Trial",
-    href: "#demo",
+    href: `${DASHBOARD_URL}/login`,
     highlighted: false,
   },
   {
@@ -34,7 +36,7 @@ const PLANS = [
       "Revenue attribution",
     ],
     cta: "Start Free Trial",
-    href: "#demo",
+    href: `${DASHBOARD_URL}/login`,
     highlighted: true,
   },
   {
@@ -50,7 +52,7 @@ const PLANS = [
       "Custom SLA",
     ],
     cta: "Contact Sales",
-    href: "#demo",
+    href: "mailto:cogniflowautomations@gmail.com",
     highlighted: false,
   },
 ];
@@ -119,7 +121,7 @@ export default function Pricing() {
               }}
               className={`glass-card rounded-2xl p-8 relative ${
                 plan.highlighted
-                  ? "border-brand/30 shadow-[0_0_40px_rgba(37,99,235,0.1)] md:scale-105"
+                  ? "border-brand/30 shadow-[0_0_40px_rgba(0,24,255,0.1)] md:scale-105"
                   : ""
               }`}
             >
@@ -157,7 +159,7 @@ export default function Pricing() {
                 href={plan.href}
                 className={`block w-full text-center py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
                   plan.highlighted
-                    ? "bg-brand text-white hover:bg-brand-light shadow-[0_0_20px_rgba(37,99,235,0.2)]"
+                    ? "bg-brand text-white hover:bg-brand-light shadow-[0_0_20px_rgba(0,24,255,0.2)]"
                     : "border border-white/[0.08] text-text-primary hover:border-white/[0.15] hover:bg-white/[0.03]"
                 }`}
               >

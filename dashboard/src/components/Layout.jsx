@@ -1,12 +1,13 @@
 import { useState, useEffect, createContext, useContext } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import {
   Phone, PhoneOutgoing, Users, BarChart3, Bot,
   LayoutTemplate, Megaphone, Settings, Sun, Moon,
   UserCircle, ShieldAlert, Cable, MessageSquare,
   Mail, DollarSign, ShieldCheck, Timer, Plug,
   PanelLeftClose, PanelLeftOpen, Search, Bell,
-  ChevronRight, Command,
+  ChevronRight, Command, LogOut,
 } from "lucide-react";
 
 const SidebarContext = createContext();
@@ -93,6 +94,7 @@ function SectionLabel({ children, collapsed }) {
 }
 
 export default function Layout() {
+  const { user, signOut } = useAuth();
   const [dark, setDark] = useState(
     () => localStorage.getItem("theme") !== "light",
   );
@@ -100,6 +102,8 @@ export default function Layout() {
     () => localStorage.getItem("sidebar_collapsed") === "true",
   );
   const location = useLocation();
+  const userEmail = user?.email || "";
+  const userInitials = userEmail ? userEmail.substring(0, 2).toUpperCase() : "C";
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
@@ -127,36 +131,22 @@ export default function Layout() {
         >
           {/* Logo */}
           <div
-            className="flex items-center gap-2.5 flex-shrink-0"
+            className="flex items-center flex-shrink-0"
             style={{
               borderBottom: "1px solid var(--sidebar-border)",
               padding: collapsed ? "16px 0" : "16px 14px",
               justifyContent: collapsed ? "center" : "flex-start",
             }}
           >
-            <div
-              className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+            <img
+              src="/cogniflow-logo.png"
+              alt="Cogniflow"
               style={{
-                background: "linear-gradient(135deg, rgba(0,188,212,0.9), rgba(0,151,167,0.9))",
-                boxShadow: "0 4px 12px rgba(0,188,212,0.25), 0 0 1px rgba(255,255,255,0.15) inset",
-                border: "1px solid rgba(34,211,238,0.15)",
+                height: collapsed ? 28 : 32,
+                width: "auto",
+                objectFit: "contain",
               }}
-            >
-              <Phone size={14} className="text-white" />
-            </div>
-            {!collapsed && (
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-white leading-none truncate">
-                  Cogniflow
-                </p>
-                <p
-                  className="text-[9px] mt-0.5 uppercase tracking-wider font-medium"
-                  style={{ color: "var(--sidebar-text)" }}
-                >
-                  Voice AI
-                </p>
-              </div>
-            )}
+            />
           </div>
 
           {/* Navigation */}
@@ -200,6 +190,16 @@ export default function Layout() {
               padding: collapsed ? "10px 6px" : "10px 8px",
             }}
           >
+            {!collapsed && userEmail && (
+              <div
+                className="px-2.5 py-2 mb-1.5 rounded-lg truncate text-[11px]"
+                style={{ color: "var(--sidebar-text)", opacity: 0.7 }}
+                title={userEmail}
+              >
+                {userEmail}
+              </div>
+            )}
+
             <NavLink
               to="/dashboard/settings"
               title={collapsed ? "Settings" : undefined}
@@ -210,6 +210,15 @@ export default function Layout() {
               <Settings size={16} strokeWidth={1.8} className="flex-shrink-0" />
               {!collapsed && <span>Settings</span>}
             </NavLink>
+
+            <button
+              onClick={signOut}
+              className="sidebar-nav-item w-full"
+              title={collapsed ? "Sign out" : undefined}
+            >
+              <LogOut size={16} strokeWidth={1.8} className="flex-shrink-0" />
+              {!collapsed && <span>Sign out</span>}
+            </button>
 
             <div
               className={`flex items-center mt-1.5 ${
@@ -331,9 +340,9 @@ export default function Layout() {
                   border: "1px solid rgba(34,211,238,0.15)",
                   boxShadow: "0 2px 8px rgba(0,188,212,0.2)",
                 }}
-                title="Profile"
+                title={userEmail || "Profile"}
               >
-                C
+                {userInitials}
               </div>
             </div>
           </header>

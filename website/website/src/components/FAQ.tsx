@@ -1,59 +1,68 @@
 "use client";
 
 import { useState } from "react";
-import { motion, AnimatePresence, useInView } from "framer-motion";
-import { useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown } from "lucide-react";
+import ScrollReveal from "./ScrollReveal";
 
 const QUESTIONS = [
   {
-    q: "How fast is the AI agent?",
-    a: "Our average end-to-end response time is 350ms — faster than human conversation. We achieve this through semantic turn detection, speculative pre-generation with Groq, and co-located inference.",
+    q: "How does it sound on a call?",
+    a: "Natural, not robotic. Our agents use advanced voice synthesis with real-time tone adaptation. They adjust pacing, emphasis, and warmth based on the caller's sentiment — so every conversation feels human.",
   },
   {
-    q: "What languages are supported?",
-    a: "30+ languages including English, Hindi, Tamil, Telugu, Kannada, Malayalam, Bengali, Marathi, Gujarati, and more. The AI can switch languages mid-conversation based on the caller's preference.",
+    q: "Can it handle complex conversations?",
+    a: "Yes. Your agent is trained on your scripts and product knowledge, adapts in real time to objections and questions, and knows when to escalate to a human. It doesn't just follow a flowchart — it thinks.",
   },
   {
-    q: "Can I use my existing phone number?",
-    a: "Yes. Bring your own number via SIP trunk, or we can provision new numbers through Twilio, Telnyx, or Exotel. Setup takes under 5 minutes.",
+    q: "How long does setup take?",
+    a: "Under 10 minutes. Connect your phone number, upload your scripts and contacts, configure your qualification criteria, and go live. No engineering team required.",
   },
   {
-    q: "Is it HIPAA/PCI compliant?",
-    a: "Yes. Our compliance guardrails auto-redact PII from transcripts, block prompt injection attempts, and enforce DNC lists. We support HIPAA, PCI, and GDPR requirements.",
+    q: "Does it integrate with our CRM?",
+    a: "Yes. Native integrations with Salesforce, HubSpot, and other major CRMs. Custom integrations via API. Every call, email, and WhatsApp message is automatically logged and synced.",
   },
   {
-    q: "How does agent cloning work?",
-    a: "Upload 20+ call recordings from your best human agent. Our AI analyzes conversation patterns, objection handling, tone, and closing techniques to create a digital clone — no fine-tuning or ML expertise needed.",
+    q: "What if a lead wants to talk to a human?",
+    a: "Seamless handoff. The agent detects when a human is needed, briefs your team with full context and sentiment analysis, and transfers the call — the lead never experiences a gap.",
   },
   {
-    q: "What CRMs do you integrate with?",
-    a: "Native integrations with Salesforce, HubSpot, Zoho CRM, and Leadsquared. We also support custom webhooks for any CRM. All calls, transcripts, and outcomes sync automatically.",
+    q: "Is it compliant?",
+    a: "Built with compliance at the core. Call recording consent, GDPR-compliant data handling, DNC list management, and full audit trails. We handle the complexity so you don't have to.",
   },
 ];
 
-function FAQItem({ question, answer }: { question: string; answer: string }) {
-  const [open, setOpen] = useState(false);
-
+function FAQItem({
+  question,
+  answer,
+  isOpen,
+  onToggle,
+}: {
+  question: string;
+  answer: string;
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
   return (
-    <div className="border-b border-white/[0.06]">
+    <div className="border-b border-border py-5">
       <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between py-5 text-left group"
+        onClick={onToggle}
+        className="w-full flex items-center justify-between text-left group"
       >
-        <span className="text-sm font-medium group-hover:text-text-primary transition-colors pr-4">
+        <span className="text-base font-medium text-text-primary group-hover:text-brand transition-colors pr-4">
           {question}
         </span>
         <motion.div
-          animate={{ rotate: open ? 180 : 0 }}
+          animate={{ rotate: isOpen ? 180 : 0 }}
           transition={{ duration: 0.2 }}
+          className="shrink-0"
         >
-          <ChevronDown className="w-4 h-4 text-text-tertiary shrink-0" />
+          <ChevronDown className="w-4 h-4 text-text-tertiary" />
         </motion.div>
       </button>
 
       <AnimatePresence>
-        {open && (
+        {isOpen && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
@@ -61,7 +70,7 @@ function FAQItem({ question, answer }: { question: string; answer: string }) {
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
             className="overflow-hidden"
           >
-            <p className="text-sm text-text-secondary leading-relaxed pb-5">
+            <p className="text-sm text-text-secondary leading-relaxed pt-3">
               {answer}
             </p>
           </motion.div>
@@ -72,37 +81,31 @@ function FAQItem({ question, answer }: { question: string; answer: string }) {
 }
 
 export default function FAQ() {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
-    <section className="relative py-32 px-6" ref={ref}>
-      <div className="max-w-3xl mx-auto relative z-10">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-          className="text-center mb-12"
-        >
-          <p className="text-xs uppercase tracking-[0.2em] text-text-secondary mb-4">
-            FAQ
-          </p>
-          <h2 className="text-4xl md:text-5xl font-semibold tracking-[-0.02em]">
-            Common <span className="gradient-text">questions</span>
-          </h2>
-        </motion.div>
+    <section id="faq" className="max-w-3xl mx-auto py-32 px-6">
+      <ScrollReveal>
+        <h2 className="text-4xl md:text-5xl font-bold text-text-primary text-center mb-16">
+          Questions
+        </h2>
+      </ScrollReveal>
 
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.7, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          className="glass-card rounded-2xl p-6 md:p-8"
-        >
-          {QUESTIONS.map((faq) => (
-            <FAQItem key={faq.q} question={faq.q} answer={faq.a} />
+      <ScrollReveal delay={0.15}>
+        <div>
+          {QUESTIONS.map((faq, i) => (
+            <FAQItem
+              key={faq.q}
+              question={faq.q}
+              answer={faq.a}
+              isOpen={openIndex === i}
+              onToggle={() =>
+                setOpenIndex(openIndex === i ? null : i)
+              }
+            />
           ))}
-        </motion.div>
-      </div>
+        </div>
+      </ScrollReveal>
     </section>
   );
 }

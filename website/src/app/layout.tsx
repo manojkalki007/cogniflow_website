@@ -17,6 +17,11 @@ export const metadata: Metadata = {
   title: "Cogniflow — AI Calling Agent & AI SDR",
   description:
     "The first autonomous AI SDR that thinks before it talks. Qualify leads, handle objections, and book high-value meetings 24/7 with human-like voice agents.",
+  icons: {
+    icon: "/favicon.png",
+    shortcut: "/favicon.png",
+    apple: "/favicon.png",
+  },
 };
 
 export default function RootLayout({

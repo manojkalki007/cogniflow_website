@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { setTenantId } from "../lib/api";
+import supabase from "../lib/supabase";
 import {
   Phone, Mail, Lock, Eye, EyeOff, ArrowRight,
   Zap, Shield, Globe,
@@ -77,6 +78,7 @@ export default function Login() {
   const [orgId, setOrgId] = useState("");
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     requestAnimationFrame(() => setMounted(true));
@@ -86,9 +88,30 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError("");
+
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (authError) {
+      setError(authError.message);
+      setLoading(false);
+      return;
+    }
+
     if (orgId.trim()) setTenantId(orgId.trim());
-    await new Promise((r) => setTimeout(r, 600));
     navigate("/dashboard");
+  };
+
+  const handleGoogleLogin = async () => {
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+    });
+    if (oauthError) {
+      setError(oauthError.message);
+    }
   };
 
   const stagger = (i) => ({
@@ -112,25 +135,12 @@ export default function Login() {
         <div className="relative z-10 px-14 xl:px-20 max-w-2xl">
           <div style={stagger(0)}>
             {/* Logo */}
-            <div className="flex items-center gap-3.5 mb-14">
-              <div
-                className="w-12 h-12 rounded-2xl flex items-center justify-center"
-                style={{
-                  background: "linear-gradient(135deg, rgba(0,188,212,0.9), rgba(0,151,167,0.9))",
-                  boxShadow: "0 8px 24px rgba(0,188,212,0.3), 0 0 1px rgba(255,255,255,0.2) inset",
-                  border: "1px solid rgba(34,211,238,0.2)",
-                }}
-              >
-                <Phone size={21} className="text-white" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-white tracking-tight">
-                  Cogniflow
-                </h2>
-                <p className="text-[11px] text-slate-500 font-medium tracking-wide uppercase">
-                  AI Voice Agent Platform
-                </p>
-              </div>
+            <div className="mb-14">
+              <img
+                src="/cogniflow-logo.png"
+                alt="Cogniflow"
+                style={{ height: 48, width: "auto", objectFit: "contain" }}
+              />
             </div>
 
             {/* Headline */}
@@ -220,17 +230,12 @@ export default function Login() {
           style={stagger(1)}
         >
           {/* Mobile logo */}
-          <div className="lg:hidden flex items-center gap-3 mb-10">
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center"
-              style={{
-                background: "linear-gradient(135deg, rgba(0,188,212,0.9), rgba(0,151,167,0.9))",
-                border: "1px solid rgba(34,211,238,0.2)",
-              }}
-            >
-              <Phone size={18} className="text-white" />
-            </div>
-            <span className="text-xl font-bold text-white">Cogniflow</span>
+          <div className="lg:hidden mb-10">
+            <img
+              src="/cogniflow-logo.png"
+              alt="Cogniflow"
+              style={{ height: 36, width: "auto", objectFit: "contain" }}
+            />
           </div>
 
           <h2
@@ -245,6 +250,15 @@ export default function Login() {
           >
             Sign in to access your voice agent dashboard
           </p>
+
+          {error && (
+            <div
+              className="mb-4 px-4 py-3 rounded-xl text-sm text-red-300 border border-red-500/20"
+              style={{ background: "rgba(239,68,68,0.08)" }}
+            >
+              {error}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email */}
@@ -363,7 +377,7 @@ export default function Login() {
 
           {/* Google */}
           <div style={stagger(10)}>
-            <button className="login-social-glass w-full py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-3 cursor-pointer">
+            <button onClick={handleGoogleLogin} type="button" className="login-social-glass w-full py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-3 cursor-pointer">
               <svg width="18" height="18" viewBox="0 0 18 18">
                 <path
                   d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615Z"

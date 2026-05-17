@@ -91,7 +91,7 @@ export default function WorkflowAnimation() {
               <circle
                 key={p}
                 r="2.5"
-                fill="#0018FF"
+                fill="#0052CC"
                 filter="url(#particleGlow)"
                 opacity="0.8"
               >
@@ -145,7 +145,7 @@ export default function WorkflowAnimation() {
             <path
               d={node.icon}
               fill="none"
-              stroke="#0018FF"
+              stroke="#0052CC"
               strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"

@@ -177,7 +177,7 @@ class CORSAndRequestIDMiddleware:
                 response_headers = [
                     (b"access-control-allow-origin", b"*"),
                     (b"access-control-allow-methods", b"GET, POST, PATCH, DELETE, OPTIONS"),
-                    (b"access-control-allow-headers", b"Content-Type, X-Api-Key, X-Request-ID"),
+                    (b"access-control-allow-headers", b"Content-Type, X-Api-Key, X-Tenant-Id, X-Request-ID"),
                     (b"access-control-max-age", b"86400"),
                 ]
                 await send({"type": "http.response.start", "status": 204, "headers": response_headers})

@@ -2,9 +2,8 @@
 
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
-import DashboardScreenshot from "@/components/DashboardScreenshot";
+import SocialProof from "@/components/SocialProof";
 import ProblemStatement from "@/components/ProblemStatement";
-import MarqueeStrip from "@/components/MarqueeStrip";
 import IntelligenceSplit from "@/components/IntelligenceSplit";
 import PerformanceSplit from "@/components/PerformanceSplit";
 import LiveCallExperience from "@/components/LiveCallExperience";
@@ -21,9 +20,8 @@ export default function Home() {
       <Navbar />
       <main>
         <Hero />
-        <DashboardScreenshot />
+        <SocialProof />
         <ProblemStatement />
-        <MarqueeStrip />
         <section id="product">
           <IntelligenceSplit />
           <PerformanceSplit />

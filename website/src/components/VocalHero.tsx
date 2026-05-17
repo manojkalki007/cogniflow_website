@@ -13,7 +13,7 @@ function GlowOrb() {
     () => ({
       uTime: { value: 0 },
       uColor1: { value: new THREE.Color("#2563eb") },
-      uColor2: { value: new THREE.Color("#0018FF") },
+      uColor2: { value: new THREE.Color("#0052CC") },
     }),
     []
   );
@@ -55,7 +55,7 @@ function GlowOrb() {
     <>
       <ambientLight intensity={0.2} />
       <pointLight position={[5, 5, 5]} intensity={0.8} color="#2563eb" />
-      <pointLight position={[-5, -3, 3]} intensity={0.4} color="#0018FF" />
+      <pointLight position={[-5, -3, 3]} intensity={0.4} color="#0052CC" />
 
       <mesh ref={meshRef}>
         <icosahedronGeometry args={[1.8, 12]} />

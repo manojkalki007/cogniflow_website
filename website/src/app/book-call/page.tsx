@@ -19,7 +19,7 @@ export default function BookCallPage() {
         theme: "dark",
         cssVarsPerTheme: {
           dark: {
-            "cal-brand": "#0018FF",
+            "cal-brand": "#0052CC",
             "cal-text": "#ffffff",
             "cal-text-emphasis": "#ffffff",
             "cal-border-emphasis": "rgba(255,255,255,0.1)",
@@ -27,7 +27,7 @@ export default function BookCallPage() {
             "cal-bg-emphasis": "#111114",
           },
           light: {
-            "cal-brand": "#0018FF",
+            "cal-brand": "#0052CC",
           },
         },
         hideEventTypeDetails: false,
@@ -91,7 +91,7 @@ export default function BookCallPage() {
                 required
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="w-full px-4 py-3 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-white/25 focus:outline-none focus:border-[#0018FF]/50 focus:ring-1 focus:ring-[#0018FF]/25 transition-all"
+                className="w-full px-4 py-3 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-white/25 focus:outline-none focus:border-[#0052CC]/50 focus:ring-1 focus:ring-[#0052CC]/25 transition-all"
                 placeholder="John Doe"
               />
             </div>
@@ -105,7 +105,7 @@ export default function BookCallPage() {
                 required
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="w-full px-4 py-3 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-white/25 focus:outline-none focus:border-[#0018FF]/50 focus:ring-1 focus:ring-[#0018FF]/25 transition-all"
+                className="w-full px-4 py-3 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-white/25 focus:outline-none focus:border-[#0052CC]/50 focus:ring-1 focus:ring-[#0052CC]/25 transition-all"
                 placeholder="john@company.com"
               />
             </div>
@@ -118,7 +118,7 @@ export default function BookCallPage() {
                 type="text"
                 value={form.company}
                 onChange={(e) => setForm({ ...form, company: e.target.value })}
-                className="w-full px-4 py-3 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-white/25 focus:outline-none focus:border-[#0018FF]/50 focus:ring-1 focus:ring-[#0018FF]/25 transition-all"
+                className="w-full px-4 py-3 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-white/25 focus:outline-none focus:border-[#0052CC]/50 focus:ring-1 focus:ring-[#0052CC]/25 transition-all"
                 placeholder="Acme Corp"
               />
             </div>
@@ -131,7 +131,7 @@ export default function BookCallPage() {
                 type="tel"
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                className="w-full px-4 py-3 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-white/25 focus:outline-none focus:border-[#0018FF]/50 focus:ring-1 focus:ring-[#0018FF]/25 transition-all"
+                className="w-full px-4 py-3 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-white/25 focus:outline-none focus:border-[#0052CC]/50 focus:ring-1 focus:ring-[#0052CC]/25 transition-all"
                 placeholder="+91 98765 43210"
               />
             </div>
@@ -139,7 +139,7 @@ export default function BookCallPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-3.5 rounded-full bg-[#0018FF] text-white font-semibold text-base hover:bg-[#0012CC] transition-colors disabled:opacity-60"
+              className="w-full py-3.5 rounded-full bg-[#0052CC] text-white font-semibold text-base hover:bg-[#003d99] transition-colors disabled:opacity-60"
             >
               {submitting ? "Saving..." : "Continue to Schedule"}
             </button>

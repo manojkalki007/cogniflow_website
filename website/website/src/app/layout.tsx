@@ -17,6 +17,28 @@ export const metadata: Metadata = {
   title: "Cogniflow — AI Calling Agent & AI SDR",
   description:
     "The first autonomous AI SDR that thinks before it talks. Qualify leads, handle objections, and book high-value meetings 24/7 with human-like voice agents.",
+  icons: {
+    icon: "/cogniflow-logo.png",
+    apple: "/cogniflow-logo.png",
+  },
+  openGraph: {
+    title: "Cogniflow — AI Calling Agent & AI SDR",
+    description:
+      "The first autonomous AI SDR that thinks before it talks. Sub-500ms response time, 30+ languages, revenue attribution built in.",
+    siteName: "Cogniflow",
+    type: "website",
+    images: ["/cogniflow-logo.png"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Cogniflow — AI Calling Agent & AI SDR",
+    description:
+      "The first autonomous AI SDR that thinks before it talks. Sub-500ms response time, 30+ languages.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({

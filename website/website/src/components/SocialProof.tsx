@@ -38,11 +38,11 @@ export default function SocialProof() {
   const isInView = useInView(ref, { once: true, margin: "-100px" });
 
   return (
-    <section className="relative py-32 px-6" ref={ref}>
+    <section id="testimonials" className="relative py-32 px-6" ref={ref}>
       <div className="max-w-6xl mx-auto relative z-10">
         <ScrollReveal className="text-center mb-16">
           <p className="text-xs uppercase tracking-[0.2em] text-text-secondary mb-4">
-            Social Proof
+            Testimonials
           </p>
           <h2 className="text-4xl md:text-5xl font-semibold tracking-[-0.02em]">
             Trusted by <span className="gradient-text">revenue teams</span>
