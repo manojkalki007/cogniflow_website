@@ -1,8 +1,9 @@
 """Semantic End-of-Turn detector.
 
-Replaces fixed silence timeout with multi-signal prediction.
-Combines punctuation, turn-final phrases, question structure,
-word count, and brief silence to determine if the user is done speaking.
+Production-grade turn detection using:
+- Deepgram's speech_final signal as primary gate
+- Multi-signal scoring (punctuation, turn-finals, word count)
+- Grace period with cancellation for interruption recovery
 """
 
 import asyncio
@@ -11,13 +12,14 @@ import re
 
 class SemanticEOTDetector:
 
-    TURN_FINALS = [
+    TURN_FINALS = {
         "thank you", "thanks", "that's all", "that's it",
         "please", "okay", "ok", "yes", "no", "sure",
         "got it", "never mind", "goodbye", "bye",
         "right", "correct", "absolutely", "exactly",
         "haan", "nahi", "theek hai", "shukriya", "dhanyavaad",
-    ]
+        "achha", "bas", "chalo", "thik hai",
+    }
 
     def __init__(self, threshold: float = 0.65):
         self.threshold = threshold
@@ -27,7 +29,7 @@ class SemanticEOTDetector:
         score = 0.0
         text = partial_text.strip().lower()
 
-        if not text or len(text.split()) < 3:
+        if not text or len(text.split()) < 2:
             return 0.0
 
         if text[-1] in ".!":
@@ -41,14 +43,15 @@ class SemanticEOTDetector:
                 break
 
         if re.search(
-            r"\b(what|when|where|how|why|can|could|would|is|are|do|does)\b", text
+            r"\b(what|when|where|how|why|can|could|would|is|are|do|does|kya|kab|kaise|kahan)\b",
+            text,
         ) and text[-1] == "?":
             score += 0.15
 
         word_count = len(text.split())
-        if word_count >= 6:
+        if word_count >= 5:
             score += 0.10
-        if word_count >= 12:
+        if word_count >= 10:
             score += 0.10
 
         if silence_ms >= 300:
@@ -62,7 +65,7 @@ class SemanticEOTDetector:
         self,
         partial_text: str,
         silence_ms: int,
-        grace_period_ms: int = 300,
+        grace_period_ms: int = 250,
     ) -> bool:
         confidence = self.predict(partial_text, silence_ms)
 

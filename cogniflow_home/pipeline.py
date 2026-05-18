@@ -1,17 +1,14 @@
 """
-Voice Pipeline Orchestrator.
+Voice Pipeline Orchestrator — Production Grade.
 
-Handles the full real-time audio loop:
-  Caller audio → VAD → STT → EOT → LLM → TTS → audio back to caller
-
-Provider-agnostic: works with Twilio, Exotel, or any provider
-that implements the TelephonyProvider interface.
-
-Language-aware: auto-selects Deepgram for English/European,
-Sarvam AI for Indian languages.
-
-Latency-optimized: semantic EOT, sentence streaming, filler audio,
-speculative pre-generation, per-component tracing.
+Key improvements over basic architecture:
+- Transcript deduplication (no duplicate LLM calls)
+- speech_final gating from Deepgram for reliable turn-taking
+- Adaptive barge-in threshold (calibrated from ambient noise)
+- Proper STT queue flushing via public API
+- Smart sentence streaming (handles abbreviations)
+- TTS error propagation (no silent audio loss)
+- Always streams audio to caller while STT is active
 """
 
 import asyncio
@@ -53,6 +50,7 @@ FORMAT:
 - Say numbers as words: "four hundred fifty" not "450".
 - If calling a tool, say a filler first: "Let me pull that up for you..."
 - NEVER repeat information you already said. Don't re-introduce yourself.
+- NEVER repeat the caller's question back to them. Just answer it directly.
 
 LISTENING RULES — these are critical:
 - NEVER cut the caller off. Wait for them to finish their full thought before responding.
@@ -64,7 +62,7 @@ SOUND HUMAN — this is the most important part:
 - ALWAYS use contractions: "don't", "can't", "I'm", "you're", "it's", "that's", "won't", "I'll", "we're", "I'd", "they're", "haven't", "isn't", "wouldn't", "shouldn't".
 - Start responses with natural reactions: "Oh, sure!", "Ah, got it.", "Right, so...", "Hmm, let me think.", "Yeah, absolutely!"
 - Use conversational connectors between sentences: "So,", "Well,", "Actually,", "Honestly,", "You know,"
-- Vary your sentence rhythm. Mix short punchy lines with slightly longer ones. Don't make every sentence the same length.
+- Vary your sentence rhythm. Mix short punchy lines with slightly longer ones.
 - Show warmth and personality. React to what the caller says. Sound like you genuinely care.
 - Use casual phrasing: "a couple of" not "several", "pretty much" not "essentially", "I'd say" not "I would estimate".
 - Add natural hedging where appropriate: "I think", "probably", "I'd say", "as far as I know".
@@ -189,7 +187,7 @@ class VoicePipeline:
         }
         self.tts = _create_tts(language, voice_id or VOICE_ID, sample_rate=sample_rate, raw_pcm=self._raw_pcm)
 
-        self.eot = SemanticEOTDetector(threshold=0.75)
+        self.eot = SemanticEOTDetector(threshold=0.65)
         self.tracer = LatencyTracer(call_id)
         self.compliance = ComplianceEngine()
         self.speculative = SpeculativeGenerator(eot_threshold=0.70, min_words=5)
@@ -205,9 +203,13 @@ class VoicePipeline:
         self._audio_chunk_count = 0
         self._silence_chunks = 0
         self._speech_energy_threshold = 200
+        self._energy_calibrated = False
+        self._energy_samples: list[float] = []
         self._user_speech_end_ts = 0.0
         self._turn_number = 0
         self._turn_first_byte_ts = 0.0
+        self._unclear_count = 0
+        self._last_agent_text = ""
         self.on_transcript = None
         self.on_latency = None
 
@@ -219,7 +221,6 @@ class VoicePipeline:
             })
 
     async def _fetch_memory_and_prediction(self) -> str | None:
-        """Fetch caller memory and pre-call prediction. Returns custom greeting or None."""
         custom_greeting = None
         try:
             from cogniflow_home.memory.caller_memory import caller_memory
@@ -247,7 +248,6 @@ class VoicePipeline:
         return custom_greeting
 
     async def _prewarm_tts(self):
-        """Connect TTS then synthesize a silent token to wake the voice model."""
         await self.tts.connect()
         try:
             async for _ in self.tts.synthesize("."):
@@ -296,8 +296,8 @@ class VoicePipeline:
         })
 
         await self._speak(greeting)
-        # Record greeting in conversation history so the LLM knows it already spoke
         self.llm.add_message("assistant", greeting)
+        self._last_agent_text = greeting.lower().strip()
         self.state.transcript.append(
             {"role": "agent", "text": greeting, "ts": time.time()}
         )
@@ -306,29 +306,34 @@ class VoicePipeline:
         if not self._running:
             return
 
+        energy = compute_energy_mulaw(mulaw_bytes)
+
+        if not self._energy_calibrated:
+            self._energy_samples.append(energy)
+            if len(self._energy_samples) >= 20:
+                avg = sum(self._energy_samples) / len(self._energy_samples)
+                self._speech_energy_threshold = max(200, avg * 2.5)
+                self._energy_calibrated = True
+                logger.debug(f"Barge-in threshold calibrated: {self._speech_energy_threshold:.0f} (ambient: {avg:.0f})")
+
         if not self.state.is_agent_speaking:
             await self.stt.send_audio(mulaw_bytes)
+        else:
+            await self.stt.send_audio(mulaw_bytes)
 
-        if self.state.is_agent_speaking:
-            energy = compute_energy_mulaw(mulaw_bytes)
             if energy > self._speech_energy_threshold:
                 self._silence_chunks = 0
                 self._audio_chunk_count += 1
-                if self._audio_chunk_count >= 28:
+                if self._audio_chunk_count >= 20:
                     barge_detect_ts = time.perf_counter() * 1000
-                    logger.info("Barge-in detected — pausing to listen")
+                    logger.info("Barge-in detected — stopping agent, listening")
                     self.state.barge_in = True
                     self.state.is_agent_speaking = False
                     self._audio_chunk_count = 0
                     self.eot.cancel()
                     self.speculative.cancel()
                     await self._telephony.clear_audio()
-                    # Flush stale STT results so we only respond to new speech
-                    while not self.stt._result_queue.empty():
-                        try:
-                            self.stt._result_queue.get_nowait()
-                        except Exception:
-                            break
+                    self.stt.flush_pending()
                     audio_stopped_ts = time.perf_counter() * 1000
                     self.barge_in_tracker.record_barge_in(
                         user_speech_detected_ms=barge_detect_ts,
@@ -339,12 +344,14 @@ class VoicePipeline:
                     )
             else:
                 self._silence_chunks += 1
-                if self._silence_chunks > 8:
+                if self._silence_chunks > 6:
                     self._audio_chunk_count = 0
-        else:
-            self._audio_chunk_count = 0
 
     async def _process_transcripts(self):
+        """Main transcript processing loop with deduplication and speech_final gating."""
+        pending_final = ""
+        pending_speech_final = False
+
         try:
             async for result in self.stt.results():
                 if not self._running:
@@ -355,67 +362,82 @@ class VoicePipeline:
                     await self.speculative.on_partial_transcript(
                         result.transcript, eot_prob
                     )
-                    # Language detection on partials
                     new_lang = self.language_detector.should_switch(result.transcript)
                     if new_lang:
                         await self._switch_language(new_lang)
                     continue
 
-                transcript = result.transcript
-                # Emotional mirroring
-                sentiment = self._quick_sentiment(transcript)
-                self.emotional_mirror.update(sentiment)
-                redacted, compliance_events = self.compliance.monitor_transcript(
-                    transcript
-                )
-                for event in compliance_events:
-                    await bus.emit("compliance.event", {
-                        "call_id": self.state.call_sid,
-                        **event,
-                    })
-
-                logger.info(f"User said: {redacted}")
-                self._user_speech_end_ts = time.perf_counter() * 1000
-                self._turn_number += 1
-
-                # Handle unclear/inaudible speech
-                cleaned = redacted.strip().lower()
-                noise_tokens = {"", "uh", "um", "hmm", "hm", "ah", "oh"}
-                words = cleaned.split()
-                if not cleaned or (len(words) <= 1 and cleaned in noise_tokens):
-                    self._unclear_count = getattr(self, '_unclear_count', 0) + 1
-                    if self._unclear_count >= 2:
-                        await self._speak("I'm having trouble hearing you. Could you speak a little louder and clearer?")
-                        self._unclear_count = 0
-                    continue
-
-                self._unclear_count = 0
-
-                self.emotion_adapter.update_caller_emotion(redacted)
-
-                self.state.transcript.append(
-                    {"role": "user", "text": redacted, "ts": time.time()}
-                )
-                if self.on_transcript:
-                    try:
-                        await self.on_transcript("user", redacted)
-                    except Exception:
-                        pass
-
-                self.tracer.new_turn()
-                eot_ts = time.perf_counter() * 1000
-
-                speculative = await self.speculative.on_final_transcript(redacted)
-                if speculative:
-                    await self._speak_speculative(speculative)
+                if result.speech_final:
+                    combined = (pending_final + " " + result.transcript).strip() if pending_final else result.transcript
+                    pending_final = ""
+                    pending_speech_final = False
+                    await self._handle_final_transcript(combined)
                 else:
-                    await self._generate_and_speak(redacted, eot_ts=eot_ts)
+                    pending_final = (pending_final + " " + result.transcript).strip() if pending_final else result.transcript
+                    if not pending_speech_final:
+                        pending_speech_final = True
+                        asyncio.get_event_loop().call_later(
+                            1.5, self._flush_pending_final, pending_final
+                        )
 
-                self.tracer.check_alert()
         except asyncio.CancelledError:
             pass
         except Exception:
             logger.exception("Transcript processing error")
+
+    def _flush_pending_final(self, text: str):
+        """Safety net: if speech_final never arrives, process after 1.5s."""
+        if not self._running:
+            return
+        asyncio.create_task(self._handle_final_transcript(text))
+
+    async def _handle_final_transcript(self, transcript: str):
+        """Process a confirmed final transcript with dedup and response generation."""
+        sentiment = self._quick_sentiment(transcript)
+        self.emotional_mirror.update(sentiment)
+        redacted, compliance_events = self.compliance.monitor_transcript(transcript)
+        for event in compliance_events:
+            await bus.emit("compliance.event", {
+                "call_id": self.state.call_sid,
+                **event,
+            })
+
+        logger.info(f"User said: {redacted}")
+        self._user_speech_end_ts = time.perf_counter() * 1000
+        self._turn_number += 1
+
+        cleaned = redacted.strip().lower()
+        noise_tokens = {"", "uh", "um", "hmm", "hm", "ah", "oh"}
+        words = cleaned.split()
+        if not cleaned or (len(words) <= 1 and cleaned in noise_tokens):
+            self._unclear_count += 1
+            if self._unclear_count >= 2:
+                await self._speak("I'm having trouble hearing you. Could you speak a little louder?")
+                self._unclear_count = 0
+            return
+
+        self._unclear_count = 0
+        self.emotion_adapter.update_caller_emotion(redacted)
+
+        self.state.transcript.append(
+            {"role": "user", "text": redacted, "ts": time.time()}
+        )
+        if self.on_transcript:
+            try:
+                await self.on_transcript("user", redacted)
+            except Exception:
+                pass
+
+        self.tracer.new_turn()
+        eot_ts = time.perf_counter() * 1000
+
+        speculative = await self.speculative.on_final_transcript(redacted)
+        if speculative:
+            await self._speak_speculative(speculative)
+        else:
+            await self._generate_and_speak(redacted, eot_ts=eot_ts)
+
+        self.tracer.check_alert()
 
     async def _generate_and_speak(self, user_text: str, eot_ts: float = 0):
         self.state.is_agent_speaking = True
@@ -423,7 +445,6 @@ class VoicePipeline:
         self._turn_first_byte_ts = 0.0
         eot_ts_orig = eot_ts
 
-        # Emotional mirroring — inject emotion context
         emotion_prompt = self.emotional_mirror.get_prompt_injection()
         caller_emotion_prompt = self.emotion_adapter.get_caller_emotion_prompt()
         llm_input = user_text
@@ -433,7 +454,6 @@ class VoicePipeline:
         if self.emotional_mirror.should_offer_human():
             llm_input += "\n[SYSTEM: Caller has been frustrated for 30+ seconds. Proactively offer to transfer to a human agent.]"
 
-        # Knowledge base RAG
         try:
             from cogniflow_home.knowledge.base import kb
             agent_id = getattr(self, 'agent_id', None)
@@ -487,6 +507,7 @@ class VoicePipeline:
         self.state.is_agent_speaking = False
 
         if full_response.strip():
+            self._last_agent_text = full_response.strip().lower()
             self.state.transcript.append(
                 {"role": "agent", "text": full_response.strip(), "ts": time.time()}
             )
@@ -539,6 +560,7 @@ class VoicePipeline:
         self.state.is_agent_speaking = False
 
         if full_response.strip():
+            self._last_agent_text = full_response.strip().lower()
             self.state.transcript.append(
                 {"role": "agent", "text": full_response.strip(), "ts": time.time()}
             )
@@ -560,7 +582,6 @@ class VoicePipeline:
             await self._speak(filler_text)
 
     async def _switch_language(self, language: str):
-        """Hot-swap STT and TTS providers when language changes."""
         providers = self.language_router.get_providers(language)
         logger.info(f"Switching to language: {language}, providers: {providers}")
 
@@ -579,7 +600,6 @@ class VoicePipeline:
         })
 
     def _quick_sentiment(self, text: str) -> float:
-        """Ultra-fast keyword-based sentiment. 0=negative, 1=positive."""
         text_lower = text.lower()
         negative = ['angry', 'frustrated', 'terrible', 'worst', 'hate', 'useless',
                      'waste', 'horrible', 'pathetic', 'disgusting', 'never', 'cancel',

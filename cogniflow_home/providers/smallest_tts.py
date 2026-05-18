@@ -1,7 +1,10 @@
 """Smallest AI Text-to-Speech.
 
-Low-latency Lightning TTS with natural-sounding voices.
-Outputs mulaw 8kHz directly — no conversion needed for telephony.
+Production-grade TTS with:
+- Proper error propagation (no silent failures)
+- Configurable chunk size for low-latency streaming
+- Speed/voice control
+- Connection health monitoring
 """
 
 import logging
@@ -31,7 +34,7 @@ class SmallestTTS:
         self.language = language
         self.sample_rate = sample_rate
         self.raw_pcm = raw_pcm
-        self._client = httpx.AsyncClient(timeout=15.0)
+        self._client = httpx.AsyncClient(timeout=8.0)
 
     async def connect(self):
         logger.info(f"Smallest AI TTS ready (voice={self.voice_id}, rate={self.sample_rate}, pcm={self.raw_pcm})")
@@ -52,24 +55,19 @@ class SmallestTTS:
             "add_wav_header": False,
         }
 
-        try:
-            chunk_bytes = 8192 if self.raw_pcm else 640
-            async with self._client.stream(
-                "POST", SMALLEST_API_URL, json=body, headers=headers
-            ) as resp:
-                if resp.status_code != 200:
-                    error = await resp.aread()
-                    logger.warning(
-                        f"Smallest AI error: {resp.status_code} {error.decode()}"
-                    )
-                    return
+        chunk_bytes = 4096 if self.raw_pcm else 320
+        async with self._client.stream(
+            "POST", SMALLEST_API_URL, json=body, headers=headers
+        ) as resp:
+            if resp.status_code != 200:
+                error = await resp.aread()
+                raise RuntimeError(
+                    f"Smallest AI TTS error {resp.status_code}: {error.decode()[:200]}"
+                )
 
-                async for chunk in resp.aiter_bytes(chunk_bytes):
-                    if chunk:
-                        yield chunk if self.raw_pcm else pcm16_to_mulaw(chunk)
-
-        except Exception:
-            logger.exception("Smallest AI TTS request failed")
+            async for chunk in resp.aiter_bytes(chunk_bytes):
+                if chunk:
+                    yield chunk if self.raw_pcm else pcm16_to_mulaw(chunk)
 
     async def close(self):
         await self._client.aclose()

@@ -1,10 +1,15 @@
 """Streaming LLM via Groq.
 
-Groq delivers ~80ms TTFT — purpose-built for real-time voice.
+Production-grade streaming with:
+- Smart sentence boundary detection (handles Dr., U.S., 3.14, etc.)
+- Word-count fallback for fast first-chunk delivery
+- Bounded tool call recursion
+- Configurable temperature/max_tokens per call
 """
 
 import json
 import logging
+import re
 from typing import AsyncIterator
 
 import httpx
@@ -12,6 +17,26 @@ import httpx
 from cogniflow_home.config import settings
 
 logger = logging.getLogger("cogniflow_home.llm.groq")
+
+_ABBREVIATIONS = re.compile(
+    r'\b(?:Mr|Mrs|Ms|Dr|Prof|Jr|Sr|St|vs|etc|Inc|Ltd|Corp|Co|Dept'
+    r'|Ave|Blvd|Rd|i\.e|e\.g|a\.m|p\.m|U\.S|U\.K)\.$',
+    re.IGNORECASE,
+)
+
+_SENTENCE_END = re.compile(r'[.!?][\s]')
+_SENTENCE_END_EOF = re.compile(r'[.!?]$')
+
+
+def _find_sentence_boundary(text: str) -> int:
+    """Find the best split point that is a real sentence boundary.
+    Returns index after the delimiter+space, or -1 if none found."""
+    for m in _SENTENCE_END.finditer(text):
+        candidate = text[:m.end()].rstrip()
+        if _ABBREVIATIONS.search(candidate):
+            continue
+        return m.end()
+    return -1
 
 
 class GroqLLM:
@@ -30,6 +55,7 @@ class GroqLLM:
         self.conversation_history: list[dict] = []
         self.call_context: dict = {}
         self.on_tool_call = None
+        self._client = httpx.AsyncClient(timeout=10.0)
 
         if system_prompt:
             self.conversation_history.append(
@@ -47,7 +73,6 @@ class GroqLLM:
             total_chars -= len(removed.get("content", ""))
 
     async def prewarm(self):
-        """Send system prompt with max_tokens=1 to warm the KV cache."""
         api_key = settings.groq_api_key
         if not api_key:
             return
@@ -58,15 +83,14 @@ class GroqLLM:
             "temperature": 0,
         }
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                await client.post(
-                    self._groq_url,
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json=body,
-                )
+            await self._client.post(
+                self._groq_url,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=body,
+            )
         except Exception:
             logger.debug("LLM prewarm failed (non-fatal)", exc_info=True)
 
@@ -77,10 +101,10 @@ class GroqLLM:
 
         try:
             async for sentence in self._try_stream(
-                self._groq_url,
                 settings.groq_api_key,
                 self.model,
                 tools,
+                depth=0,
             ):
                 yield sentence
         except Exception:
@@ -89,13 +113,16 @@ class GroqLLM:
 
     async def _try_stream(
         self,
-        url: str,
         api_key: str,
         model: str,
         tools: list | None = None,
+        depth: int = 0,
     ) -> AsyncIterator[str]:
         if not api_key:
-            raise ValueError(f"No API key configured for {url}")
+            raise ValueError("No Groq API key configured")
+        if depth > 3:
+            yield "I've run into an issue processing that. Let me try a different approach."
+            return
 
         body: dict = {
             "model": model,
@@ -108,74 +135,70 @@ class GroqLLM:
             body["tools"] = tools
 
         full_response = ""
-        sentence_buffer = ""
+        buffer = ""
         tool_calls_data: dict[int, dict] = {}
         first_chunk_sent = False
+        word_count = 0
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            async with client.stream(
-                "POST",
-                url,
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
-                json=body,
-            ) as response:
-                if response.status_code != 200:
-                    error_body = await response.aread()
-                    raise RuntimeError(
-                        f"LLM API error {response.status_code}: {error_body.decode()}"
-                    )
+        async with self._client.stream(
+            "POST",
+            self._groq_url,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json=body,
+        ) as response:
+            if response.status_code != 200:
+                error_body = await response.aread()
+                raise RuntimeError(
+                    f"LLM API error {response.status_code}: {error_body.decode()}"
+                )
 
-                async for line in response.aiter_lines():
-                    if not line.startswith("data: ") or line == "data: [DONE]":
-                        continue
+            async for line in response.aiter_lines():
+                if not line.startswith("data: ") or line == "data: [DONE]":
+                    continue
 
-                    chunk = json.loads(line[6:])
-                    delta = chunk["choices"][0].get("delta", {})
+                chunk = json.loads(line[6:])
+                delta = chunk["choices"][0].get("delta", {})
 
-                    if delta.get("tool_calls"):
-                        for tc in delta["tool_calls"]:
-                            idx = tc["index"]
-                            if idx not in tool_calls_data:
-                                tool_calls_data[idx] = {
-                                    "id": "", "name": "", "arguments": ""
-                                }
-                            if tc.get("id"):
-                                tool_calls_data[idx]["id"] = tc["id"]
-                            if tc.get("function"):
-                                if tc["function"].get("name"):
-                                    tool_calls_data[idx]["name"] = tc["function"]["name"]
-                                if tc["function"].get("arguments"):
-                                    tool_calls_data[idx]["arguments"] += tc["function"]["arguments"]
+                if delta.get("tool_calls"):
+                    for tc in delta["tool_calls"]:
+                        idx = tc["index"]
+                        if idx not in tool_calls_data:
+                            tool_calls_data[idx] = {
+                                "id": "", "name": "", "arguments": ""
+                            }
+                        if tc.get("id"):
+                            tool_calls_data[idx]["id"] = tc["id"]
+                        if tc.get("function"):
+                            if tc["function"].get("name"):
+                                tool_calls_data[idx]["name"] = tc["function"]["name"]
+                            if tc["function"].get("arguments"):
+                                tool_calls_data[idx]["arguments"] += tc["function"]["arguments"]
 
-                    elif delta.get("content"):
-                        token = delta["content"]
-                        full_response += token
-                        sentence_buffer += token
+                elif delta.get("content"):
+                    token = delta["content"]
+                    full_response += token
+                    buffer += token
+                    word_count = len(buffer.split())
 
-                        yielded = False
-                        for delimiter in [".", "!", "?", ",", ";", ":"]:
-                            if delimiter in sentence_buffer:
-                                parts = sentence_buffer.split(delimiter, 1)
-                                sentence = (parts[0] + delimiter).strip()
-                                sentence_buffer = parts[1] if len(parts) > 1 else ""
-                                if sentence:
-                                    first_chunk_sent = True
-                                    yielded = True
-                                    yield sentence
-                                break
+                    split_at = _find_sentence_boundary(buffer)
+                    if split_at > 0:
+                        sentence = buffer[:split_at].strip()
+                        buffer = buffer[split_at:]
+                        if sentence:
+                            first_chunk_sent = True
+                            yield sentence
+                    elif not first_chunk_sent and word_count >= 6:
+                        text = buffer.strip()
+                        buffer = ""
+                        if text:
+                            first_chunk_sent = True
+                            yield text
 
-                        if not yielded and not first_chunk_sent and len(sentence_buffer.split()) >= 4:
-                            text = sentence_buffer.strip()
-                            sentence_buffer = ""
-                            if text:
-                                first_chunk_sent = True
-                                yield text
-
-        if sentence_buffer.strip() and not tool_calls_data:
-            yield sentence_buffer.strip()
+        if buffer.strip() and not tool_calls_data:
+            yield buffer.strip()
 
         if tool_calls_data:
             tool_call_messages = []
@@ -202,6 +225,7 @@ class GroqLLM:
                     func_args = json.loads(tc["function"]["arguments"])
                 except json.JSONDecodeError:
                     func_args = {}
+                    logger.warning(f"Bad tool args for {func_name}, using empty dict")
 
                 logger.info(f"Tool call: {func_name}({func_args})")
                 result = await execute_tool(func_name, func_args, self.call_context)
@@ -212,8 +236,11 @@ class GroqLLM:
                     "content": result,
                 })
 
-            async for sentence in self._try_stream(url, api_key, model):
+            async for sentence in self._try_stream(api_key, model, depth=depth + 1):
                 yield sentence
 
         if full_response.strip():
             self.add_message("assistant", full_response.strip())
+
+    async def close(self):
+        await self._client.aclose()
