@@ -1,4 +1,4 @@
-const BASE = import.meta.env.VITE_API_URL || "";
+const BASE = import.meta.env.VITE_API_URL || "https://api.cogniflowautomations.com";
 const API_KEY = import.meta.env.VITE_API_KEY || "";
 
 let _tenantId = localStorage.getItem("cogniflow_tenant_id") || "";
