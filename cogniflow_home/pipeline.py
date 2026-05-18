@@ -169,6 +169,11 @@ class VoicePipeline:
         self._telephony = telephony
         self._raw_pcm = getattr(telephony, 'raw_pcm', False)
 
+        self.emotion_adapter = EmotionTTSAdapter(
+            template_type=emotion_profile,
+            gender=voice_gender,
+        )
+
         base_instructions = instructions_override or AGENT_INSTRUCTIONS
         emotion_instructions = self.emotion_adapter.get_llm_emotion_instructions()
         self._instructions = base_instructions + "\n\n" + SYSTEM_PROMPT_VOICE_RULES + "\n\n" + emotion_instructions
@@ -194,10 +199,6 @@ class VoicePipeline:
         self.language_router = LanguageRouter()
         self.turn_quality = TurnQualityAnalyzer()
         self.barge_in_tracker = BargeInTracker()
-        self.emotion_adapter = EmotionTTSAdapter(
-            template_type=emotion_profile,
-            gender=voice_gender,
-        )
 
         self._running = False
         self._stt_task = None
