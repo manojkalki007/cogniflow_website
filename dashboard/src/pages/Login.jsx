@@ -77,7 +77,7 @@ export default function Login() {
     if (orgId.trim()) setTenantId(orgId.trim());
     setSuccess(true);
     setFailCount(0);
-    setTimeout(() => navigate("/dashboard"), 600);
+    setTimeout(() => navigate("/home"), 600);
   };
 
   const handleForgotPassword = async (e) => {

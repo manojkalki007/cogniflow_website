@@ -14,51 +14,51 @@ const SidebarContext = createContext();
 export const useSidebar = () => useContext(SidebarContext);
 
 const NAV_CORE = [
-  { to: "/dashboard", label: "Call Log", icon: Phone, end: true },
-  { to: "/dashboard/call", label: "Make a Call", icon: PhoneOutgoing },
-  { to: "/dashboard/contacts", label: "Contacts", icon: Users },
-  { to: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
-  { to: "/dashboard/agents", label: "Agents", icon: Bot },
-  { to: "/dashboard/templates", label: "Templates", icon: LayoutTemplate },
-  { to: "/dashboard/campaigns", label: "Campaigns", icon: Megaphone },
+  { to: "/home", label: "Call Log", icon: Phone, end: true },
+  { to: "/home/call", label: "Make a Call", icon: PhoneOutgoing },
+  { to: "/home/contacts", label: "Contacts", icon: Users },
+  { to: "/home/analytics", label: "Analytics", icon: BarChart3 },
+  { to: "/home/agents", label: "Agents", icon: Bot },
+  { to: "/home/templates", label: "Templates", icon: LayoutTemplate },
+  { to: "/home/campaigns", label: "Campaigns", icon: Megaphone },
 ];
 
 const NAV_CHANNELS = [
-  { to: "/dashboard/whatsapp", label: "WhatsApp", icon: MessageSquare },
-  { to: "/dashboard/email", label: "Email", icon: Mail },
-  { to: "/dashboard/integrations", label: "Integrations", icon: Plug },
+  { to: "/home/whatsapp", label: "WhatsApp", icon: MessageSquare },
+  { to: "/home/email", label: "Email", icon: Mail },
+  { to: "/home/integrations", label: "Integrations", icon: Plug },
 ];
 
 const NAV_INSIGHTS = [
-  { to: "/dashboard/revenue", label: "Revenue", icon: DollarSign },
-  { to: "/dashboard/compliance", label: "Compliance", icon: ShieldCheck },
-  { to: "/dashboard/latency", label: "Latency", icon: Timer },
+  { to: "/home/revenue", label: "Revenue", icon: DollarSign },
+  { to: "/home/compliance", label: "Compliance", icon: ShieldCheck },
+  { to: "/home/latency", label: "Latency", icon: Timer },
 ];
 
 const NAV_ACCOUNT = [
-  { to: "/dashboard/tenant", label: "My Account", icon: UserCircle },
-  { to: "/dashboard/admin", label: "Admin Panel", icon: ShieldAlert },
-  { to: "/dashboard/api-hub", label: "API Hub", icon: Cable },
+  { to: "/home/tenant", label: "My Account", icon: UserCircle },
+  { to: "/home/admin", label: "Admin Panel", icon: ShieldAlert },
+  { to: "/home/api-hub", label: "API Hub", icon: Cable },
 ];
 
 const PAGE_TITLES = {
-  "/dashboard": "Call Log",
-  "/dashboard/call": "Make a Call",
-  "/dashboard/contacts": "Contacts",
-  "/dashboard/analytics": "Analytics",
-  "/dashboard/agents": "Agents",
-  "/dashboard/templates": "Templates",
-  "/dashboard/campaigns": "Campaigns",
-  "/dashboard/whatsapp": "WhatsApp",
-  "/dashboard/email": "Email",
-  "/dashboard/integrations": "Integrations",
-  "/dashboard/revenue": "Revenue",
-  "/dashboard/compliance": "Compliance",
-  "/dashboard/latency": "Latency",
-  "/dashboard/tenant": "My Account",
-  "/dashboard/admin": "Admin Panel",
-  "/dashboard/api-hub": "API Hub",
-  "/dashboard/settings": "Settings",
+  "/home": "Call Log",
+  "/home/call": "Make a Call",
+  "/home/contacts": "Contacts",
+  "/home/analytics": "Analytics",
+  "/home/agents": "Agents",
+  "/home/templates": "Templates",
+  "/home/campaigns": "Campaigns",
+  "/home/whatsapp": "WhatsApp",
+  "/home/email": "Email",
+  "/home/integrations": "Integrations",
+  "/home/revenue": "Revenue",
+  "/home/compliance": "Compliance",
+  "/home/latency": "Latency",
+  "/home/tenant": "My Account",
+  "/home/admin": "Admin Panel",
+  "/home/api-hub": "API Hub",
+  "/home/settings": "Settings",
 };
 
 function NavItem({ to, label, icon: Icon, end, collapsed }) {
@@ -201,7 +201,7 @@ export default function Layout() {
             )}
 
             <NavLink
-              to="/dashboard/settings"
+              to="/home/settings"
               title={collapsed ? "Settings" : undefined}
               className={({ isActive }) =>
                 `sidebar-nav-item ${isActive ? "active" : ""}`

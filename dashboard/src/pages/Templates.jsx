@@ -165,7 +165,7 @@ function PreviewDialog({ open, onOpenChange, template }) {
               </p>
             </div>
             <div className="flex gap-3 justify-center">
-              <Button onClick={() => navigate("/dashboard/agents")} style={{ background: 'var(--accent)', color: 'white' }}>
+              <Button onClick={() => navigate("/home/agents")} style={{ background: 'var(--accent)', color: 'white' }}>
                 <ArrowRight size={14} /> Go to Agents
               </Button>
               <Button variant="outline" onClick={handleClose}>Close</Button>

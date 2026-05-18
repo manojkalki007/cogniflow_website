@@ -48,7 +48,7 @@ export default function ContactDetail() {
       <div className="px-8 py-6">
         <div className="max-w-2xl">
           <button
-            onClick={() => navigate("/dashboard/contacts")}
+            onClick={() => navigate("/home/contacts")}
             className="flex items-center gap-1.5 text-sm mb-6 transition-colors"
             style={{ color: 'var(--text-muted)' }}
             onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}

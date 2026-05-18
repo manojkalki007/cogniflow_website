@@ -39,25 +39,25 @@ ReactDOM.createRoot(document.getElementById("root")).render(
             <Route path="/login" element={<Login />} />
             <Route element={<ProtectedRoute />}>
               <Route element={<Layout />}>
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/dashboard" element={<CallLog />} />
-                <Route path="/dashboard/call" element={<MakeCall />} />
-                <Route path="/dashboard/contacts" element={<Contacts />} />
-                <Route path="/dashboard/contacts/:id" element={<ContactDetail />} />
-                <Route path="/dashboard/analytics" element={<Analytics />} />
-                <Route path="/dashboard/agents" element={<Agents />} />
-                <Route path="/dashboard/templates" element={<Templates />} />
-                <Route path="/dashboard/campaigns" element={<Campaigns />} />
-                <Route path="/dashboard/revenue" element={<Revenue />} />
-                <Route path="/dashboard/compliance" element={<Compliance />} />
-                <Route path="/dashboard/latency" element={<Latency />} />
-                <Route path="/dashboard/whatsapp" element={<WhatsApp />} />
-                <Route path="/dashboard/email" element={<EmailAutomation />} />
-                <Route path="/dashboard/integrations" element={<Integrations />} />
-                <Route path="/dashboard/tenant" element={<TenantDashboard />} />
-                <Route path="/dashboard/admin" element={<AdminDashboard />} />
-                <Route path="/dashboard/api-hub" element={<ApiHub />} />
-                <Route path="/dashboard/settings" element={<Settings />} />
+                <Route path="/" element={<Navigate to="/home" replace />} />
+                <Route path="/home" element={<CallLog />} />
+                <Route path="/home/call" element={<MakeCall />} />
+                <Route path="/home/contacts" element={<Contacts />} />
+                <Route path="/home/contacts/:id" element={<ContactDetail />} />
+                <Route path="/home/analytics" element={<Analytics />} />
+                <Route path="/home/agents" element={<Agents />} />
+                <Route path="/home/templates" element={<Templates />} />
+                <Route path="/home/campaigns" element={<Campaigns />} />
+                <Route path="/home/revenue" element={<Revenue />} />
+                <Route path="/home/compliance" element={<Compliance />} />
+                <Route path="/home/latency" element={<Latency />} />
+                <Route path="/home/whatsapp" element={<WhatsApp />} />
+                <Route path="/home/email" element={<EmailAutomation />} />
+                <Route path="/home/integrations" element={<Integrations />} />
+                <Route path="/home/tenant" element={<TenantDashboard />} />
+                <Route path="/home/admin" element={<AdminDashboard />} />
+                <Route path="/home/api-hub" element={<ApiHub />} />
+                <Route path="/home/settings" element={<Settings />} />
               </Route>
             </Route>
           </Routes>
