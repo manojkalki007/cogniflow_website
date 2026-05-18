@@ -49,7 +49,12 @@ class Settings(BaseSettings):
     server_port: int = 8000
     public_url: str = "https://your-domain.com"
     api_secret_key: str = ""
-    cors_origins: list[str] = ["http://localhost:3000"]
+    cors_origins: list[str] = [
+        "http://localhost:3000",
+        "https://home.cogniflowautomations.com",
+        "https://cogniflowautomations.com",
+        "https://www.cogniflowautomations.com",
+    ]
     debug: bool = False
     max_concurrent_calls: int = 50
 
