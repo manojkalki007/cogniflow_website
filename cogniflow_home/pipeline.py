@@ -512,8 +512,6 @@ class VoicePipeline:
 
     async def _handle_final_transcript(self, transcript: str):
         """Process a confirmed final transcript with dedup and response generation."""
-        sentiment = self._quick_sentiment(transcript)
-        self.emotional_mirror.update(sentiment)
         redacted, compliance_events = self.compliance.monitor_transcript(transcript)
         for event in compliance_events:
             await bus.emit("compliance.event", {
@@ -537,6 +535,9 @@ class VoicePipeline:
 
         self._unclear_count = 0
         self.emotion_adapter.update_caller_emotion(redacted)
+        current_emotion = self.emotion_adapter.current_emotion.emotion
+        self.emotional_mirror.sync_from_adapter(current_emotion)
+        self.filler.set_emotion(current_emotion)
 
         self.state.transcript.append(
             {"role": "user", "text": redacted, "ts": time.time()}
@@ -731,34 +732,24 @@ class VoicePipeline:
                 "new_language": language,
             })
 
-    def _quick_sentiment(self, text: str) -> float:
-        text_lower = text.lower()
-        negative = ['angry', 'frustrated', 'terrible', 'worst', 'hate', 'useless',
-                     'waste', 'horrible', 'pathetic', 'disgusting', 'never', 'cancel',
-                     'complaint', 'unacceptable', 'ridiculous', 'stupid']
-        positive = ['thank', 'great', 'excellent', 'perfect', 'wonderful', 'amazing',
-                     'love', 'awesome', 'fantastic', 'helpful', 'good', 'happy',
-                     'appreciate', 'pleased', 'satisfied']
+    def _get_emotion_tts_kwargs(self) -> dict:
+        """Return emotion-derived TTS params based on the active provider type."""
+        from cogniflow_home.providers.elevenlabs_tts import ElevenLabsTTS
+        from cogniflow_home.providers.smallest_tts import SmallestTTS
 
-        neg_count = sum(1 for w in negative if w in text_lower)
-        pos_count = sum(1 for w in positive if w in text_lower)
-
-        if neg_count + pos_count == 0:
-            return 0.5
-        return pos_count / (neg_count + pos_count)
+        if isinstance(self.tts, ElevenLabsTTS):
+            return self.emotion_adapter.get_elevenlabs_kwargs()
+        if isinstance(self.tts, SmallestTTS):
+            return self.emotion_adapter.get_smallest_kwargs()
+        # SarvamTTS — uses temperature/pace/voice
+        return self.emotion_adapter.get_tts_kwargs()
 
     async def _speak(self, text: str):
         try:
             text = _humanize_for_speech(text)
             if not text:
                 return
-            text = self.emotion_adapter.add_prosody_hints(text)
-            emotion_kwargs = self.emotion_adapter.get_tts_kwargs()
-            synth_kwargs = {}
-            if hasattr(self.tts, 'VALID_VOICES'):
-                synth_kwargs["speed"] = emotion_kwargs.get("pace", 1.0)
-            else:
-                synth_kwargs = emotion_kwargs
+            synth_kwargs = self._get_emotion_tts_kwargs()
 
             try:
                 await self._stream_tts_audio(self.tts.synthesize(text, **synth_kwargs))

@@ -65,7 +65,8 @@ class ElevenLabsTTS:
             f"rate={self.sample_rate}, pcm={self.raw_pcm})"
         )
 
-    async def synthesize(self, text: str, speed: float = 1.0, **kwargs) -> AsyncIterator[bytes]:
+    async def synthesize(self, text: str, speed: float = 1.0, stability: float | None = None,
+                         style: float | None = None, **kwargs) -> AsyncIterator[bytes]:
         if not text.strip():
             return
 
@@ -76,6 +77,10 @@ class ElevenLabsTTS:
         voice = kwargs.get("voice", self.voice_id)
         if voice not in VALID_VOICES:
             voice = self.voice_id
+
+        # Use per-request overrides if provided, otherwise fall back to instance defaults
+        req_stability = stability if stability is not None else self.stability
+        req_style = style if style is not None else self.style
 
         # Determine output format based on target sample rate and mode
         if self.raw_pcm:
@@ -92,9 +97,9 @@ class ElevenLabsTTS:
             "text": text,
             "model_id": self.model,
             "voice_settings": {
-                "stability": self.stability,
+                "stability": req_stability,
                 "similarity_boost": self.similarity_boost,
-                "style": self.style,
+                "style": req_style,
                 "use_speaker_boost": self.use_speaker_boost,
             },
             "output_format": output_format,

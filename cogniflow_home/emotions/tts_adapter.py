@@ -1,14 +1,12 @@
 """
-Emotion-aware TTS adapter.
-Wraps SarvamTTS with emotion-based parameter adjustments.
+Emotion-aware TTS adapter — single source of truth for caller emotion.
 
 1. Agent template sets baseline (voice, temperature, pace)
 2. Sentiment detector reads caller emotion from last transcript
 3. This adapter merges baseline + real-time adjustments
-4. Sends the final parameters to Sarvam Bulbul v3
+4. Produces provider-specific TTS params (Sarvam, ElevenLabs, Smallest)
 """
 
-import re
 import logging
 
 from cogniflow_home.emotions.profiles import get_emotion_profile
@@ -17,10 +15,35 @@ from cogniflow_home.emotions.sentiment import detect_emotion, CallerEmotion
 logger = logging.getLogger("cogniflow_home.emotions.tts_adapter")
 
 
+# ElevenLabs emotion → voice_settings mapping
+# stability: lower = more expressive, higher = more stable/monotone
+# style: higher = more stylistic expression
+ELEVENLABS_EMOTION_PARAMS = {
+    "frustrated": {"stability": 0.35, "style": 0.2},
+    "happy":      {"stability": 0.4,  "style": 0.6},
+    "neutral":    {"stability": 0.5,  "style": 0.3},
+    "angry":      {"stability": 0.6,  "style": 0.1},
+    "confused":   {"stability": 0.45, "style": 0.2},
+    "sad":        {"stability": 0.4,  "style": 0.15},
+    "anxious":    {"stability": 0.45, "style": 0.2},
+}
+
+# SmallestTTS emotion → speed mapping
+SMALLEST_EMOTION_SPEED = {
+    "frustrated": 0.90,
+    "happy":      1.05,
+    "neutral":    1.0,
+    "angry":      0.85,
+    "confused":   0.90,
+    "sad":        0.85,
+    "anxious":    0.92,
+}
+
+
 class EmotionTTSAdapter:
     """
-    Manages emotion state and produces TTS kwargs (temperature, pace, voice)
-    for the pipeline's existing SarvamTTS instance.
+    Single source of truth for caller emotion state.
+    Produces provider-specific TTS kwargs for Sarvam, ElevenLabs, and Smallest.
 
     Does NOT own a TTS instance — the pipeline keeps its own.
     """
@@ -39,6 +62,7 @@ class EmotionTTSAdapter:
         self.current_emotion = CallerEmotion("neutral", 0.5, {})
 
     def update_caller_emotion(self, transcript: str):
+        """Detect emotion from transcript. This is the single source of truth."""
         detected = detect_emotion(transcript)
         if detected.confidence >= 0.3:
             if detected.emotion != self.current_emotion.emotion:
@@ -49,7 +73,7 @@ class EmotionTTSAdapter:
             self.current_emotion = detected
 
     def get_tts_kwargs(self) -> dict:
-        """Returns kwargs to pass to SarvamTTS.synthesize()."""
+        """Returns kwargs for SarvamTTS.synthesize() (temperature, pace, voice)."""
         adjustments = self.current_emotion.tts_adjustments
         confidence = self.current_emotion.confidence
 
@@ -69,6 +93,22 @@ class EmotionTTSAdapter:
             "voice": self.voice,
         }
 
+    def get_elevenlabs_kwargs(self) -> dict:
+        """Returns emotion-derived kwargs for ElevenLabsTTS.synthesize()."""
+        emotion = self.current_emotion.emotion
+        params = ELEVENLABS_EMOTION_PARAMS.get(emotion, ELEVENLABS_EMOTION_PARAMS["neutral"])
+        return {
+            "stability": params["stability"],
+            "style": params["style"],
+            "speed": self.baseline_pace,
+        }
+
+    def get_smallest_kwargs(self) -> dict:
+        """Returns emotion-derived kwargs for SmallestTTS.synthesize()."""
+        emotion = self.current_emotion.emotion
+        speed = SMALLEST_EMOTION_SPEED.get(emotion, 1.0)
+        return {"speed": speed}
+
     def get_llm_emotion_instructions(self) -> str:
         return self.profile.get("llm_emotion_instructions", "")
 
@@ -86,21 +126,6 @@ class EmotionTTSAdapter:
             "- angry: stay calm, don't get defensive, acknowledge their frustration\n"
             "- anxious: be reassuring, give clear information, reduce uncertainty\n"
         )
-
-    def add_prosody_hints(self, text: str) -> str:
-        text = re.sub(r'\b(um|hmm|uh|ah)\s+(so|well|okay|like|yeah)\b',
-                      r'\1... \2', text, flags=re.IGNORECASE)
-        text = re.sub(r'\b(achha|haan|hmm)\s+(toh|so|dekhiye)\b',
-                      r'\1... \2', text, flags=re.IGNORECASE)
-
-        if self.current_emotion.emotion in ("sad", "frustrated", "anxious"):
-            text = re.sub(
-                r'(sorry|understand|hear that|tough|difficult)',
-                r'\1...',
-                text, count=1, flags=re.IGNORECASE
-            )
-
-        return text
 
     def get_emotion_state(self) -> dict:
         params = self.get_tts_kwargs()

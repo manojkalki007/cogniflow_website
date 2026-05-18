@@ -1996,14 +1996,10 @@ async def api_run_benchmarks(auth: AuthContext = Depends(get_auth_context)):
         tts = SmallestTTS(voice_id="emily", language="en", sample_rate=16000, raw_pcm=True)
         await tts.connect()
         ttfb = await voice_eval.measure_tts_ttfb(tts)
-        emotion_results = await voice_eval.evaluate_tts_emotions(tts)
         await tts.close()
 
-        all_scores = [r["avg_score"] for r in emotion_results.values() if r["avg_score"] > 0]
         voice_data = {
             "ttfb_ms": ttfb,
-            "avg_emotion_score": round(sum(all_scores) / len(all_scores), 1) if all_scores else 0,
-            "emotions": emotion_results,
         }
     except Exception:
         logger.exception("Voice benchmark failed")
