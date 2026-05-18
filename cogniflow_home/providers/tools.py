@@ -4,6 +4,7 @@ The LLM can invoke these tools via function calling.
 Add new tools by defining the function and adding it to TOOL_REGISTRY.
 """
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Any
@@ -148,7 +149,10 @@ async def execute_tool(tool_name: str, args: dict, call_context: dict) -> str:
     if not handler:
         return f"Unknown tool: {tool_name}"
     try:
-        return await handler(args, call_context)
+        return await asyncio.wait_for(handler(args, call_context), timeout=10)
+    except asyncio.TimeoutError:
+        logger.error(f"Tool execution timed out after 10s: {tool_name}")
+        return "Sorry, that request took too long. Let me try another way."
     except Exception:
         logger.exception(f"Tool execution error: {tool_name}")
         return "Sorry, I encountered an error processing that request."

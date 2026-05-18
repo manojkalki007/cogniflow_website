@@ -34,13 +34,14 @@ class DeepgramSTT:
         self.language = language
         self.sample_rate = sample_rate
         self._ws = None
-        self._result_queue: asyncio.Queue[STTResult] = asyncio.Queue()
+        self._result_queue: asyncio.Queue[STTResult] = asyncio.Queue(maxsize=200)
         self._running = False
         self._receive_task = None
         self._last_partial = ""
         self._last_final_text = ""
         self._last_final_ts = 0.0
         self._ready = asyncio.Event()
+        self._reconnect_backoff = 0.0
 
     async def connect(self):
         params = (
@@ -58,6 +59,7 @@ class DeepgramSTT:
         )
         self._running = True
         self._ready.set()
+        self._reconnect_backoff = 0.0
         self._receive_task = asyncio.create_task(self._receive_loop())
         logger.info("Deepgram STT connected")
 
@@ -108,6 +110,11 @@ class DeepgramSTT:
         except websockets.exceptions.ConnectionClosed:
             logger.warning("Deepgram connection closed — attempting reconnect")
             if self._running:
+                self._reconnect_backoff = min(
+                    max(self._reconnect_backoff * 2, 1.0), 15.0
+                )
+                logger.info(f"Reconnect backoff: {self._reconnect_backoff:.1f}s")
+                await asyncio.sleep(self._reconnect_backoff)
                 try:
                     await self.connect()
                 except Exception:

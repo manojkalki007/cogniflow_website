@@ -200,6 +200,7 @@ class VoicePipeline:
 
         self._running = False
         self._stt_task = None
+        self._call_timeout_task = None
         self._audio_chunk_count = 0
         self._silence_chunks = 0
         self._speech_energy_threshold = 200
@@ -212,6 +213,8 @@ class VoicePipeline:
         self._last_agent_text = ""
         self.on_transcript = None
         self.on_latency = None
+        self._speak_lock = asyncio.Lock()
+        self._pending_final_task: asyncio.Task | None = None
 
     def inject_context(self, context: str):
         if context:
@@ -280,6 +283,7 @@ class VoicePipeline:
         greeting = custom_greeting or self._greeting
 
         self._stt_task = asyncio.create_task(self._process_transcripts())
+        self._call_timeout_task = asyncio.create_task(self._call_timeout_watchdog())
         logger.info(
             f"Pipeline started for call {self.state.call_sid} "
             f"via {self.state.provider} (lang={self.state.language})"
@@ -332,6 +336,9 @@ class VoicePipeline:
                     self._audio_chunk_count = 0
                     self.eot.cancel()
                     self.speculative.cancel()
+                    if self._pending_final_task and not self._pending_final_task.done():
+                        self._pending_final_task.cancel()
+                        self._pending_final_task = None
                     await self._telephony.clear_audio()
                     self.stt.flush_pending()
                     audio_stopped_ts = time.perf_counter() * 1000
@@ -350,7 +357,6 @@ class VoicePipeline:
     async def _process_transcripts(self):
         """Main transcript processing loop with deduplication and speech_final gating."""
         pending_final = ""
-        pending_speech_final = False
 
         try:
             async for result in self.stt.results():
@@ -368,28 +374,33 @@ class VoicePipeline:
                     continue
 
                 if result.speech_final:
+                    if self._pending_final_task and not self._pending_final_task.done():
+                        self._pending_final_task.cancel()
+                        self._pending_final_task = None
                     combined = (pending_final + " " + result.transcript).strip() if pending_final else result.transcript
                     pending_final = ""
-                    pending_speech_final = False
                     await self._handle_final_transcript(combined)
                 else:
                     pending_final = (pending_final + " " + result.transcript).strip() if pending_final else result.transcript
-                    if not pending_speech_final:
-                        pending_speech_final = True
-                        asyncio.get_event_loop().call_later(
-                            1.5, self._flush_pending_final, pending_final
-                        )
+                    if self._pending_final_task and not self._pending_final_task.done():
+                        self._pending_final_task.cancel()
+                    self._pending_final_task = asyncio.create_task(
+                        self._flush_pending_final(pending_final)
+                    )
 
         except asyncio.CancelledError:
             pass
         except Exception:
             logger.exception("Transcript processing error")
 
-    def _flush_pending_final(self, text: str):
+    async def _flush_pending_final(self, text: str):
         """Safety net: if speech_final never arrives, process after 1.5s."""
-        if not self._running:
-            return
-        asyncio.create_task(self._handle_final_transcript(text))
+        try:
+            await asyncio.sleep(1.5)
+            if self._running and text:
+                await self._handle_final_transcript(text)
+        except asyncio.CancelledError:
+            pass
 
     async def _handle_final_transcript(self, transcript: str):
         """Process a confirmed final transcript with dedup and response generation."""
@@ -439,132 +450,144 @@ class VoicePipeline:
 
         self.tracer.check_alert()
 
-    async def _generate_and_speak(self, user_text: str, eot_ts: float = 0):
-        self.state.is_agent_speaking = True
-        self.state.barge_in = False
-        self._turn_first_byte_ts = 0.0
-        eot_ts_orig = eot_ts
-
-        emotion_prompt = self.emotional_mirror.get_prompt_injection()
-        caller_emotion_prompt = self.emotion_adapter.get_caller_emotion_prompt()
-        llm_input = user_text
-        combined_emotion = (emotion_prompt + "\n" + caller_emotion_prompt).strip()
-        if combined_emotion:
-            llm_input = f"[EMOTION CONTEXT: {combined_emotion}]\n\nCaller said: \"{user_text}\""
-        if self.emotional_mirror.should_offer_human():
-            llm_input += "\n[SYSTEM: Caller has been frustrated for 30+ seconds. Proactively offer to transfer to a human agent.]"
-
+    async def _call_timeout_watchdog(self):
+        """Auto-stop pipeline after 45 minutes to prevent zombie calls."""
         try:
-            from cogniflow_home.knowledge.base import kb
-            agent_id = getattr(self, 'agent_id', None)
-            if agent_id:
-                kb_results = await kb.query(agent_id, user_text)
-                kb_context = kb.build_context_prompt(kb_results)
-                if kb_context:
-                    llm_input = kb_context + "\n\n" + llm_input
-        except Exception:
+            await asyncio.sleep(45 * 60)
+            if self._running:
+                logger.warning(f"Call {self.state.call_sid} hit 45-minute timeout — auto-stopping")
+                await self.stop()
+        except asyncio.CancelledError:
             pass
 
-        full_response = ""
-        t_llm = self.tracer.start("llm_ttft")
-        first_sentence = True
+    async def _generate_and_speak(self, user_text: str, eot_ts: float = 0):
+        async with self._speak_lock:
+            self.state.is_agent_speaking = True
+            self.state.barge_in = False
+            self._turn_first_byte_ts = 0.0
+            eot_ts_orig = eot_ts
 
-        try:
-            async for sentence in self.llm.generate_stream(llm_input):
-                if first_sentence:
-                    self.tracer.end(t_llm)
-                    first_sentence = False
+            emotion_prompt = self.emotional_mirror.get_prompt_injection()
+            caller_emotion_prompt = self.emotion_adapter.get_caller_emotion_prompt()
+            llm_input = user_text
+            combined_emotion = (emotion_prompt + "\n" + caller_emotion_prompt).strip()
+            if combined_emotion:
+                llm_input = f"[EMOTION CONTEXT: {combined_emotion}]\n\nCaller said: \"{user_text}\""
+            if self.emotional_mirror.should_offer_human():
+                llm_input += "\n[SYSTEM: Caller has been frustrated for 30+ seconds. Proactively offer to transfer to a human agent.]"
 
-                if self.state.barge_in:
-                    logger.info("Barge-in: stopping mid-response")
-                    break
+            try:
+                from cogniflow_home.knowledge.base import kb
+                agent_id = getattr(self, 'agent_id', None)
+                if agent_id:
+                    kb_results = await kb.query(agent_id, user_text)
+                    kb_context = kb.build_context_prompt(kb_results)
+                    if kb_context:
+                        llm_input = kb_context + "\n\n" + llm_input
+            except Exception:
+                pass
 
-                full_response += sentence + " "
+            full_response = ""
+            t_llm = self.tracer.start("llm_ttft")
+            first_sentence = True
 
-                t_tts = self.tracer.start("tts_ttfb")
-                await self._speak(sentence)
-                self.tracer.end(t_tts)
+            try:
+                async for sentence in self.llm.generate_stream(llm_input):
+                    if first_sentence:
+                        self.tracer.end(t_llm)
+                        first_sentence = False
 
-                if eot_ts and self._user_speech_end_ts and self._turn_first_byte_ts:
-                    self.turn_quality.record_turn(TurnEvent(
-                        turn_number=self._turn_number,
-                        user_speech_end_ms=self._user_speech_end_ts,
-                        eot_fired_ms=eot_ts,
-                        agent_first_audio_ms=self._turn_first_byte_ts,
-                        agent_speech_end_ms=0,
-                    ))
-                    eot_ts = 0
+                    if self.state.barge_in:
+                        logger.info("Barge-in: stopping mid-response")
+                        break
 
-                if self.state.barge_in:
-                    break
+                    full_response += sentence + " "
 
-        except Exception:
-            logger.exception("Generate-and-speak error")
+                    t_tts = self.tracer.start("tts_ttfb")
+                    await self._speak(sentence)
+                    self.tracer.end(t_tts)
 
-        if first_sentence:
-            self.tracer.end(t_llm)
+                    if eot_ts and self._user_speech_end_ts and self._turn_first_byte_ts:
+                        self.turn_quality.record_turn(TurnEvent(
+                            turn_number=self._turn_number,
+                            user_speech_end_ms=self._user_speech_end_ts,
+                            eot_fired_ms=eot_ts,
+                            agent_first_audio_ms=self._turn_first_byte_ts,
+                            agent_speech_end_ms=0,
+                        ))
+                        eot_ts = 0
 
-        self.state.is_agent_speaking = False
+                    if self.state.barge_in:
+                        break
 
-        if full_response.strip():
-            self._last_agent_text = full_response.strip().lower()
-            self.state.transcript.append(
-                {"role": "agent", "text": full_response.strip(), "ts": time.time()}
-            )
-            if self.on_transcript:
-                try:
-                    await self.on_transcript("agent", full_response.strip())
-                except Exception:
-                    pass
+            except Exception:
+                logger.exception("Generate-and-speak error")
 
-            if self.on_latency and self._user_speech_end_ts and eot_ts_orig:
-                first_byte = self._turn_first_byte_ts or (time.perf_counter() * 1000)
-                total_ms = round(first_byte - self._user_speech_end_ts)
-                eot_decision = round(eot_ts_orig - self._user_speech_end_ts)
-                llm_ms = round(self.tracer.get_turn_summary().get("llm_ttft", 0))
-                tts_ms = max(0, total_ms - eot_decision - llm_ms)
-                try:
-                    await self.on_latency({
-                        "turn": self._turn_number,
-                        "eot_ms": eot_decision,
-                        "llm_ms": llm_ms,
-                        "tts_ms": tts_ms,
-                        "total_ms": total_ms,
+            if first_sentence:
+                self.tracer.end(t_llm)
+
+            self.state.is_agent_speaking = False
+
+            if full_response.strip():
+                self._last_agent_text = full_response.strip().lower()
+                self.state.transcript.append(
+                    {"role": "agent", "text": full_response.strip(), "ts": time.time()}
+                )
+                if self.on_transcript:
+                    try:
+                        await self.on_transcript("agent", full_response.strip())
+                    except Exception:
+                        pass
+
+                if self.on_latency and self._user_speech_end_ts and eot_ts_orig:
+                    first_byte = self._turn_first_byte_ts or (time.perf_counter() * 1000)
+                    total_ms = round(first_byte - self._user_speech_end_ts)
+                    eot_decision = round(eot_ts_orig - self._user_speech_end_ts)
+                    llm_ms = round(self.tracer.get_turn_summary().get("llm_ttft", 0))
+                    tts_ms = max(0, total_ms - eot_decision - llm_ms)
+                    try:
+                        await self.on_latency({
+                            "turn": self._turn_number,
+                            "eot_ms": eot_decision,
+                            "llm_ms": llm_ms,
+                            "tts_ms": tts_ms,
+                            "total_ms": total_ms,
+                        })
+                    except Exception:
+                        pass
+
+                agent_text = " ".join(
+                    t["text"] for t in self.state.transcript if t["role"] == "agent"
+                )
+                disclosure_violations = self.compliance.check_disclosures(
+                    self.state.started_at, agent_text
+                )
+                for v in disclosure_violations:
+                    await bus.emit("compliance.event", {
+                        "call_id": self.state.call_sid,
+                        **v,
                     })
-                except Exception:
-                    pass
-
-            agent_text = " ".join(
-                t["text"] for t in self.state.transcript if t["role"] == "agent"
-            )
-            disclosure_violations = self.compliance.check_disclosures(
-                self.state.started_at, agent_text
-            )
-            for v in disclosure_violations:
-                await bus.emit("compliance.event", {
-                    "call_id": self.state.call_sid,
-                    **v,
-                })
 
     async def _speak_speculative(self, sentences: list[str]):
-        self.state.is_agent_speaking = True
-        self.state.barge_in = False
-        full_response = ""
+        async with self._speak_lock:
+            self.state.is_agent_speaking = True
+            self.state.barge_in = False
+            full_response = ""
 
-        for sentence in sentences:
-            if self.state.barge_in:
-                break
-            full_response += sentence + " "
-            await self._speak(sentence)
+            for sentence in sentences:
+                if self.state.barge_in:
+                    break
+                full_response += sentence + " "
+                await self._speak(sentence)
 
-        self.state.is_agent_speaking = False
+            self.state.is_agent_speaking = False
 
-        if full_response.strip():
-            self._last_agent_text = full_response.strip().lower()
-            self.state.transcript.append(
-                {"role": "agent", "text": full_response.strip(), "ts": time.time()}
-            )
-            logger.info("Speculative response delivered")
+            if full_response.strip():
+                self._last_agent_text = full_response.strip().lower()
+                self.state.transcript.append(
+                    {"role": "agent", "text": full_response.strip(), "ts": time.time()}
+                )
+                logger.info("Speculative response delivered")
 
     async def _on_tool_call(self, tool_name: str):
         filler_audio = self.filler.get_filler(tool_name)
@@ -653,6 +676,14 @@ class VoicePipeline:
 
     async def stop(self):
         self._running = False
+        if self._call_timeout_task:
+            self._call_timeout_task.cancel()
+            try:
+                await self._call_timeout_task
+            except asyncio.CancelledError:
+                pass
+        if self._pending_final_task and not self._pending_final_task.done():
+            self._pending_final_task.cancel()
         if self._stt_task:
             self._stt_task.cancel()
             try:

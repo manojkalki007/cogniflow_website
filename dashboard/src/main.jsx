@@ -26,6 +26,7 @@ import TenantDashboard from "./pages/TenantDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import ApiHub from "./pages/ApiHub";
 import EmailAutomation from "./pages/EmailAutomation";
+import AgentBuilder from "./pages/AgentBuilder";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 10_000, retry: 1 } },
@@ -48,6 +49,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                 <Route path="/home/contacts/:id" element={<ContactDetail />} />
                 <Route path="/home/analytics" element={<Analytics />} />
                 <Route path="/home/agents" element={<Agents />} />
+                <Route path="/home/agents/:id" element={<AgentBuilder />} />
                 <Route path="/home/templates" element={<Templates />} />
                 <Route path="/home/campaigns" element={<Campaigns />} />
                 <Route path="/home/revenue" element={<Revenue />} />

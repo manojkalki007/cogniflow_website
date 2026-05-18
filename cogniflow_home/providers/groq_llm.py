@@ -7,6 +7,7 @@ Production-grade streaming with:
 - Configurable temperature/max_tokens per call
 """
 
+import asyncio
 import json
 import logging
 import re
@@ -24,7 +25,7 @@ _ABBREVIATIONS = re.compile(
     re.IGNORECASE,
 )
 
-_SENTENCE_END = re.compile(r'[.!?][\s]')
+_SENTENCE_END = re.compile(r'[.!?](?=\s|$)')
 _SENTENCE_END_EOF = re.compile(r'[.!?]$')
 
 
@@ -55,7 +56,7 @@ class GroqLLM:
         self.conversation_history: list[dict] = []
         self.call_context: dict = {}
         self.on_tool_call = None
-        self._client = httpx.AsyncClient(timeout=10.0)
+        self._client = httpx.AsyncClient(timeout=5.0)
 
         if system_prompt:
             self.conversation_history.append(
@@ -140,21 +141,32 @@ class GroqLLM:
         first_chunk_sent = False
         word_count = 0
 
-        async with self._client.stream(
-            "POST",
-            self._groq_url,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json=body,
-        ) as response:
+        _stream_ctx = None
+        for _attempt in range(2):
+            _stream_ctx = self._client.stream(
+                "POST",
+                self._groq_url,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=body,
+            )
+            response = await _stream_ctx.__aenter__()
+            if response.status_code in (429, 503) and _attempt == 0:
+                await _stream_ctx.__aexit__(None, None, None)
+                logger.warning(f"Groq returned {response.status_code}, retrying in 1s")
+                await asyncio.sleep(1.0)
+                continue
             if response.status_code != 200:
                 error_body = await response.aread()
+                await _stream_ctx.__aexit__(None, None, None)
                 raise RuntimeError(
                     f"LLM API error {response.status_code}: {error_body.decode()}"
                 )
+            break
 
+        try:
             async for line in response.aiter_lines():
                 if not line.startswith("data: ") or line == "data: [DONE]":
                     continue
@@ -196,6 +208,9 @@ class GroqLLM:
                         if text:
                             first_chunk_sent = True
                             yield text
+        finally:
+            if _stream_ctx:
+                await _stream_ctx.__aexit__(None, None, None)
 
         if buffer.strip() and not tool_calls_data:
             yield buffer.strip()

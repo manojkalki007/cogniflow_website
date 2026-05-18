@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
-import { useRef, useEffect } from "react";
 import {
-  Plus, Save, Bot, Copy, Upload, Loader2, Trash2,
-  PhoneOutgoing, BarChart3, Sliders, Wrench, Shield, Brain,
+  Plus, Bot, Copy, Upload, Loader2, Trash2,
+  BarChart3, Sliders, Wrench, Shield, Brain,
   Phone, PhoneOff, PhoneCall, X,
 } from "lucide-react";
 import { Badge } from "../components/ui/badge";
@@ -12,269 +12,7 @@ import { Button } from "../components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "../components/ui/dialog";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
 import PageHeader from "../components/PageHeader";
-
-const LLM_MODELS = {
-  groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"],
-};
-
-const TTS_PROVIDERS = ["smallest", "sarvam"];
-
-const AVAILABLE_TOOLS = [
-  { id: "book_appointment", label: "Book Appointment", icon: "📅" },
-  { id: "transfer_call", label: "Transfer Call", icon: "📞" },
-  { id: "save_contact_info", label: "Save Contact", icon: "💾" },
-  { id: "send_followup", label: "Send Follow-up", icon: "📧" },
-  { id: "send_whatsapp", label: "Send WhatsApp", icon: "💬" },
-  { id: "check_availability", label: "Check Calendar", icon: "📆" },
-  { id: "create_payment_link", label: "Payment Link", icon: "💳" },
-];
-
-const LANGUAGES = [
-  { code: "en", label: "English" }, { code: "hi", label: "Hindi" },
-  { code: "ta", label: "Tamil" }, { code: "te", label: "Telugu" },
-  { code: "kn", label: "Kannada" }, { code: "ml", label: "Malayalam" },
-  { code: "bn", label: "Bengali" }, { code: "mr", label: "Marathi" },
-  { code: "gu", label: "Gujarati" }, { code: "en-in", label: "English (Indian)" },
-];
-
-function AgentFormDialog({ open, onOpenChange, agent, onSave }) {
-  const isEdit = !!agent;
-  const [form, setForm] = useState(() => ({
-    name: agent?.name || "",
-    instructions: agent?.instructions || "",
-    greeting: agent?.greeting || "",
-    language: agent?.language || "en",
-    emotion_profile: agent?.emotion_profile || "friendly",
-    voice_gender: agent?.voice_gender || "female",
-    voice_id: agent?.voice_id || "",
-    phone_numbers: (agent?.phone_numbers || []).join(", "),
-    llm_provider: agent?.llm_provider || "groq",
-    llm_model: agent?.llm_model || "llama-3.3-70b-versatile",
-    tts_provider: agent?.tts_provider || "smallest",
-    temperature: agent?.temperature ?? 0.7,
-    max_call_duration: agent?.max_call_duration || 600,
-    enable_memory: agent?.enable_memory ?? true,
-    enable_prediction: agent?.enable_prediction ?? true,
-    enable_emotion: agent?.enable_emotion ?? true,
-    enable_language_switch: agent?.enable_language_switch ?? true,
-    enable_rag: agent?.enable_rag ?? false,
-    tools_enabled: agent?.tools_enabled || AVAILABLE_TOOLS.map(t => t.id),
-    guardrails: agent?.guardrails || {},
-  }));
-
-  const set = (k, v) => setForm({ ...form, [k]: v });
-
-  const handleSave = () => {
-    onSave({
-      ...form,
-      phone_numbers: form.phone_numbers.split(",").map(n => n.trim()).filter(Boolean),
-      temperature: parseFloat(form.temperature),
-      max_call_duration: parseInt(form.max_call_duration),
-    });
-  };
-
-  const toggleTool = (toolId) => {
-    const tools = form.tools_enabled.includes(toolId)
-      ? form.tools_enabled.filter(t => t !== toolId)
-      : [...form.tools_enabled, toolId];
-    set("tools_enabled", tools);
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit Agent" : "Create Agent"}</DialogTitle>
-        </DialogHeader>
-
-        <Tabs defaultValue="basic">
-          <TabsList>
-            <TabsTrigger value="basic">Basic</TabsTrigger>
-            <TabsTrigger value="llm">LLM & Voice</TabsTrigger>
-            <TabsTrigger value="tools">Tools</TabsTrigger>
-            <TabsTrigger value="features">Features</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="basic">
-            <div className="space-y-4 text-sm">
-              <div>
-                <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Agent Name *</label>
-                <input value={form.name} onChange={(e) => set("name", e.target.value)}
-                  className="w-full rounded-xl px-4 py-3 border focus:border-[var(--accent)]" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} placeholder="Lead Qualifier" />
-              </div>
-              <div>
-                <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>System Prompt *</label>
-                <textarea value={form.instructions} onChange={(e) => set("instructions", e.target.value)}
-                  rows={6} className="w-full rounded-xl px-4 py-3 border focus:border-[var(--accent)] resize-none font-mono text-xs"
-                  style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
-                  placeholder="You are a professional sales agent..." />
-              </div>
-              <div>
-                <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Greeting Message</label>
-                <input value={form.greeting} onChange={(e) => set("greeting", e.target.value)}
-                  className="w-full rounded-xl px-4 py-3 border focus:border-[var(--accent)]"
-                  style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
-                  placeholder="Hello! Thanks for calling Cogniflow. How can I help you today?" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Language</label>
-                  <select value={form.language} onChange={(e) => set("language", e.target.value)}
-                    className="w-full rounded-xl px-4 py-3 border outline-none" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
-                    {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Phone Numbers</label>
-                  <input value={form.phone_numbers} onChange={(e) => set("phone_numbers", e.target.value)}
-                    className="w-full rounded-xl px-4 py-3 border focus:border-[var(--accent)] font-mono" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} placeholder="+1234, +5678" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Emotion Profile</label>
-                  <select value={form.emotion_profile} onChange={(e) => set("emotion_profile", e.target.value)}
-                    className="w-full rounded-xl px-4 py-3 border outline-none" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
-                    <option value="friendly">Friendly & Efficient (General)</option>
-                    <option value="empathetic">Warm & Empathetic (Healthcare, Support)</option>
-                    <option value="energetic">Energetic & Persuasive (Sales, EdTech)</option>
-                    <option value="professional">Calm & Professional (Finance, Legal)</option>
-                    <option value="hinglish_friendly">Hinglish Natural (Desi, Casual)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Voice Gender</label>
-                  <select value={form.voice_gender} onChange={(e) => set("voice_gender", e.target.value)}
-                    className="w-full rounded-xl px-4 py-3 border outline-none" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
-                    <option value="female">Female</option>
-                    <option value="male">Male</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="llm">
-            <div className="space-y-5 text-sm">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>LLM Provider</label>
-                  <select value={form.llm_provider} onChange={(e) => {
-                    set("llm_provider", e.target.value);
-                    set("llm_model", (LLM_MODELS[e.target.value] || [])[0] || "");
-                  }} className="w-full rounded-xl px-4 py-3 border" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
-                    {Object.keys(LLM_MODELS).map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Model</label>
-                  <select value={form.llm_model} onChange={(e) => set("llm_model", e.target.value)}
-                    className="w-full rounded-xl px-4 py-3 border" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
-                    {(LLM_MODELS[form.llm_provider] || []).map(m => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Temperature: {form.temperature}</label>
-                <input type="range" min="0" max="2" step="0.1" value={form.temperature}
-                  onChange={(e) => set("temperature", e.target.value)}
-                  className="w-full accent-blue-500" />
-                <div className="flex justify-between text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                  <span>Precise (0)</span><span>Creative (2)</span>
-                </div>
-              </div>
-
-              <div className="h-px" style={{ background: 'var(--border)' }} />
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>TTS Provider</label>
-                  <select value={form.tts_provider} onChange={(e) => set("tts_provider", e.target.value)}
-                    className="w-full rounded-xl px-4 py-3 border" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
-                    {TTS_PROVIDERS.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Voice ID</label>
-                  <input value={form.voice_id} onChange={(e) => set("voice_id", e.target.value)}
-                    className="w-full rounded-xl px-4 py-3 border focus:border-[var(--accent)] font-mono" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} placeholder="Voice ID" />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Max Call Duration (seconds)</label>
-                <input type="number" value={form.max_call_duration} onChange={(e) => set("max_call_duration", e.target.value)}
-                  className="w-32 rounded-xl px-4 py-3 border focus:border-[var(--accent)]" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="tools">
-            <div className="space-y-3">
-              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Enable the tools this agent can use during calls:</p>
-              <div className="grid grid-cols-2 gap-3">
-                {AVAILABLE_TOOLS.map(tool => (
-                  <button key={tool.id} onClick={() => toggleTool(tool.id)}
-                    className={`flex items-center gap-3 p-4 rounded-xl border text-sm text-left transition-all duration-200 ${
-                      form.tools_enabled.includes(tool.id)
-                        ? "border-blue-500/50 bg-blue-500/10 shadow-md shadow-blue-500/5"
-                        : "hover:border-gray-600/50"
-                    }`}
-                    style={form.tools_enabled.includes(tool.id)
-                      ? { color: 'var(--text-primary)' }
-                      : { borderColor: 'var(--border)', background: 'var(--bg-muted)', color: 'var(--text-secondary)' }
-                    }>
-                    <span className="text-lg">{tool.icon}</span>
-                    <span>{tool.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="features">
-            <div className="space-y-3">
-              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Toggle AI features for this agent:</p>
-              {[
-                { key: "enable_memory", label: "Caller Memory", desc: "Remember callers across sessions", icon: Brain },
-                { key: "enable_prediction", label: "Pre-Call Prediction", desc: "Predict caller intent before answering", icon: BarChart3 },
-                { key: "enable_emotion", label: "Emotional Mirroring", desc: "Adapt tone based on caller sentiment", icon: Sliders },
-                { key: "enable_language_switch", label: "Language Switching", desc: "Auto-detect and switch languages mid-call", icon: Wrench },
-                { key: "enable_rag", label: "Knowledge Base (RAG)", desc: "Use uploaded documents during calls", icon: Shield },
-              ].map(({ key, label, desc, icon: Icon }) => (
-                <div key={key} className="flex items-center justify-between p-4 rounded-xl border" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--accent-subtle)' }}>
-                      <Icon size={15} style={{ color: 'var(--accent)' }} />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{label}</p>
-                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{desc}</p>
-                    </div>
-                  </div>
-                  <button onClick={() => set(key, !form[key])}
-                    className={`w-11 h-6 rounded-full transition-all duration-200 relative ${form[key] ? "bg-blue-500 shadow-md shadow-blue-500/30" : "bg-gray-700"}`}>
-                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${form[key] ? "left-6" : "left-1"}`} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
-
-        <div className="flex gap-3 pt-3">
-          <Button onClick={handleSave} disabled={!form.name || !form.instructions}>
-            <Save size={14} /> {isEdit ? "Save Changes" : "Create Agent"}
-          </Button>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 function LatencyBar({ eot_ms, llm_ms, tts_ms, total_ms }) {
   const wrapStyles = total_ms < 600
@@ -607,8 +345,9 @@ function AgentPerformance({ agentId }) {
   );
 }
 
-function AgentCard({ agent, onEdit, onDelete, onClone }) {
+function AgentCard({ agent, onDelete, onClone }) {
   const [showTest, setShowTest] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <div className="rounded-xl border p-5 transition-all duration-200" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
@@ -627,7 +366,7 @@ function AgentCard({ agent, onEdit, onDelete, onClone }) {
           </div>
         </div>
         <div className="flex gap-1">
-          <Button variant="ghost" size="sm" onClick={() => onEdit(agent)}>Edit</Button>
+          <Button variant="ghost" size="sm" onClick={() => navigate(`/home/agents/${agent.id}`)}>Edit</Button>
           <Button variant="ghost" size="sm" onClick={() => onClone(agent)}><Copy size={12} /></Button>
           <Button variant={showTest ? "outline" : "ghost"} size="sm" onClick={() => setShowTest(!showTest)}>
             <Phone size={12} /> Talk
@@ -722,34 +461,16 @@ function CloneDialog({ open, onOpenChange, sourceAgent }) {
 
 export default function Agents() {
   const queryClient = useQueryClient();
-  const [formDialog, setFormDialog] = useState({ open: false, agent: null });
+  const navigate = useNavigate();
   const [cloneDialog, setCloneDialog] = useState({ open: false, source: null });
 
   const { data } = useQuery({ queryKey: ["agents"], queryFn: api.getAgents });
   const agents = data?.agents || [];
 
-  const createMut = useMutation({
-    mutationFn: (data) => api.createAgent(data),
-    onSuccess: () => { queryClient.invalidateQueries(["agents"]); setFormDialog({ open: false, agent: null }); },
-  });
-
-  const updateMut = useMutation({
-    mutationFn: ({ id, data }) => api.updateAgent(id, data),
-    onSuccess: () => { queryClient.invalidateQueries(["agents"]); setFormDialog({ open: false, agent: null }); },
-  });
-
   const deleteMut = useMutation({
     mutationFn: (id) => api.deleteAgent(id),
     onSuccess: () => queryClient.invalidateQueries(["agents"]),
   });
-
-  const handleSave = (data) => {
-    if (formDialog.agent) {
-      updateMut.mutate({ id: formDialog.agent.id, data });
-    } else {
-      createMut.mutate(data);
-    }
-  };
 
   return (
     <div>
@@ -761,7 +482,7 @@ export default function Agents() {
             <Button variant="outline" size="sm" onClick={() => setCloneDialog({ open: true, source: null })}>
               <Copy size={14} /> Clone from Recordings
             </Button>
-            <Button size="sm" onClick={() => setFormDialog({ open: true, agent: null })}>
+            <Button size="sm" onClick={() => navigate("/home/agents/new")}>
               <Plus size={14} /> New Agent
             </Button>
           </div>
@@ -772,7 +493,6 @@ export default function Agents() {
         <div className="space-y-4">
           {agents.map((a) => (
             <AgentCard key={a.id} agent={a}
-              onEdit={(agent) => setFormDialog({ open: true, agent })}
               onDelete={(id) => deleteMut.mutate(id)}
               onClone={(agent) => setCloneDialog({ open: true, source: agent })} />
           ))}
@@ -783,7 +503,7 @@ export default function Agents() {
               </div>
               <p className="font-medium" style={{ color: 'var(--text-primary)' }}>No agents configured</p>
               <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Using default agent. Create one to get started.</p>
-              <Button size="sm" onClick={() => setFormDialog({ open: true, agent: null })}>
+              <Button size="sm" onClick={() => navigate("/home/agents/new")}>
                 <Plus size={14} /> Create Your First Agent
               </Button>
             </div>
@@ -791,8 +511,6 @@ export default function Agents() {
         </div>
       </div>
 
-      <AgentFormDialog open={formDialog.open} onOpenChange={(open) => setFormDialog({ open, agent: formDialog.agent })}
-        agent={formDialog.agent} onSave={handleSave} />
       <CloneDialog open={cloneDialog.open} onOpenChange={(open) => setCloneDialog({ open, source: cloneDialog.source })}
         sourceAgent={cloneDialog.source} />
     </div>

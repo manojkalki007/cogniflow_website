@@ -7,6 +7,7 @@ word reordering, minor differences between partial and final).
 
 import asyncio
 import logging
+import time
 from difflib import SequenceMatcher
 
 logger = logging.getLogger("cogniflow_home.latency.speculative")
@@ -22,6 +23,7 @@ class SpeculativeGenerator:
         self._speculative_response: list[str] = []
         self._generate_fn = None
         self._last_trigger_text = ""
+        self._last_trigger_ts = 0.0
 
     def set_generate_fn(self, fn):
         self._generate_fn = fn
@@ -29,6 +31,10 @@ class SpeculativeGenerator:
     async def on_partial_transcript(self, text: str, eot_probability: float):
         word_count = len(text.split())
         if word_count < self.min_words or eot_probability < self.eot_threshold:
+            return
+
+        now = time.monotonic()
+        if now - self._last_trigger_ts < 0.8:
             return
 
         if self._is_similar(text, self._last_trigger_text, 0.90):
@@ -40,6 +46,7 @@ class SpeculativeGenerator:
         self._speculative_text = text
         self._speculative_response = []
         self._last_trigger_text = text
+        self._last_trigger_ts = now
         self._speculative_task = asyncio.create_task(
             self._generate_speculative(text)
         )
@@ -63,7 +70,7 @@ class SpeculativeGenerator:
         ):
             if self._speculative_task and not self._speculative_task.done():
                 try:
-                    await asyncio.wait_for(self._speculative_task, timeout=0.5)
+                    await asyncio.wait_for(self._speculative_task, timeout=1.5)
                 except (asyncio.TimeoutError, asyncio.CancelledError):
                     pass
 
