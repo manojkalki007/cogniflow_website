@@ -45,11 +45,13 @@ class GroqLLM:
     def __init__(
         self,
         model: str = "llama-3.3-70b-versatile",
+        fallback_model: str = "llama-3.1-8b-instant",
         system_prompt: str = "",
         temperature: float = 0.7,
         max_tokens: int = 150,
     ):
         self.model = model
+        self.fallback_model = fallback_model
         self.system_prompt = system_prompt
         self.temperature = temperature
         self.max_tokens = max_tokens
@@ -110,8 +112,27 @@ class GroqLLM:
                 depth=0,
             ):
                 yield sentence
-        except Exception:
-            logger.exception("Groq LLM failed")
+        except Exception as primary_err:
+            if self.fallback_model and self.fallback_model != self.model:
+                logger.warning(
+                    f"Primary model {self.model} failed ({primary_err!r}), "
+                    f"falling back to {self.fallback_model}"
+                )
+                try:
+                    async for sentence in self._try_stream(
+                        settings.groq_api_key,
+                        self.fallback_model,
+                        tools,
+                        depth=0,
+                    ):
+                        yield sentence
+                    return
+                except Exception:
+                    logger.exception(
+                        f"Fallback model {self.fallback_model} also failed"
+                    )
+            else:
+                logger.exception("Groq LLM failed (no fallback model)")
             yield "I'm sorry, I'm having trouble right now. Could you repeat that?"
 
     async def _try_stream(

@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import {
   BarChart3, TrendingUp, Clock, PhoneIncoming, PhoneOutgoing,
-  Target, Bot, Activity,
+  Target, Bot, Activity, DollarSign,
 } from "lucide-react";
 import {
   LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -78,13 +78,36 @@ export default function Analytics() {
   const agentStats = agentsData?.agents || [];
   const calls = callsData?.calls || [];
 
+  const COST_PER_MIN = 0.0283; // STT + LLM + TTS + Telephony
+
   const dispositions = {};
   let totalSentimentScore = 0, sentimentCount = 0, totalQuality = 0, qualityCount = 0;
+  let totalCost = 0, costCallCount = 0;
   calls.forEach((c) => {
     if (c.disposition) dispositions[c.disposition] = (dispositions[c.disposition] || 0) + 1;
     if (c.sentiment_score != null) { totalSentimentScore += c.sentiment_score; sentimentCount++; }
     if (c.quality_score != null) { totalQuality += c.quality_score; qualityCount++; }
+    // Cost: use actual if available, otherwise estimate from duration
+    if (c.cost != null) {
+      totalCost += c.cost;
+      costCallCount++;
+    } else if (c.cost_breakdown?.total != null) {
+      totalCost += c.cost_breakdown.total;
+      costCallCount++;
+    } else if (c.duration_seconds) {
+      totalCost += (c.duration_seconds / 60) * COST_PER_MIN;
+      costCallCount++;
+    }
   });
+
+  const avgCostPerCall = costCallCount > 0 ? (totalCost / costCallCount) : 0;
+  const costIsEstimated = calls.length > 0 && calls.every((c) => c.cost == null && c.cost_breakdown == null);
+
+  // Build cost trend data from daily trends
+  const costTrends = trends.map((t) => ({
+    ...t,
+    estimated_cost: +((((t.inbound || 0) + (t.outbound || 0)) * (t.avg_duration || 0) / 60) * COST_PER_MIN).toFixed(2),
+  }));
 
   const avgSentiment = sentimentCount > 0 ? (totalSentimentScore / sentimentCount).toFixed(2) : "0";
   const avgQuality = qualityCount > 0 ? Math.round((totalQuality / qualityCount) * 100) + "%" : "0%";
@@ -110,7 +133,7 @@ export default function Analytics() {
     <div>
       <PageHeader title="Analytics" description="Real-time performance insights" action={periodAction} />
 
-      <div className="px-8 py-6">
+      <div className="px-4 sm:px-6 lg:px-8 py-6">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <StatCard icon={BarChart3} label="Today's Calls" value={today.total_calls ?? 0} iconColor="var(--accent)" />
           <StatCard icon={PhoneIncoming} label="Inbound" value={today.inbound ?? 0} iconColor="var(--success)" />
@@ -118,10 +141,55 @@ export default function Analytics() {
           <StatCard icon={Clock} label="Avg Duration" value={today.avg_duration_seconds ? `${today.avg_duration_seconds}s` : "0s"} iconColor="var(--warning)" />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
           <StatCard icon={TrendingUp} label="Avg Sentiment" value={avgSentiment} sub="Scale: -1.0 to 1.0" iconColor="var(--info)" />
           <StatCard icon={Target} label="Avg Quality" value={avgQuality} sub="Agent performance" iconColor="#8b5cf6" />
           <StatCard icon={Activity} label="Active Calls" value={stats?.active_calls ?? 0} iconColor="var(--accent)" />
+        </div>
+
+        {/* Cost Analytics Row */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+          <StatCard
+            icon={DollarSign}
+            label="Total Cost"
+            value={totalCost > 0 ? `$${totalCost.toFixed(2)}` : "$0.00"}
+            sub={costIsEstimated ? "Estimated from duration" : `${costCallCount} calls this period`}
+            iconColor="var(--success)"
+          />
+          <StatCard
+            icon={DollarSign}
+            label="Avg Cost / Call"
+            value={avgCostPerCall > 0 ? `$${avgCostPerCall.toFixed(4)}` : "$0.00"}
+            sub="Per-call average"
+            iconColor="#f59e0b"
+          />
+          <div className="rounded-xl border p-5 transition-shadow hover:shadow-md"
+               style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Cost Trend</span>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--accent-subtle)' }}>
+                <TrendingUp size={14} style={{ color: 'var(--accent)' }} />
+              </div>
+            </div>
+            {costTrends.length > 0 ? (
+              <ResponsiveContainer width="100%" height={60}>
+                <AreaChart data={costTrends}>
+                  <defs>
+                    <linearGradient id="costG" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <Area type="monotone" dataKey="estimated_cost" stroke="#10b981" fill="url(#costG)" strokeWidth={1.5} dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[60px] rounded-lg animate-pulse" style={{ background: 'var(--bg-muted)' }} />
+            )}
+            <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
+              {costIsEstimated ? "Estimated daily cost" : "Actual daily cost"}
+            </p>
+          </div>
         </div>
 
         <Tabs defaultValue="overview">

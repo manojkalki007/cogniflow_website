@@ -273,6 +273,39 @@ async def health():
     return {"status": status, **checks}
 
 
+@app.get("/api/providers/health")
+async def providers_health():
+    """Return circuit breaker state for all registered provider failover chains."""
+    from cogniflow_home.providers.failover import all_chain_status
+
+    chains = all_chain_status()
+    if not chains:
+        return {
+            "status": "no_chains_registered",
+            "message": "No active calls — failover chains are created per-call.",
+            "chains": {},
+        }
+
+    # Determine overall health from breaker states
+    all_closed = True
+    any_open = False
+    for category, breakers in chains.items():
+        for b in breakers:
+            if b["state"] != "CLOSED":
+                all_closed = False
+            if b["state"] == "OPEN":
+                any_open = True
+
+    if all_closed:
+        status = "healthy"
+    elif any_open:
+        status = "degraded"
+    else:
+        status = "recovering"  # HALF_OPEN
+
+    return {"status": status, "chains": chains}
+
+
 @app.get("/api/voice/diagnose")
 async def diagnose_voice():
     """Test each voice provider connection in isolation."""

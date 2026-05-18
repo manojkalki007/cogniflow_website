@@ -7,7 +7,7 @@ import {
   UserCircle, ShieldAlert, Cable, MessageSquare,
   Mail, DollarSign, ShieldCheck, Timer, Plug,
   PanelLeftClose, PanelLeftOpen, Search, Bell,
-  ChevronRight, Command, LogOut,
+  ChevronRight, Command, LogOut, Menu, X,
 } from "lucide-react";
 
 const SidebarContext = createContext();
@@ -101,6 +101,7 @@ export default function Layout() {
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem("sidebar_collapsed") === "true",
   );
+  const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const userEmail = user?.email || "";
   const userInitials = userEmail ? userEmail.substring(0, 2).toUpperCase() : "C";
@@ -114,35 +115,49 @@ export default function Layout() {
     localStorage.setItem("sidebar_collapsed", collapsed);
   }, [collapsed]);
 
+  // Close mobile sidebar on navigation
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
+
+  // Prevent body scroll when mobile sidebar is open
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [mobileOpen]);
+
   const currentTitle = PAGE_TITLES[location.pathname] || "Dashboard";
   const pathSegments = location.pathname.split("/").filter(Boolean);
 
-  return (
-    <SidebarContext.Provider value={{ collapsed, setCollapsed }}>
-      <div
-        className="flex h-screen overflow-hidden"
-        style={{ background: "var(--bg-subtle)" }}
-      >
-        {/* ──── Sidebar ──── */}
-        <aside
-          className={`sidebar-glass flex-shrink-0 flex flex-col transition-all duration-300 ease-in-out ${
-            collapsed ? "w-[60px] sidebar-collapsed" : "w-[220px]"
-          }`}
-        >
+  const sidebarContent = (isMobile = false) => (
+    <>
           {/* Logo */}
           <div
             className="flex items-center flex-shrink-0"
             style={{
               borderBottom: "1px solid var(--sidebar-border)",
-              padding: collapsed ? "16px 0" : "16px 14px",
-              justifyContent: collapsed ? "center" : "flex-start",
+              padding: (!isMobile && collapsed) ? "16px 0" : "16px 14px",
+              justifyContent: (!isMobile && collapsed) ? "center" : "flex-start",
             }}
           >
+            {isMobile && (
+              <button
+                onClick={() => setMobileOpen(false)}
+                className="mr-3 p-1.5 rounded-lg transition-all"
+                style={{ color: "var(--sidebar-text)" }}
+              >
+                <X size={18} />
+              </button>
+            )}
             <img
               src="/cogniflow-logo.png"
               alt="Cogniflow"
               style={{
-                height: collapsed ? 28 : 32,
+                height: (!isMobile && collapsed) ? 28 : 32,
                 width: "auto",
                 objectFit: "contain",
               }}
@@ -152,32 +167,32 @@ export default function Layout() {
           {/* Navigation */}
           <nav
             className="flex-1 overflow-y-auto overflow-x-hidden"
-            style={{ padding: collapsed ? "8px 6px" : "8px 8px" }}
+            style={{ padding: (!isMobile && collapsed) ? "8px 6px" : "8px 8px" }}
           >
             <div className="space-y-0.5">
               {NAV_CORE.map((item) => (
-                <NavItem key={item.to} {...item} collapsed={collapsed} />
+                <NavItem key={item.to} {...item} collapsed={!isMobile && collapsed} />
               ))}
             </div>
 
-            <SectionLabel collapsed={collapsed}>Channels</SectionLabel>
+            <SectionLabel collapsed={!isMobile && collapsed}>Channels</SectionLabel>
             <div className="space-y-0.5">
               {NAV_CHANNELS.map((item) => (
-                <NavItem key={item.to} {...item} collapsed={collapsed} />
+                <NavItem key={item.to} {...item} collapsed={!isMobile && collapsed} />
               ))}
             </div>
 
-            <SectionLabel collapsed={collapsed}>Insights</SectionLabel>
+            <SectionLabel collapsed={!isMobile && collapsed}>Insights</SectionLabel>
             <div className="space-y-0.5">
               {NAV_INSIGHTS.map((item) => (
-                <NavItem key={item.to} {...item} collapsed={collapsed} />
+                <NavItem key={item.to} {...item} collapsed={!isMobile && collapsed} />
               ))}
             </div>
 
-            <SectionLabel collapsed={collapsed}>Account</SectionLabel>
+            <SectionLabel collapsed={!isMobile && collapsed}>Account</SectionLabel>
             <div className="space-y-0.5">
               {NAV_ACCOUNT.map((item) => (
-                <NavItem key={item.to} {...item} collapsed={collapsed} />
+                <NavItem key={item.to} {...item} collapsed={!isMobile && collapsed} />
               ))}
             </div>
           </nav>
@@ -187,10 +202,10 @@ export default function Layout() {
             className="flex-shrink-0"
             style={{
               borderTop: "1px solid var(--sidebar-border)",
-              padding: collapsed ? "10px 6px" : "10px 8px",
+              padding: (!isMobile && collapsed) ? "10px 6px" : "10px 8px",
             }}
           >
-            {!collapsed && userEmail && (
+            {(isMobile || !collapsed) && userEmail && (
               <div
                 className="px-2.5 py-2 mb-1.5 rounded-lg truncate text-[11px]"
                 style={{ color: "var(--sidebar-text)", opacity: 0.7 }}
@@ -202,27 +217,27 @@ export default function Layout() {
 
             <NavLink
               to="/home/settings"
-              title={collapsed ? "Settings" : undefined}
+              title={(!isMobile && collapsed) ? "Settings" : undefined}
               className={({ isActive }) =>
                 `sidebar-nav-item ${isActive ? "active" : ""}`
               }
             >
               <Settings size={16} strokeWidth={1.8} className="flex-shrink-0" />
-              {!collapsed && <span>Settings</span>}
+              {(isMobile || !collapsed) && <span>Settings</span>}
             </NavLink>
 
             <button
               onClick={signOut}
               className="sidebar-nav-item w-full"
-              title={collapsed ? "Sign out" : undefined}
+              title={(!isMobile && collapsed) ? "Sign out" : undefined}
             >
               <LogOut size={16} strokeWidth={1.8} className="flex-shrink-0" />
-              {!collapsed && <span>Sign out</span>}
+              {(isMobile || !collapsed) && <span>Sign out</span>}
             </button>
 
             <div
               className={`flex items-center mt-1.5 ${
-                collapsed ? "flex-col gap-1" : "gap-1"
+                (!isMobile && collapsed) ? "flex-col gap-1" : "gap-1"
               }`}
             >
               <button
@@ -233,20 +248,60 @@ export default function Layout() {
               >
                 {dark ? <Sun size={15} /> : <Moon size={15} />}
               </button>
-              <button
-                onClick={() => setCollapsed((c) => !c)}
-                className="sidebar-nav-item flex-1"
-                style={{ justifyContent: "center" }}
-                title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-              >
-                {collapsed ? (
-                  <PanelLeftOpen size={15} />
-                ) : (
-                  <PanelLeftClose size={15} />
-                )}
-              </button>
+              {!isMobile && (
+                <button
+                  onClick={() => setCollapsed((c) => !c)}
+                  className="sidebar-nav-item flex-1"
+                  style={{ justifyContent: "center" }}
+                  title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+                >
+                  {collapsed ? (
+                    <PanelLeftOpen size={15} />
+                  ) : (
+                    <PanelLeftClose size={15} />
+                  )}
+                </button>
+              )}
             </div>
           </div>
+    </>
+  );
+
+  return (
+    <SidebarContext.Provider value={{ collapsed, setCollapsed }}>
+      <div
+        className="flex h-screen overflow-hidden"
+        style={{ background: "var(--bg-subtle)" }}
+      >
+        {/* ──── Mobile Sidebar Overlay ──── */}
+        {mobileOpen && (
+          <div
+            className="fixed inset-0 z-40 lg:hidden"
+            onClick={() => setMobileOpen(false)}
+          >
+            <div
+              className="absolute inset-0"
+              style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
+            />
+          </div>
+        )}
+
+        {/* ──── Mobile Sidebar ──── */}
+        <aside
+          className={`fixed inset-y-0 left-0 z-50 w-[260px] sidebar-glass flex flex-col transition-transform duration-300 ease-in-out lg:hidden ${
+            mobileOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          {sidebarContent(true)}
+        </aside>
+
+        {/* ──── Desktop Sidebar ──── */}
+        <aside
+          className={`sidebar-glass flex-shrink-0 flex-col transition-all duration-300 ease-in-out hidden lg:flex ${
+            collapsed ? "w-[60px] sidebar-collapsed" : "w-[220px]"
+          }`}
+        >
+          {sidebarContent(false)}
         </aside>
 
         {/* ──── Main Content ──── */}
@@ -255,12 +310,22 @@ export default function Layout() {
           <header
             className="header-glass flex items-center justify-between flex-shrink-0"
             style={{
-              padding: "0 24px",
+              padding: "0 16px 0 12px",
               height: "54px",
             }}
           >
-            {/* Left: Breadcrumbs */}
-            <div className="flex items-center gap-1.5 min-w-0">
+            {/* Left: Hamburger + Breadcrumbs */}
+            <div className="flex items-center gap-2 min-w-0">
+              <button
+                onClick={() => setMobileOpen(true)}
+                className="p-2 rounded-lg transition-all lg:hidden cursor-pointer"
+                style={{ color: "var(--text-muted)" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-muted)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                title="Open menu"
+              >
+                <Menu size={18} />
+              </button>
               <span
                 className="text-xs"
                 style={{ color: "var(--text-muted)" }}

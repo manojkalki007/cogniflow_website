@@ -33,6 +33,7 @@ from cogniflow_home.language.detector import LanguageDetector, LanguageRouter
 from cogniflow_home.monitoring.turn_quality import TurnEvent, TurnQualityAnalyzer
 from cogniflow_home.monitoring.barge_in import BargeInTracker
 from cogniflow_home.emotions.tts_adapter import EmotionTTSAdapter
+from cogniflow_home.providers.failover import ProviderChain, register_chain
 from cogniflow_home.telephony.base import CallInfo, TelephonyProvider
 
 logger = logging.getLogger("cogniflow_home.pipeline")
@@ -123,6 +124,42 @@ def _humanize_for_speech(text: str) -> str:
     return t.strip()
 
 
+def _create_tts_chain(language: str, voice_id: str, sample_rate: int = 8000, raw_pcm: bool = False) -> ProviderChain:
+    """Build a TTS failover chain: primary + fallback between Smallest and Sarvam."""
+    providers = []
+
+    if language in SARVAM_TTS_LANGUAGES:
+        # Indian language — Sarvam primary, Smallest fallback (if configured)
+        from cogniflow_home.providers.sarvam_tts import SarvamTTS
+        providers.append(("sarvam-tts", SarvamTTS(language=language, sample_rate=sample_rate)))
+        if settings.smallest_ai_api_key:
+            from cogniflow_home.providers.smallest_tts import SmallestTTS
+            providers.append(("smallest-tts", SmallestTTS(
+                voice_id=voice_id, language=language,
+                sample_rate=sample_rate, raw_pcm=raw_pcm,
+            )))
+    elif settings.smallest_ai_api_key:
+        # Non-Indian language — Smallest primary, Sarvam en-in fallback
+        from cogniflow_home.providers.smallest_tts import SmallestTTS
+        providers.append(("smallest-tts", SmallestTTS(
+            voice_id=voice_id, language=language,
+            sample_rate=sample_rate, raw_pcm=raw_pcm,
+        )))
+        from cogniflow_home.providers.sarvam_tts import SarvamTTS
+        providers.append(("sarvam-tts", SarvamTTS(language="en-in", sample_rate=sample_rate)))
+    else:
+        # Only Sarvam available
+        from cogniflow_home.providers.sarvam_tts import SarvamTTS
+        providers.append(("sarvam-tts", SarvamTTS(
+            language=language if language in SARVAM_TTS_LANGUAGES else "en-in",
+            sample_rate=sample_rate,
+        )))
+
+    chain = ProviderChain(providers, failure_threshold=3, reset_timeout=60.0)
+    register_chain("tts", chain)
+    return chain
+
+
 def _create_llm(system_prompt: str):
     from cogniflow_home.providers.groq_llm import GroqLLM
     return GroqLLM(system_prompt=system_prompt)
@@ -186,6 +223,12 @@ class VoicePipeline:
             "direction": call_info.direction,
         }
         self.tts = _create_tts(language, voice_id or VOICE_ID, sample_rate=sample_rate, raw_pcm=self._raw_pcm)
+
+        # TTS failover chain (Smallest <-> Sarvam)
+        self._tts_chain = _create_tts_chain(
+            language, voice_id or VOICE_ID,
+            sample_rate=sample_rate, raw_pcm=self._raw_pcm,
+        )
 
         self.eot = SemanticEOTDetector(threshold=0.65)
         self.tracer = LatencyTracer(call_id)
@@ -257,6 +300,17 @@ class VoicePipeline:
                 pass
         except Exception:
             logger.debug("TTS voice prewarm failed (non-fatal)", exc_info=True)
+
+        # Connect all fallback TTS providers in the chain
+        for _, provider, _ in self._tts_chain._providers:
+            if provider is not self.tts:
+                try:
+                    await provider.connect()
+                except Exception:
+                    logger.debug(
+                        f"Failover TTS connect failed for {type(provider).__name__} (non-fatal)",
+                        exc_info=True,
+                    )
 
     async def start(self):
         self._running = True
@@ -661,29 +715,45 @@ class VoicePipeline:
                 synth_kwargs["speed"] = emotion_kwargs.get("pace", 1.0)
             else:
                 synth_kwargs = emotion_kwargs
-            async for audio_chunk in self.tts.synthesize(text, **synth_kwargs):
-                if self.state.barge_in:
-                    break
 
-                if self._raw_pcm:
-                    payload = base64.b64encode(audio_chunk).decode("ascii")
-                    await self._telephony.send_audio(payload)
-                    if not self._turn_first_byte_ts:
-                        self._turn_first_byte_ts = time.perf_counter() * 1000
-                else:
-                    chunk_size = self._sample_rate // 50
-                    for i in range(0, len(audio_chunk), chunk_size):
-                        if self.state.barge_in:
-                            break
-                        segment = audio_chunk[i : i + chunk_size]
-                        payload = base64.b64encode(segment).decode("ascii")
-                        await self._telephony.send_audio(payload)
-                        if not self._turn_first_byte_ts:
-                            self._turn_first_byte_ts = time.perf_counter() * 1000
-                        await asyncio.sleep(0.018)
+            try:
+                await self._stream_tts_audio(self.tts.synthesize(text, **synth_kwargs))
+            except Exception as primary_err:
+                logger.warning(
+                    f"Primary TTS failed ({primary_err!r}), trying failover chain"
+                )
+                try:
+                    await self._stream_tts_audio(
+                        self._tts_chain.execute_stream("synthesize", text, **synth_kwargs)
+                    )
+                except Exception:
+                    raise primary_err  # re-raise original if chain also fails
 
         except Exception:
             logger.exception("TTS speak error")
+
+    async def _stream_tts_audio(self, audio_gen):
+        """Send audio chunks from a TTS async generator to telephony."""
+        async for audio_chunk in audio_gen:
+            if self.state.barge_in:
+                break
+
+            if self._raw_pcm:
+                payload = base64.b64encode(audio_chunk).decode("ascii")
+                await self._telephony.send_audio(payload)
+                if not self._turn_first_byte_ts:
+                    self._turn_first_byte_ts = time.perf_counter() * 1000
+            else:
+                chunk_size = self._sample_rate // 50
+                for i in range(0, len(audio_chunk), chunk_size):
+                    if self.state.barge_in:
+                        break
+                    segment = audio_chunk[i : i + chunk_size]
+                    payload = base64.b64encode(segment).decode("ascii")
+                    await self._telephony.send_audio(payload)
+                    if not self._turn_first_byte_ts:
+                        self._turn_first_byte_ts = time.perf_counter() * 1000
+                    await asyncio.sleep(0.018)
 
     async def stop(self):
         self._running = False
@@ -703,6 +773,13 @@ class VoicePipeline:
                 pass
         await self.stt.close()
         await self.tts.close()
+        # Close failover TTS providers
+        for _, provider, _ in self._tts_chain._providers:
+            if provider is not self.tts:
+                try:
+                    await provider.close()
+                except Exception:
+                    pass
 
         duration = int(time.time() - self.state.started_at)
 

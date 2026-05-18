@@ -493,7 +493,7 @@ export default function Agents() {
         }
       />
 
-      <div className="px-8 py-6">
+      <div className="px-4 sm:px-6 lg:px-8 py-6">
         <div className="space-y-4">
           {agents.map((a) => (
             <AgentCard key={a.id} agent={a}
