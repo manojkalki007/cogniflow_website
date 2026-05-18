@@ -258,6 +258,56 @@ async def health():
     return {"status": status, **checks}
 
 
+@app.get("/api/voice/diagnose")
+async def diagnose_voice():
+    """Test each voice provider connection in isolation."""
+    results = {}
+
+    # STT
+    try:
+        from cogniflow_home.providers.stt import DeepgramSTT
+        stt = DeepgramSTT(language="en", sample_rate=16000)
+        await asyncio.wait_for(stt.connect(), timeout=10)
+        await stt.close()
+        results["stt_deepgram"] = "ok"
+    except Exception as e:
+        results["stt_deepgram"] = f"error: {e}"
+
+    # TTS
+    try:
+        from cogniflow_home.providers.smallest_tts import SmallestTTS
+        tts = SmallestTTS(voice_id="emily", language="en", sample_rate=16000, raw_pcm=True)
+        await tts.connect()
+        chunks = []
+        async for chunk in tts.synthesize("hello"):
+            chunks.append(chunk)
+        results["tts_smallest"] = f"ok ({len(chunks)} chunks, {sum(len(c) for c in chunks)} bytes)"
+    except Exception as e:
+        results["tts_smallest"] = f"error: {e}"
+
+    # LLM
+    try:
+        from cogniflow_home.providers.groq_llm import GroqLLM
+        llm = GroqLLM(system_prompt="You are a test.")
+        await asyncio.wait_for(llm.prewarm(), timeout=10)
+        results["llm_groq"] = "ok"
+    except Exception as e:
+        results["llm_groq"] = f"error: {e}"
+
+    # Agent lookup
+    try:
+        agents = await list_agents()
+        if agents:
+            agent_config = await get_agent_by_id(agents[0]["id"])
+            results["agent_lookup"] = f"ok ({agent_config.name})" if agent_config else "error: agent not found"
+        else:
+            results["agent_lookup"] = "no agents"
+    except Exception as e:
+        results["agent_lookup"] = f"error: {e}"
+
+    return results
+
+
 # ─── API Hub: Provider status, usage tracking ───
 
 @app.get("/api/providers")
