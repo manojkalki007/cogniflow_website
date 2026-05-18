@@ -21,9 +21,9 @@ const DASHBOARD_URL = process.env.NEXT_PUBLIC_DASHBOARD_URL || "http://localhost
 
 function MidPageCTA() {
   return (
-    <section className="py-20 px-6">
+    <section className="py-16 sm:py-20 px-4 sm:px-6">
       <div className="max-w-3xl mx-auto text-center">
-        <p className="text-2xl md:text-3xl font-semibold text-text-primary mb-6">
+        <p className="text-xl sm:text-2xl md:text-3xl font-semibold text-text-primary mb-6">
           Ready to see it in action?
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">

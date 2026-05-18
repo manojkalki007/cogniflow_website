@@ -63,7 +63,7 @@ export default function Pricing() {
   const [annual, setAnnual] = useState(false);
 
   return (
-    <section id="pricing" className="relative py-32 px-6" ref={ref}>
+    <section id="pricing" className="relative py-20 sm:py-32 px-4 sm:px-6" ref={ref}>
       <div className="max-w-6xl mx-auto relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -74,7 +74,7 @@ export default function Pricing() {
           <p className="text-xs uppercase tracking-[0.2em] text-text-secondary mb-4">
             Pricing
           </p>
-          <h2 className="text-4xl md:text-5xl font-semibold tracking-[-0.02em] mb-4">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-[-0.02em] mb-4">
             Simple, <span className="gradient-text">transparent pricing</span>
           </h2>
           <p className="text-text-secondary mb-8">
@@ -108,7 +108,7 @@ export default function Pricing() {
           </div>
         </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-6 items-start">
+        <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 items-start">
           {PLANS.map((plan, i) => (
             <motion.div
               key={plan.name}
@@ -119,7 +119,7 @@ export default function Pricing() {
                 delay: 0.2 + i * 0.15,
                 ease: [0.16, 1, 0.3, 1],
               }}
-              className={`glass-card rounded-2xl p-8 relative ${
+              className={`glass-card rounded-2xl p-6 sm:p-8 relative ${
                 plan.highlighted
                   ? "border-brand/30 shadow-[0_0_40px_rgba(0,24,255,0.1)] md:scale-105"
                   : ""
@@ -136,13 +136,13 @@ export default function Pricing() {
               <div className="mb-6">
                 {plan.monthlyPrice !== null ? (
                   <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-bold">
+                    <span className="text-3xl sm:text-4xl font-bold">
                       ${annual ? Math.round(plan.monthlyPrice * 0.8) : plan.monthlyPrice}
                     </span>
                     <span className="text-text-tertiary text-sm">/mo</span>
                   </div>
                 ) : (
-                  <span className="text-4xl font-bold">Custom</span>
+                  <span className="text-3xl sm:text-4xl font-bold">Custom</span>
                 )}
               </div>
 
@@ -157,7 +157,7 @@ export default function Pricing() {
 
               <a
                 href={plan.href}
-                className={`block w-full text-center py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                className={`block w-full text-center py-3 min-h-[44px] flex items-center justify-center rounded-xl text-sm font-semibold transition-all duration-200 ${
                   plan.highlighted
                     ? "bg-brand text-white hover:bg-brand-light shadow-[0_0_20px_rgba(0,24,255,0.2)]"
                     : "border border-white/[0.08] text-text-primary hover:border-white/[0.15] hover:bg-white/[0.03]"

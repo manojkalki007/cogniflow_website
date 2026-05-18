@@ -106,8 +106,8 @@ function PipelineVisualization() {
 
 export default function PerformanceSplit() {
   return (
-    <section className="py-32 px-6">
-      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
+    <section className="py-20 sm:py-32 px-4 sm:px-6">
+      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-16 items-center">
         {/* Left: pipeline visualization */}
         <div className="order-2 md:order-1">
           <PipelineVisualization />
@@ -119,10 +119,10 @@ export default function PerformanceSplit() {
             <span className="text-xs uppercase tracking-widest text-brand font-mono">
               Performance
             </span>
-            <h2 className="text-4xl md:text-5xl font-bold text-text-primary mt-4 leading-tight">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-text-primary mt-4 leading-tight">
               Sub-500ms. Every turn.
             </h2>
-            <p className="text-text-secondary text-lg leading-relaxed mt-6 max-w-lg">
+            <p className="text-text-secondary text-base sm:text-lg leading-relaxed mt-4 sm:mt-6 max-w-lg">
               From the moment the caller finishes speaking to the moment your
               agent responds — under 500 milliseconds. Faster than your best
               rep&apos;s first breath.

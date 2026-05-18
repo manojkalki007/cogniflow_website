@@ -101,18 +101,18 @@ function SentimentMockup() {
 
 export default function IntelligenceSplit() {
   return (
-    <section className="py-32 px-6">
-      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
+    <section className="py-20 sm:py-32 px-4 sm:px-6">
+      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-16 items-center">
         {/* Left: text */}
         <ScrollReveal>
           <div>
             <span className="text-xs uppercase tracking-widest text-brand font-mono">
               Intelligence
             </span>
-            <h2 className="text-4xl md:text-5xl font-bold text-text-primary mt-4 leading-tight">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-text-primary mt-4 leading-tight">
               Knows how the caller feels
             </h2>
-            <p className="text-text-secondary text-lg leading-relaxed mt-6 max-w-lg">
+            <p className="text-text-secondary text-base sm:text-lg leading-relaxed mt-4 sm:mt-6 max-w-lg">
               Your AI agent doesn&apos;t just listen — it reads. Real-time
               sentiment analysis detects hesitation, interest, frustration, and
               buying signals. It adapts tone, pacing, and responses

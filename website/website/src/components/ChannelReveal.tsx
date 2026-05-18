@@ -29,7 +29,7 @@ const WHATSAPP_MESSAGES = [
 
 export default function ChannelReveal() {
   return (
-    <section className="max-w-7xl mx-auto py-32 px-6">
+    <section className="max-w-7xl mx-auto py-20 sm:py-32 px-4 sm:px-6">
       {/* Email Section */}
       <ScrollReveal>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
@@ -38,7 +38,7 @@ export default function ChannelReveal() {
             <p className="text-xs uppercase tracking-widest text-brand font-mono mb-4">
               Email
             </p>
-            <h3 className="text-3xl md:text-4xl font-bold text-text-primary mb-6">
+            <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold text-text-primary mb-4 sm:mb-6">
               Every email written for one person
             </h3>
             <p className="text-base text-text-secondary leading-relaxed">
@@ -109,7 +109,7 @@ export default function ChannelReveal() {
       </ScrollReveal>
 
       {/* WhatsApp Section */}
-      <div className="mt-32">
+      <div className="mt-20 sm:mt-32">
         <ScrollReveal>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             {/* Left - WhatsApp Mockup */}
@@ -183,7 +183,7 @@ export default function ChannelReveal() {
               <p className="text-xs uppercase tracking-widest text-brand font-mono mb-4">
                 WhatsApp
               </p>
-              <h3 className="text-3xl md:text-4xl font-bold text-text-primary mb-6">
+              <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold text-text-primary mb-4 sm:mb-6">
                 The follow-up that never drops
               </h3>
               <p className="text-base text-text-secondary leading-relaxed">

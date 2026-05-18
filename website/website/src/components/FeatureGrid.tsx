@@ -46,20 +46,20 @@ const FEATURES = [
 
 export default function FeatureGrid() {
   return (
-    <section className="max-w-7xl mx-auto py-32 px-6">
+    <section className="max-w-7xl mx-auto py-20 sm:py-32 px-4 sm:px-6">
       <ScrollReveal>
-        <h2 className="text-4xl md:text-5xl font-bold text-text-primary text-center mb-16">
+        <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-text-primary text-center mb-10 sm:mb-16">
           Built different
         </h2>
       </ScrollReveal>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {FEATURES.map((feature, i) => (
           <ScrollReveal key={feature.title} delay={i * 0.1}>
             <motion.div
               whileHover={{ y: -2 }}
               transition={{ duration: 0.2 }}
-              className="bg-glass border border-glass-border rounded-2xl p-8 hover:border-brand-glow transition-colors duration-300 h-full"
+              className="bg-glass border border-glass-border rounded-2xl p-6 sm:p-8 hover:border-brand-glow transition-colors duration-300 h-full"
             >
               <feature.icon size={24} className="text-brand/60" />
               <h3 className="text-lg font-semibold text-text-primary mt-4">

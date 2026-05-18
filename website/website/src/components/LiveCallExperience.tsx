@@ -65,19 +65,19 @@ const BAR_SENTIMENTS = ["green", "green", "yellow", "green", "green"];
 
 export default function LiveCallExperience() {
   return (
-    <section className="w-full py-32 bg-bg-secondary">
+    <section className="w-full py-20 sm:py-32 bg-bg-secondary">
       <ScrollReveal>
-        <div className="text-center mb-16 px-6">
+        <div className="text-center mb-10 sm:mb-16 px-4 sm:px-6">
           <p className="text-xs uppercase tracking-widest text-brand font-mono mb-4">
             See it live
           </p>
-          <h2 className="text-4xl md:text-5xl font-bold text-text-primary">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-text-primary">
             The call experience
           </h2>
         </div>
 
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_280px] gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[280px_1fr_280px] gap-4">
             {/* Left Panel - Caller Profile */}
             <div className="bg-glass border border-glass-border rounded-2xl p-6">
               <p className="text-xs uppercase text-text-tertiary tracking-wider mb-5">
@@ -158,7 +158,7 @@ export default function LiveCallExperience() {
                 </div>
               </div>
 
-              <div className="flex-1 space-y-4 overflow-y-auto max-h-[400px] pr-2">
+              <div className="flex-1 space-y-4 overflow-y-auto max-h-[300px] sm:max-h-[400px] pr-2">
                 {TRANSCRIPT.map((line, i) => (
                   <div key={i} className="flex gap-2">
                     {line.sentiment && (

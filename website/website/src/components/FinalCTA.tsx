@@ -12,7 +12,7 @@ export default function FinalCTA() {
   return (
     <section
       id="book-demo"
-      className="relative py-32 overflow-hidden"
+      className="relative py-20 sm:py-32 overflow-hidden"
     >
       {/* Decorative gradients */}
       <div
@@ -38,8 +38,8 @@ export default function FinalCTA() {
         }}
       />
 
-      <ScrollReveal className="relative z-10 px-6">
-        <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-16 items-center">
+      <ScrollReveal className="relative z-10 px-4 sm:px-6">
+        <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-10 md:gap-16 items-center">
           {/* Left — copy */}
           <div>
             <p
@@ -49,7 +49,7 @@ export default function FinalCTA() {
               Your next SDR doesn&apos;t need a salary
             </p>
             <h2
-              className="mt-4 text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tighter leading-[0.95] bg-gradient-to-b from-white via-white to-[#7dd3fc] bg-clip-text text-transparent"
+              className="mt-4 text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold tracking-tighter leading-[0.95] bg-gradient-to-b from-white via-white to-[#7dd3fc] bg-clip-text text-transparent"
               style={{ fontFamily: "'Instrument Sans', sans-serif" }}
             >
               Book a Demo

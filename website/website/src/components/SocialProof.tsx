@@ -38,18 +38,18 @@ export default function SocialProof() {
   const isInView = useInView(ref, { once: true, margin: "-100px" });
 
   return (
-    <section id="testimonials" className="relative py-32 px-6" ref={ref}>
+    <section id="testimonials" className="relative py-20 sm:py-32 px-4 sm:px-6" ref={ref}>
       <div className="max-w-6xl mx-auto relative z-10">
         <ScrollReveal className="text-center mb-16">
           <p className="text-xs uppercase tracking-[0.2em] text-text-secondary mb-4">
             Testimonials
           </p>
-          <h2 className="text-4xl md:text-5xl font-semibold tracking-[-0.02em]">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-[-0.02em]">
             Trusted by <span className="gradient-text">revenue teams</span>
           </h2>
         </ScrollReveal>
 
-        <div className="grid md:grid-cols-3 gap-6 mb-20">
+        <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-12 sm:mb-20">
           {TESTIMONIALS.map((t, i) => (
             <motion.div
               key={t.name}
@@ -60,7 +60,7 @@ export default function SocialProof() {
                 delay: 0.2 + i * 0.15,
                 ease: [0.16, 1, 0.3, 1],
               }}
-              className="glass-card rounded-2xl p-8"
+              className="glass-card rounded-2xl p-6 sm:p-8"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" className="text-brand/30 mb-4">
                 <path
@@ -95,8 +95,8 @@ export default function SocialProof() {
           className="grid grid-cols-2 md:grid-cols-4 gap-6"
         >
           {STATS.map((stat) => (
-            <div key={stat.label} className="glass-card rounded-xl p-6 text-center">
-              <p className="text-3xl md:text-4xl font-bold font-mono gradient-text mb-1">
+            <div key={stat.label} className="glass-card rounded-xl p-4 sm:p-6 text-center">
+              <p className="text-2xl sm:text-3xl md:text-4xl font-bold font-mono gradient-text mb-1">
                 {stat.prefix}
                 <AnimatedCounter target={stat.value} suffix={stat.suffix} />
               </p>

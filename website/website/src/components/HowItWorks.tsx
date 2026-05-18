@@ -25,13 +25,13 @@ const STEPS = [
 
 export default function HowItWorks() {
   return (
-    <section id="how-it-works" className="max-w-5xl mx-auto py-32 px-6">
+    <section id="how-it-works" className="max-w-5xl mx-auto py-20 sm:py-32 px-4 sm:px-6">
       <ScrollReveal>
         <div className="text-center mb-16">
           <p className="text-xs uppercase tracking-widest text-brand font-mono mb-4">
             Setup
           </p>
-          <h2 className="text-4xl md:text-5xl font-bold text-text-primary">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-text-primary">
             Live in under 10 minutes
           </h2>
         </div>
@@ -53,7 +53,7 @@ export default function HowItWorks() {
           {STEPS.map((step, i) => (
             <ScrollReveal key={step.number} delay={i * 0.15}>
               <div className="bg-glass border border-glass-border rounded-2xl p-8">
-                <span className="text-5xl font-bold font-mono text-brand/20">
+                <span className="text-4xl sm:text-5xl font-bold font-mono text-brand/20">
                   {step.number}
                 </span>
                 <h3 className="text-xl font-semibold text-text-primary mt-4">

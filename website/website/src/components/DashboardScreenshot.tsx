@@ -43,7 +43,7 @@ function WaveformBars() {
 
 export default function DashboardScreenshot() {
   return (
-    <section className="relative px-6 pb-32 -mt-12">
+    <section className="relative px-4 sm:px-6 pb-20 sm:pb-32 -mt-12">
       <ScrollReveal>
         <div className="max-w-5xl mx-auto relative">
           <div

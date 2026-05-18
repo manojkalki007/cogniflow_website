@@ -27,8 +27,8 @@ const LEGAL_LINKS = [
 export default function Footer() {
   return (
     <footer className="border-t border-border">
-      <div className="max-w-7xl mx-auto px-6 py-16">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 sm:gap-10 mb-10 sm:mb-12">
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
             <CogniflowLogo width={120} />
@@ -103,7 +103,7 @@ export default function Footer() {
             </ul>
             <a
               href={`${DASHBOARD_URL}/login`}
-              className="inline-flex px-5 py-2 rounded-full text-sm font-semibold bg-brand text-white hover:bg-brand/90 transition-colors"
+              className="inline-flex px-5 py-2.5 min-h-[44px] items-center rounded-full text-sm font-semibold bg-brand text-white hover:bg-brand/90 transition-colors"
             >
               Get Started
             </a>

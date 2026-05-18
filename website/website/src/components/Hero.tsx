@@ -137,7 +137,7 @@ export default function Hero() {
 
       {/* Content */}
       <div
-        className="relative mx-auto max-w-7xl h-full flex flex-col justify-center px-6 lg:px-12"
+        className="relative mx-auto max-w-7xl h-full flex flex-col justify-center px-4 sm:px-6 lg:px-12"
         style={{ zIndex: 20 }}
       >
         <div className="flex flex-col gap-12">
@@ -153,7 +153,7 @@ export default function Hero() {
             </BlurIn>
 
             {/* Heading */}
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-medium leading-tight lg:leading-[1.2] text-white">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-medium leading-tight lg:leading-[1.2] text-white">
               <span className="block">
                 <SplitText text="The AI Employee That" startIndex={0} />
               </span>
@@ -171,7 +171,7 @@ export default function Hero() {
 
             {/* Subtitle */}
             <BlurIn delay={0.4} duration={0.6}>
-              <p className="text-white/80 text-lg font-normal leading-relaxed max-w-xl">
+              <p className="text-white/80 text-base sm:text-lg font-normal leading-relaxed max-w-xl">
                 It calls. It writes hyperpersonalized emails. It follows up on
                 WhatsApp. In under 500ms. While you sleep.
               </p>
@@ -183,14 +183,14 @@ export default function Hero() {
             <div className="flex flex-wrap gap-4">
               <a
                 href={`${DASHBOARD_URL}/login`}
-                className="inline-flex items-center gap-2 rounded-full bg-[#0018FF] text-white px-5 py-3 font-medium transition-transform hover:scale-105"
+                className="inline-flex items-center gap-2 rounded-full bg-[#0018FF] text-white px-5 py-3 min-h-[44px] font-medium transition-transform hover:scale-105"
               >
                 Start Free Trial
                 <ArrowRight className="w-4 h-4" />
               </a>
               <a
                 href="#book-demo"
-                className="inline-flex items-center rounded-full bg-white/20 backdrop-blur-sm text-white px-8 py-3 font-medium transition-colors hover:bg-white/30"
+                className="inline-flex items-center rounded-full bg-white/20 backdrop-blur-sm text-white px-6 sm:px-8 py-3 min-h-[44px] font-medium transition-colors hover:bg-white/30"
               >
                 Book a Demo
               </a>

@@ -74,7 +74,7 @@ export default function Navbar() {
             </a>
             <a
               href={`${DASHBOARD_URL}/login`}
-              className="px-5 py-2.5 rounded-full text-sm font-semibold bg-white text-black hover:bg-white/90 transition-colors"
+              className="px-4 sm:px-5 py-2.5 min-h-[44px] flex items-center rounded-full text-sm font-semibold bg-white text-black hover:bg-white/90 transition-colors"
               style={{ fontFamily: "'Instrument Sans', sans-serif" }}
             >
               Get Started
@@ -120,7 +120,7 @@ export default function Navbar() {
                 key={link.label}
                 href={link.href}
                 onClick={() => setMobileOpen(false)}
-                className="text-2xl font-medium text-white/70 hover:text-white transition-colors"
+                className="text-xl sm:text-2xl font-medium text-white/70 hover:text-white transition-colors"
               >
                 {link.label}
               </a>
@@ -128,9 +128,16 @@ export default function Navbar() {
             <a
               href={`${DASHBOARD_URL}/login`}
               onClick={() => setMobileOpen(false)}
-              className="px-8 py-3 rounded-full text-base font-semibold bg-white text-black"
+              className="px-8 py-3.5 rounded-full text-base font-semibold bg-white text-black min-h-[44px] flex items-center"
             >
               Get Started
+            </a>
+            <a
+              href={`${DASHBOARD_URL}/login`}
+              onClick={() => setMobileOpen(false)}
+              className="text-sm font-medium text-white/50 hover:text-white transition-colors"
+            >
+              Log In
             </a>
           </motion.div>
         )}

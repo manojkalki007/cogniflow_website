@@ -44,10 +44,10 @@ function FAQItem({
   onToggle: () => void;
 }) {
   return (
-    <div className="border-b border-border py-5">
+    <div className="border-b border-border py-4 sm:py-5">
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between text-left group"
+        className="w-full flex items-center justify-between text-left group min-h-[44px]"
       >
         <span className="text-base font-medium text-text-primary group-hover:text-brand transition-colors pr-4">
           {question}
@@ -84,9 +84,9 @@ export default function FAQ() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
-    <section id="faq" className="max-w-3xl mx-auto py-32 px-6">
+    <section id="faq" className="max-w-3xl mx-auto py-20 sm:py-32 px-4 sm:px-6">
       <ScrollReveal>
-        <h2 className="text-4xl md:text-5xl font-bold text-text-primary text-center mb-16">
+        <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-text-primary text-center mb-10 sm:mb-16">
           Questions
         </h2>
       </ScrollReveal>
