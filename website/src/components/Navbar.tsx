@@ -99,13 +99,13 @@ export default function Navbar() {
             {/* Right: Login + Get Started + Hamburger */}
             <div className="flex items-center gap-3">
               <a
-                href="/login"
+                href="https://cogniflowautomations.com/login"
                 className="hidden md:block text-sm text-white/80 hover:text-white transition-colors duration-200"
               >
                 Login
               </a>
               <a
-                href="/signup"
+                href="https://cogniflowautomations.com/login"
                 className="hidden sm:block rounded-xl px-5 py-2 bg-[#0052CC] text-white text-sm font-medium hover:bg-[#003d99] transition-colors duration-200"
               >
                 Get Started
@@ -174,7 +174,7 @@ export default function Navbar() {
             ))}
 
             <a
-              href="/login"
+              href="https://cogniflowautomations.com/login"
               onClick={() => setMobileOpen(false)}
               className="text-2xl font-medium text-white/70 hover:text-white transition-colors"
             >
@@ -182,7 +182,7 @@ export default function Navbar() {
             </a>
 
             <a
-              href="/signup"
+              href="https://cogniflowautomations.com/login"
               onClick={() => setMobileOpen(false)}
               className="px-8 py-3 rounded-xl text-base font-medium bg-[#0052CC] text-white hover:bg-[#003d99] transition-colors"
             >

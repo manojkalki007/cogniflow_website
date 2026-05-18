@@ -28,7 +28,15 @@ export default function Login() {
   useEffect(() => {
     requestAnimationFrame(() => setMounted(true));
     document.documentElement.classList.add("dark");
-  }, []);
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        setSuccess(true);
+        setTimeout(() => navigate("/home"), 600);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [navigate]);
 
   useEffect(() => {
     if (cooldown <= 0) return;

@@ -97,7 +97,7 @@ export default function Hero() {
             className="flex items-center gap-4 mt-8"
           >
             <a
-              href="#"
+              href="https://cogniflowautomations.com/login"
               className="rounded-full px-7 py-3.5 bg-[#0052CC] text-white text-sm font-medium hover:bg-[#003d99] transition-colors"
             >
               Start Free Trial
