@@ -394,7 +394,7 @@ function TestCallPanel({ agent, onClose }) {
       gainNodeRef.current = gain;
       nextPlayTimeRef.current = 0;
 
-      const wsBase = import.meta.env.VITE_API_URL || window.location.origin;
+      const wsBase = (import.meta.env.VITE_API_URL || "https://api.cogniflowautomations.com").trim();
       const wsUrl = wsBase.replace(/^http/, "ws") + `/voice/browser/test?agent_id=${agent.id}`;
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
