@@ -406,7 +406,7 @@ export default function Login() {
               <p className="login-footer-text" style={fade(600)}>
                 Don&apos;t have an account?{" "}
                 <a
-                  href="mailto:cogniflowautomations@gmail.com?subject=Cogniflow%20Account%20Request"
+                  href="https://www.cogniflowautomations.com/#pricing"
                   className="login-footer-link"
                 >
                   Get started free
