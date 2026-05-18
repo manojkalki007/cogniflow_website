@@ -601,7 +601,12 @@ class VoicePipeline:
             if not text:
                 return
             text = self.emotion_adapter.add_prosody_hints(text)
-            synth_kwargs = self.emotion_adapter.get_tts_kwargs()
+            emotion_kwargs = self.emotion_adapter.get_tts_kwargs()
+            synth_kwargs = {}
+            if hasattr(self.tts, 'VALID_VOICES'):
+                synth_kwargs["speed"] = emotion_kwargs.get("pace", 1.0)
+            else:
+                synth_kwargs = emotion_kwargs
             async for audio_chunk in self.tts.synthesize(text, **synth_kwargs):
                 if self.state.barge_in:
                     break
