@@ -387,6 +387,7 @@ function TestCallPanel({ agent, onClose }) {
       streamRef.current = stream;
 
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      if (audioCtx.state === "suspended") await audioCtx.resume();
       audioCtxRef.current = audioCtx;
       const gain = audioCtx.createGain();
       gain.gain.value = 1.0;
@@ -413,8 +414,10 @@ function TestCallPanel({ agent, onClose }) {
           for (let i = 0; i < input.length; i++) {
             pcm16[i] = Math.max(-32768, Math.min(32767, Math.round(input[i] * 32768)));
           }
-          const b64 = btoa(String.fromCharCode(...new Uint8Array(pcm16.buffer)));
-          ws.send(JSON.stringify({ event: "audio", data: b64 }));
+          const raw = new Uint8Array(pcm16.buffer);
+          let binary = "";
+          for (let i = 0; i < raw.length; i++) binary += String.fromCharCode(raw[i]);
+          ws.send(JSON.stringify({ event: "audio", data: btoa(binary) }));
         };
         source.connect(processor);
         processor.connect(audioCtx.destination);
@@ -423,6 +426,8 @@ function TestCallPanel({ agent, onClose }) {
       ws.onmessage = (e) => {
         const msg = JSON.parse(e.data);
         if (msg.event === "audio") {
+          const ctx = audioCtxRef.current;
+          if (ctx && ctx.state === "suspended") ctx.resume();
           const raw = atob(msg.data);
           const bytes = new Uint8Array(raw.length);
           for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
