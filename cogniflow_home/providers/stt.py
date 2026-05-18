@@ -65,64 +65,79 @@ class DeepgramSTT:
 
     async def _receive_loop(self):
         import time as _time
-        try:
-            async for message in self._ws:
-                data = json.loads(message)
-                msg_type = data.get("type", "")
+        while self._running:
+            try:
+                async for message in self._ws:
+                    data = json.loads(message)
+                    msg_type = data.get("type", "")
 
-                if msg_type == "Results":
-                    is_final = data.get("is_final", False)
-                    speech_final = data.get("speech_final", False)
-                    transcript = (
-                        data.get("channel", {})
-                        .get("alternatives", [{}])[0]
-                        .get("transcript", "")
-                    )
-                    if not transcript:
-                        continue
-
-                    if not is_final:
-                        if transcript == self._last_partial:
+                    if msg_type == "Results":
+                        is_final = data.get("is_final", False)
+                        speech_final = data.get("speech_final", False)
+                        transcript = (
+                            data.get("channel", {})
+                            .get("alternatives", [{}])[0]
+                            .get("transcript", "")
+                        )
+                        if not transcript:
                             continue
-                        self._last_partial = transcript
 
-                    if is_final:
-                        now = _time.monotonic()
-                        if (
-                            transcript == self._last_final_text
-                            and now - self._last_final_ts < 0.8
-                        ):
-                            continue
-                        self._last_final_text = transcript
-                        self._last_final_ts = now
-                        self._last_partial = ""
+                        if not is_final:
+                            if transcript == self._last_partial:
+                                continue
+                            self._last_partial = transcript
 
-                    result = STTResult(
-                        transcript=transcript,
-                        is_final=is_final,
-                        speech_final=speech_final,
-                    )
-                    await self._result_queue.put(result)
+                        if is_final:
+                            now = _time.monotonic()
+                            if (
+                                transcript == self._last_final_text
+                                and now - self._last_final_ts < 0.8
+                            ):
+                                continue
+                            self._last_final_text = transcript
+                            self._last_final_ts = now
+                            self._last_partial = ""
 
-                elif msg_type == "UtteranceEnd":
-                    pass
+                        result = STTResult(
+                            transcript=transcript,
+                            is_final=is_final,
+                            speech_final=speech_final,
+                        )
+                        await self._result_queue.put(result)
 
-        except websockets.exceptions.ConnectionClosed:
-            logger.warning("Deepgram connection closed — attempting reconnect")
-            if self._running:
+                    elif msg_type == "UtteranceEnd":
+                        pass
+
+            except websockets.exceptions.ConnectionClosed:
+                if not self._running:
+                    return
+                logger.warning("Deepgram connection closed — attempting reconnect")
                 self._reconnect_backoff = min(
                     max(self._reconnect_backoff * 2, 1.0), 15.0
                 )
                 logger.info(f"Reconnect backoff: {self._reconnect_backoff:.1f}s")
                 await asyncio.sleep(self._reconnect_backoff)
                 try:
-                    await self.connect()
+                    params = (
+                        f"?encoding=mulaw&sample_rate={self.sample_rate}&channels=1"
+                        f"&model=nova-3&language={self.language}"
+                        f"&punctuate=true&interim_results=true&endpointing=300"
+                        f"&vad_events=true&smart_format=true&utterance_end_ms=1200"
+                    )
+                    headers = {"Authorization": f"Token {settings.deepgram_api_key}"}
+                    self._ws = await websockets.connect(
+                        DEEPGRAM_WS_URL + params,
+                        extra_headers=headers,
+                        ping_interval=5,
+                        ping_timeout=20,
+                    )
+                    self._reconnect_backoff = 0.0
+                    logger.info("Deepgram STT reconnected")
                 except Exception:
                     logger.exception("Deepgram reconnect failed")
-        except Exception:
-            logger.exception("Deepgram receive error")
-        finally:
-            if not self._running:
+                    return
+            except Exception:
+                logger.exception("Deepgram receive error")
                 return
 
     async def send_audio(self, audio_bytes: bytes):
@@ -136,7 +151,7 @@ class DeepgramSTT:
         while self._running or not self._result_queue.empty():
             try:
                 result = await asyncio.wait_for(
-                    self._result_queue.get(), timeout=0.05
+                    self._result_queue.get(), timeout=0.5
                 )
                 yield result
             except asyncio.TimeoutError:

@@ -23,9 +23,19 @@ async function request(path, options = {}) {
 
   try {
     const res = await fetch(`${BASE}${path}`, { headers, ...options });
-    return res.json();
-  } catch {
-    return { error: "Network error" };
+    let data;
+    try {
+      const text = await res.text();
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      throw new Error(`Server error (${res.status}): Invalid response`);
+    }
+    if (!res.ok && !data.error) {
+      data.error = data.detail || `Request failed (${res.status})`;
+    }
+    return data;
+  } catch (err) {
+    return { error: err.message || "Network error" };
   }
 }
 

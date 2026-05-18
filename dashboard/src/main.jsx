@@ -62,6 +62,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                 <Route path="/home/admin" element={<AdminDashboard />} />
                 <Route path="/home/api-hub" element={<ApiHub />} />
                 <Route path="/home/settings" element={<Settings />} />
+                <Route path="*" element={<Navigate to="/home" replace />} />
               </Route>
             </Route>
           </Routes>

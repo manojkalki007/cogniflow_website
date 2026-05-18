@@ -514,14 +514,14 @@ function AdvancedSection({ form, set, agentId, onDelete, onClone }) {
       <div className="p-4 rounded-xl border space-y-3" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
         <h4 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Latency Optimizations</h4>
         {[
-          { label: "Pre-warm TTS on connect", checked: true },
-          { label: "Sentence streaming to TTS", checked: true },
-          { label: "Filler audio for tool calls", checked: true },
-          { label: "Speculative LLM generation", checked: false },
+          { key: "enable_prewarm", label: "Pre-warm TTS on connect" },
+          { key: "enable_sentence_streaming", label: "Sentence streaming to TTS" },
+          { key: "enable_filler", label: "Filler audio for tool calls" },
+          { key: "enable_speculative", label: "Speculative LLM generation" },
         ].map(item => (
-          <div key={item.label} className="flex items-center justify-between">
+          <div key={item.key} className="flex items-center justify-between">
             <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{item.label}</span>
-            <ToggleSwitch checked={item.checked} onChange={() => {}} />
+            <ToggleSwitch checked={form[item.key]} onChange={() => set(item.key, !form[item.key])} />
           </div>
         ))}
       </div>
@@ -565,6 +565,7 @@ export default function AgentBuilder() {
   const [section, setSection] = useState("prompt");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
 
   const isNew = !id || id === "new";
 
@@ -583,6 +584,10 @@ export default function AgentBuilder() {
     enable_language_switch: true, enable_rag: false,
     tools_enabled: ["book_appointment", "save_contact_info", "send_whatsapp"],
     guardrails: { ai_disclosure: true, recording_consent: true, pii_redaction: true },
+    enable_prewarm: true,
+    enable_sentence_streaming: true,
+    enable_filler: true,
+    enable_speculative: false,
   });
 
   useEffect(() => {
@@ -608,6 +613,10 @@ export default function AgentBuilder() {
         enable_rag: agentData.enable_rag ?? false,
         tools_enabled: agentData.tools_enabled || ["book_appointment", "save_contact_info"],
         guardrails: agentData.guardrails || { ai_disclosure: true, recording_consent: true, pii_redaction: true },
+        enable_prewarm: agentData.enable_prewarm ?? true,
+        enable_sentence_streaming: agentData.enable_sentence_streaming ?? true,
+        enable_filler: agentData.enable_filler ?? true,
+        enable_speculative: agentData.enable_speculative ?? false,
       });
     }
   }, [agentData]);
@@ -616,43 +625,69 @@ export default function AgentBuilder() {
 
   const handleSave = async () => {
     setSaving(true);
-    const payload = {
-      ...form,
-      phone_numbers: form.phone_numbers.split(",").map(n => n.trim()).filter(Boolean),
-      temperature: parseFloat(form.temperature),
-      max_call_duration: parseInt(form.max_call_duration),
-    };
+    setError("");
+    try {
+      const payload = {
+        ...form,
+        phone_numbers: form.phone_numbers.split(",").map(n => n.trim()).filter(Boolean),
+        temperature: parseFloat(form.temperature),
+        max_call_duration: parseInt(form.max_call_duration),
+      };
 
-    let result;
-    if (isNew) {
-      result = await api.createAgent(payload);
-    } else {
-      result = await api.updateAgent(id, payload);
-    }
-
-    setSaving(false);
-    if (result && !result.error) {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-      queryClient.invalidateQueries(["agents"]);
-      queryClient.invalidateQueries(["agent", id]);
-      if (isNew && result.id) {
-        navigate(`/home/agents/${result.id}`, { replace: true });
+      let result;
+      if (isNew) {
+        result = await api.createAgent(payload);
+      } else {
+        result = await api.updateAgent(id, payload);
       }
+
+      if (result && !result.error) {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+        queryClient.invalidateQueries(["agents"]);
+        queryClient.invalidateQueries(["agent", id]);
+        if (isNew && result.id) {
+          navigate(`/home/agents/${result.id}`, { replace: true });
+        }
+      } else {
+        setError(result?.error || "Failed to save agent");
+      }
+    } catch (err) {
+      setError(err.message || "Failed to save agent");
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleDelete = async () => {
     if (!confirm("Delete this agent? This cannot be undone.")) return;
-    await api.deleteAgent(id);
-    queryClient.invalidateQueries(["agents"]);
-    navigate("/home/agents");
+    setError("");
+    try {
+      const result = await api.deleteAgent(id);
+      if (result?.error) {
+        setError(result.error);
+        return;
+      }
+      queryClient.invalidateQueries(["agents"]);
+      navigate("/home/agents");
+    } catch (err) {
+      setError(err.message || "Failed to delete agent");
+    }
   };
 
   const handleClone = async () => {
-    await api.cloneAgent({ source_agent_id: id, name: form.name + " (Copy)" });
-    queryClient.invalidateQueries(["agents"]);
-    navigate("/home/agents");
+    setError("");
+    try {
+      const result = await api.cloneAgent({ source_agent_id: id, name: form.name + " (Copy)" });
+      if (result?.error) {
+        setError(result.error);
+        return;
+      }
+      queryClient.invalidateQueries(["agents"]);
+      navigate("/home/agents");
+    } catch (err) {
+      setError(err.message || "Failed to clone agent");
+    }
   };
 
   if (isLoading && !isNew) {
@@ -696,6 +731,19 @@ export default function AgentBuilder() {
         </div>
       </div>
 
+      {/* Error banner */}
+      {error && (
+        <div className="mx-6 mt-3 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={14} className="text-red-400 flex-shrink-0" />
+            <span className="text-sm text-red-400">{error}</span>
+          </div>
+          <button onClick={() => setError("")} className="p-1 rounded-lg hover:bg-red-500/10 text-red-400">
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {/* Three-column layout */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left: Section Nav */}
@@ -711,7 +759,19 @@ export default function AgentBuilder() {
             {section === "voice" && <VoiceSection form={form} set={set} />}
             {section === "call" && <CallSection form={form} set={set} />}
             {section === "tools" && <ToolsSection form={form} set={set} />}
-            {section === "kb" && <FeaturesSection form={form} set={set} />}
+            {section === "kb" && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Knowledge Base</h2>
+                  <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Upload documents or add URLs for your agent to reference during calls.</p>
+                </div>
+                <div className="border-2 border-dashed rounded-xl p-12 text-center" style={{ borderColor: 'var(--border)' }}>
+                  <Upload size={32} className="mx-auto mb-3" style={{ color: 'var(--text-muted)' }} />
+                  <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Coming Soon</p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>RAG-powered knowledge base with document upload and URL crawling</p>
+                </div>
+              </div>
+            )}
             {section === "analytics" && <AnalyticsSection agentId={isNew ? null : id} />}
             {section === "advanced" && <AdvancedSection form={form} set={set} agentId={isNew ? null : id} onDelete={handleDelete} onClone={handleClone} />}
           </div>
@@ -723,10 +783,11 @@ export default function AgentBuilder() {
 
           <div className="mt-6 space-y-2">
             <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Quick Actions</h3>
-            <button onClick={() => navigate("/home/agents")}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl border text-sm transition-all hover:bg-[var(--bg-muted)]"
+            <button onClick={() => !isNew && navigate("/home/agents")}
+              disabled={isNew}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl border text-sm transition-all hover:bg-[var(--bg-muted)] disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}>
-              <PhoneCall size={14} /> Test Voice Call
+              <PhoneCall size={14} /> {isNew ? "Save first to test" : "Test Voice Call"}
             </button>
             {!isNew && (
               <button onClick={() => navigator.clipboard.writeText(id)}

@@ -56,7 +56,9 @@ class GroqLLM:
         self.conversation_history: list[dict] = []
         self.call_context: dict = {}
         self.on_tool_call = None
-        self._client = httpx.AsyncClient(timeout=5.0)
+        self._client = httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=5.0, read=30.0, write=5.0, pool=5.0)
+        )
 
         if system_prompt:
             self.conversation_history.append(
@@ -142,6 +144,7 @@ class GroqLLM:
         word_count = 0
 
         _stream_ctx = None
+        response = None
         for _attempt in range(2):
             _stream_ctx = self._client.stream(
                 "POST",
@@ -155,16 +158,21 @@ class GroqLLM:
             response = await _stream_ctx.__aenter__()
             if response.status_code in (429, 503) and _attempt == 0:
                 await _stream_ctx.__aexit__(None, None, None)
+                _stream_ctx = None
                 logger.warning(f"Groq returned {response.status_code}, retrying in 1s")
                 await asyncio.sleep(1.0)
                 continue
             if response.status_code != 200:
                 error_body = await response.aread()
                 await _stream_ctx.__aexit__(None, None, None)
+                _stream_ctx = None
                 raise RuntimeError(
                     f"LLM API error {response.status_code}: {error_body.decode()}"
                 )
             break
+
+        if response is None or _stream_ctx is None:
+            raise RuntimeError("LLM API: failed to establish connection after retries")
 
         try:
             async for line in response.aiter_lines():
@@ -254,7 +262,7 @@ class GroqLLM:
             async for sentence in self._try_stream(api_key, model, depth=depth + 1):
                 yield sentence
 
-        if full_response.strip():
+        if full_response.strip() and not tool_calls_data:
             self.add_message("assistant", full_response.strip())
 
     async def close(self):

@@ -6,7 +6,7 @@ Input: PCM16 from browser mic → converted to mulaw for STT pipeline.
 Output: raw PCM16 from TTS → forwarded directly to browser.
 """
 
-import audioop
+import struct
 import base64
 import json
 import logging
@@ -17,6 +17,51 @@ from starlette.websockets import WebSocket
 from cogniflow_home.telephony.base import AudioEncoding, CallInfo, TelephonyProvider
 
 logger = logging.getLogger("cogniflow_home.telephony.browser")
+
+# ─── Pure-Python mu-law encoding (replaces audioop.lin2ulaw for Python 3.13+) ───
+
+_MULAW_BIAS = 0x84
+_MULAW_CLIP = 32635
+
+_MULAW_COMPRESS_TABLE = [
+    0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3,
+    4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+    5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+    5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+    6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+    6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+    6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+    6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+]
+
+
+def _lin2ulaw_sample(sample: int) -> int:
+    """Encode a single 16-bit signed PCM sample to mu-law."""
+    sign = 0
+    if sample < 0:
+        sign = 0x80
+        sample = -sample
+    if sample > _MULAW_CLIP:
+        sample = _MULAW_CLIP
+    sample += _MULAW_BIAS
+    exponent = _MULAW_COMPRESS_TABLE[(sample >> 7) & 0xFF]
+    mantissa = (sample >> (exponent + 3)) & 0x0F
+    return ~(sign | (exponent << 4) | mantissa) & 0xFF
+
+
+def _pcm16_to_mulaw(pcm_data: bytes) -> bytes:
+    """Convert PCM16 (little-endian, 16-bit signed) to mu-law bytes."""
+    n_samples = len(pcm_data) // 2
+    samples = struct.unpack(f"<{n_samples}h", pcm_data[:n_samples * 2])
+    return bytes(_lin2ulaw_sample(s) for s in samples)
 
 
 class BrowserProvider(TelephonyProvider):
@@ -67,7 +112,7 @@ class BrowserProvider(TelephonyProvider):
                     payload = msg.get("data", "")
                     if payload:
                         pcm16 = base64.b64decode(payload)
-                        mulaw = audioop.lin2ulaw(pcm16, 2)
+                        mulaw = _pcm16_to_mulaw(pcm16)
                         await on_audio(mulaw)
 
                 elif event == "stop":

@@ -71,20 +71,23 @@ def _valid_uuid(val: str) -> bool:
     return bool(_UUID_RE.match(val))
 
 
-# ─── Rate Limiting ───
+# ─── Rate Limiting (per-tenant) ───
 
 class RateLimiter:
     def __init__(self, max_calls: int = 10, window_seconds: int = 60):
         self.max_calls = max_calls
         self.window = window_seconds
-        self._calls: list[float] = []
+        self._buckets: dict[str, list[float]] = {}
 
-    def check(self) -> bool:
+    def check(self, tenant_id: str = "__global__") -> bool:
         now = time.time()
-        self._calls = [t for t in self._calls if now - t < self.window]
-        if len(self._calls) >= self.max_calls:
+        if tenant_id not in self._buckets:
+            self._buckets[tenant_id] = []
+        calls = self._buckets[tenant_id]
+        calls[:] = [t for t in calls if now - t < self.window]
+        if len(calls) >= self.max_calls:
             return False
-        self._calls.append(now)
+        calls.append(now)
         return True
 
 
@@ -165,6 +168,14 @@ app = FastAPI(title="Cogniflow Home Voice Agent", version="2.0.0", lifespan=life
 class CORSAndRequestIDMiddleware:
     def __init__(self, app: ASGIApp):
         self.app = app
+        self._allowed_origins = set(settings.cors_origins)
+
+    def _get_allowed_origin(self, headers: dict) -> bytes | None:
+        """Check if the request Origin is in the allowed list."""
+        origin = headers.get(b"origin", b"").decode()
+        if origin in self._allowed_origins:
+            return origin.encode()
+        return None
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send):
         if scope["type"] == "websocket":
@@ -175,15 +186,17 @@ class CORSAndRequestIDMiddleware:
             headers = dict(scope.get("headers", []))
             request_id = headers.get(b"x-request-id", str(_uuid.uuid4())[:8].encode()).decode()
             scope.setdefault("state", {})["request_id"] = request_id
+            allowed_origin = self._get_allowed_origin(headers)
 
             method = scope.get("method", "GET")
             if method == "OPTIONS":
                 response_headers = [
-                    (b"access-control-allow-origin", b"*"),
                     (b"access-control-allow-methods", b"GET, POST, PATCH, DELETE, OPTIONS"),
-                    (b"access-control-allow-headers", b"Content-Type, X-Api-Key, X-Tenant-Id, X-Request-ID"),
+                    (b"access-control-allow-headers", b"Content-Type, Authorization, X-Api-Key, X-Tenant-Id, X-Request-ID"),
                     (b"access-control-max-age", b"86400"),
                 ]
+                if allowed_origin:
+                    response_headers.insert(0, (b"access-control-allow-origin", allowed_origin))
                 await send({"type": "http.response.start", "status": 204, "headers": response_headers})
                 await send({"type": "http.response.body", "body": b""})
                 return
@@ -191,7 +204,8 @@ class CORSAndRequestIDMiddleware:
             async def send_with_cors(message):
                 if message["type"] == "http.response.start":
                     h = list(message.get("headers", []))
-                    h.append((b"access-control-allow-origin", b"*"))
+                    if allowed_origin:
+                        h.append((b"access-control-allow-origin", allowed_origin))
                     h.append((b"x-request-id", request_id.encode()))
                     message["headers"] = h
                 await send(message)
@@ -728,7 +742,7 @@ async def make_outbound_call(request: Request, auth: AuthContext = Depends(get_a
     if not to_number:
         return {"error": "to_number is required"}
 
-    if not _call_limiter.check():
+    if not _call_limiter.check(auth.tenant_id or "__global__"):
         return {"error": "Rate limit exceeded. Max 20 calls per minute."}
 
     try:

@@ -412,10 +412,14 @@ function CloneDialog({ open, onOpenChange, sourceAgent }) {
   });
 
   const handleClone = () => {
-    cloneMut.mutate({
-      agent_name: agentName || `Clone of ${sourceAgent?.name || "Agent"}`,
+    const payload = {
+      name: agentName || `Clone of ${sourceAgent?.name || "Agent"}`,
       recording_urls: recordings.split("\n").map(u => u.trim()).filter(Boolean),
-    });
+    };
+    if (sourceAgent?.id) {
+      payload.source_agent_id = sourceAgent.id;
+    }
+    cloneMut.mutate(payload);
   };
 
   const handleClose = () => { setRecordings(""); setAgentName(""); setCloneResult(null); onOpenChange(false); };

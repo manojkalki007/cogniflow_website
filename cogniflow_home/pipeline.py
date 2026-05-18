@@ -276,9 +276,19 @@ class VoicePipeline:
             raise RuntimeError(f"STT connect failed: {results[0]}")
         custom_greeting = results[2] if not isinstance(results[2], Exception) else None
 
-        self.speculative.set_generate_fn(self.llm.generate_stream)
+        async def _speculative_generate(text):
+            """Wrapper that prevents speculative runs from mutating conversation history."""
+            history_snapshot = list(self.llm.conversation_history)
+            try:
+                async for sentence in self.llm.generate_stream(text):
+                    yield sentence
+            finally:
+                self.llm.conversation_history = history_snapshot
+
+        self.speculative.set_generate_fn(_speculative_generate)
         self.llm.on_tool_call = self._on_tool_call
-        asyncio.create_task(self.filler.initialize(self.tts))
+        _filler_task = asyncio.create_task(self.filler.initialize(self.tts))
+        _filler_task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
 
         greeting = custom_greeting or self._greeting
 
@@ -605,22 +615,23 @@ class VoicePipeline:
             await self._speak(filler_text)
 
     async def _switch_language(self, language: str):
-        providers = self.language_router.get_providers(language)
-        logger.info(f"Switching to language: {language}, providers: {providers}")
+        async with self._speak_lock:
+            providers = self.language_router.get_providers(language)
+            logger.info(f"Switching to language: {language}, providers: {providers}")
 
-        await self.stt.close()
-        self.stt = _create_stt(language, sample_rate=self._sample_rate)
-        await self.stt.connect()
+            await self.stt.close()
+            self.stt = _create_stt(language, sample_rate=self._sample_rate)
+            await self.stt.connect()
 
-        await self.tts.close()
-        self.tts = _create_tts(language, "", sample_rate=self._sample_rate, raw_pcm=self._raw_pcm)
-        await self.tts.connect()
+            await self.tts.close()
+            self.tts = _create_tts(language, "", sample_rate=self._sample_rate, raw_pcm=self._raw_pcm)
+            await self.tts.connect()
 
-        self.state.language = language
-        await bus.emit("language.switched", {
-            "call_id": self.state.call_sid,
-            "new_language": language,
-        })
+            self.state.language = language
+            await bus.emit("language.switched", {
+                "call_id": self.state.call_sid,
+                "new_language": language,
+            })
 
     def _quick_sentiment(self, text: str) -> float:
         text_lower = text.lower()
@@ -716,13 +727,14 @@ class VoicePipeline:
 
         if self.state.tenant_id and duration > 0:
             from cogniflow_home.tenants.manager import record_call_usage
-            asyncio.create_task(record_call_usage(
+            _usage_task = asyncio.create_task(record_call_usage(
                 tenant_id=self.state.tenant_id,
                 call_id=self.state.call_sid,
                 duration_seconds=duration,
                 language=self.state.language,
                 provider=self.state.provider,
             ))
+            _usage_task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
 
         if turn_summary:
             logger.info(
