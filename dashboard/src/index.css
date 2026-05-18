@@ -754,6 +754,94 @@ body {
   color: #22D3EE;
 }
 
+/* ─── OTP Input ─── */
+.otp-container {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin: 8px 0;
+}
+.otp-box {
+  width: 48px;
+  height: 56px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: #F1F5F9;
+  font-size: 1.5rem;
+  font-weight: 600;
+  text-align: center;
+  outline: none;
+  transition: all 0.2s ease;
+  caret-color: #06B6D4;
+}
+.otp-box:focus {
+  border-color: rgba(6,182,212,0.5);
+  box-shadow: 0 0 0 3px rgba(6,182,212,0.1);
+  background: rgba(255,255,255,0.06);
+}
+.otp-box--filled {
+  border-color: rgba(6,182,212,0.3);
+  background: rgba(6,182,212,0.06);
+}
+.otp-box--error {
+  border-color: rgba(239,68,68,0.5) !important;
+  box-shadow: 0 0 0 3px rgba(239,68,68,0.08) !important;
+  animation: otpShake 0.4s ease;
+}
+.otp-box:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+@keyframes otpShake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
+
+.login-step-slide {
+  animation: stepSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes stepSlideIn {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.login-industry-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 8px 0;
+}
+.login-industry-card {
+  padding: 14px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+  color: #94A3B8;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.login-industry-card:hover {
+  border-color: rgba(6,182,212,0.3);
+  background: rgba(6,182,212,0.05);
+}
+.login-industry-card--active {
+  border-color: rgba(6,182,212,0.5);
+  background: rgba(6,182,212,0.1);
+  color: #22D3EE;
+}
+.login-industry-icon {
+  font-size: 1.25rem;
+}
+
 /* ─── SIDEBAR ─── */
 .sidebar-glass {
   background: var(--sidebar-bg);
