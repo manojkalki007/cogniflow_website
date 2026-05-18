@@ -141,7 +141,10 @@ async def lifespan(app):
             "Set API_SECRET_KEY in your .env file for production."
         )
 
-    await resume_active_campaigns()
+    try:
+        await resume_active_campaigns()
+    except Exception:
+        logger.exception("Failed to resume campaigns on startup — continuing anyway")
 
     yield
 

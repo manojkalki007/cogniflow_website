@@ -16,13 +16,17 @@ export function getTenantId() {
 async function request(path, options = {}) {
   const headers = {
     "Content-Type": "application/json",
-    "X-Api-Key": API_KEY,
     ...options.headers,
   };
+  if (API_KEY) headers["X-Api-Key"] = API_KEY;
   if (_tenantId) headers["X-Tenant-Id"] = _tenantId;
 
-  const res = await fetch(`${BASE}${path}`, { headers, ...options });
-  return res.json();
+  try {
+    const res = await fetch(`${BASE}${path}`, { headers, ...options });
+    return res.json();
+  } catch {
+    return { error: "Network error" };
+  }
 }
 
 export const api = {
