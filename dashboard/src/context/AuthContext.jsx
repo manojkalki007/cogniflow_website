@@ -17,11 +17,24 @@ export function AuthProvider({ children }) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
+    const init = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+
+      if (code) {
+        window.history.replaceState({}, "", window.location.pathname);
+        try {
+          await supabase.auth.exchangeCodeForSession(code);
+        } catch (_) {}
+      }
+
+      const { data: { session: s } } = await supabase.auth.getSession();
       setSession(s);
       setUser(s?.user ?? null);
       setLoading(false);
-    });
+    };
+
+    init();
 
     const {
       data: { subscription },

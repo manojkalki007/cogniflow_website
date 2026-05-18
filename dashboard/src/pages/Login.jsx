@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { setTenantId } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 import supabase from "../lib/supabase";
 import {
   Mail, Lock, Eye, EyeOff, ArrowRight,
@@ -9,6 +10,7 @@ import {
 
 export default function Login() {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -28,15 +30,14 @@ export default function Login() {
   useEffect(() => {
     requestAnimationFrame(() => setMounted(true));
     document.documentElement.classList.add("dark");
+  }, []);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
-        setSuccess(true);
-        setTimeout(() => navigate("/home"), 600);
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+  useEffect(() => {
+    if (!authLoading && user) {
+      setSuccess(true);
+      setTimeout(() => navigate("/home", { replace: true }), 600);
+    }
+  }, [user, authLoading, navigate]);
 
   useEffect(() => {
     if (cooldown <= 0) return;
