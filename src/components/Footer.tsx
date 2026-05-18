@@ -2,8 +2,6 @@
 
 import CogniflowLogo from "./CogniflowLogo";
 
-const DASHBOARD_URL = "https://cogniflowautomations.com/login";
-
 const FOOTER_LINKS = {
   Product: [
     { label: "AI Calling Agent", href: "#calling-agent" },

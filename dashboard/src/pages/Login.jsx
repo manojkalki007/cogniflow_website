@@ -26,6 +26,9 @@ export default function Login() {
   const [resetSent, setResetSent] = useState(false);
   const [failCount, setFailCount] = useState(0);
   const [cooldown, setCooldown] = useState(0);
+  const [signupMode, setSignupMode] = useState(
+    () => new URLSearchParams(window.location.search).get("mode") === "signup"
+  );
 
   useEffect(() => {
     requestAnimationFrame(() => setMounted(true));
@@ -126,6 +129,26 @@ export default function Login() {
     }
   };
 
+  const handleSignup = async (e) => {
+    e.preventDefault();
+    if (!validate()) return;
+    setLoading(true);
+    setError("");
+
+    const { error: signupError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: window.location.origin + "/auth/callback" },
+    });
+
+    setLoading(false);
+    if (signupError) {
+      setError(signupError.message);
+      return;
+    }
+    setResetSent(true);
+  };
+
   const fade = (delay) => ({
     opacity: mounted ? 1 : 0,
     transform: mounted ? "translateY(0)" : "translateY(16px)",
@@ -212,11 +235,13 @@ export default function Login() {
 
             <div style={fade(250)}>
               <h2 className="login-card-title">
-                {resetMode ? "Reset password" : "Welcome back"}
+                {resetMode ? "Reset password" : signupMode ? "Create your account" : "Welcome back"}
               </h2>
               <p className="login-card-subtitle">
                 {resetMode
                   ? "We'll send a reset link to your email"
+                  : signupMode
+                  ? "Get started with Cogniflow for free"
                   : "Sign in to your Cogniflow account"}
               </p>
             </div>
@@ -234,10 +259,13 @@ export default function Login() {
                 </div>
                 <p className="login-reset-title">Check your inbox</p>
                 <p className="login-reset-sub">
-                  We sent a reset link to <strong>{email}</strong>
+                  {signupMode
+                    ? <>We sent a verification link to <strong>{email}</strong></>
+                    : <>We sent a reset link to <strong>{email}</strong></>
+                  }
                 </p>
                 <button
-                  onClick={() => { setResetMode(false); setResetSent(false); }}
+                  onClick={() => { setResetMode(false); setResetSent(false); setSignupMode(false); }}
                   className="login-link"
                 >
                   Back to sign in
@@ -264,17 +292,17 @@ export default function Login() {
                           <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 2.58 9 2.58Z" fill="#EA4335" />
                         </svg>
                       )}
-                      <span>Continue with Google</span>
+                      <span>{signupMode ? "Sign up with Google" : "Continue with Google"}</span>
                     </button>
 
                     <div className="login-divider" style={fade(350)}>
-                      <span>or sign in with email</span>
+                      <span>{signupMode ? "or sign up with email" : "or sign in with email"}</span>
                     </div>
                   </div>
                 )}
 
                 <form
-                  onSubmit={resetMode ? handleForgotPassword : handleSubmit}
+                  onSubmit={resetMode ? handleForgotPassword : signupMode ? handleSignup : handleSubmit}
                   className="login-form"
                 >
                   {/* Email */}
@@ -382,6 +410,8 @@ export default function Login() {
                         `Try again in ${cooldown}s`
                       ) : resetMode ? (
                         <>Send reset link</>
+                      ) : signupMode ? (
+                        <>Create account <ArrowRight size={16} /></>
                       ) : (
                         <>Sign in <ArrowRight size={16} /></>
                       )}
@@ -405,13 +435,15 @@ export default function Login() {
 
             {!resetMode && !resetSent && (
               <p className="login-footer-text" style={fade(600)}>
-                Don&apos;t have an account?{" "}
-                <a
-                  href="https://www.cogniflowautomations.com/#pricing"
+                {signupMode ? "Already have an account? " : "Don’t have an account? "}
+                <button
+                  type="button"
+                  onClick={() => { setSignupMode(!signupMode); setError(""); setFieldErrors({}); }}
                   className="login-footer-link"
+                  style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
                 >
-                  Get started free
-                </a>
+                  {signupMode ? "Sign in" : "Get started free"}
+                </button>
               </p>
             )}
           </div>

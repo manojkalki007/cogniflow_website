@@ -2,7 +2,7 @@
 
 import { ArrowRight } from "lucide-react";
 
-const DASHBOARD_URL = "https://cogniflowautomations.com/login";
+const SIGNUP_URL = "https://cogniflowautomations.com/login?mode=signup";
 
 export default function FinalCTA() {
   return (
@@ -17,7 +17,7 @@ export default function FinalCTA() {
 
         <div className="flex items-center justify-center gap-4 mt-8 flex-wrap">
           <a
-            href={DASHBOARD_URL}
+            href={SIGNUP_URL}
             className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-[var(--color-brand)] text-white font-medium text-base hover:bg-[var(--color-brand-dark)] transition-all"
           >
             Get Started — Free for 7 days <ArrowRight size={16} />

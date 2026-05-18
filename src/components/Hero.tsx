@@ -2,7 +2,7 @@
 
 import { ArrowRight, Play } from "lucide-react";
 
-const DASHBOARD_URL = "https://cogniflowautomations.com/login";
+const SIGNUP_URL = "https://cogniflowautomations.com/login?mode=signup";
 
 export default function Hero() {
   return (
@@ -31,7 +31,7 @@ export default function Hero() {
 
         {/* CTAs */}
         <div className="flex items-center justify-center gap-4 mt-8 flex-wrap">
-          <a href={DASHBOARD_URL} className="btn-primary text-base !py-3.5 !px-7">
+          <a href={SIGNUP_URL} className="btn-primary text-base !py-3.5 !px-7">
             Start Free Trial <ArrowRight size={16} />
           </a>
           <a href="#demo" className="btn-ghost text-base !py-3.5 !px-7">

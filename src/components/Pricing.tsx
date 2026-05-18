@@ -2,7 +2,7 @@
 
 import { Check, ArrowRight } from "lucide-react";
 
-const DASHBOARD_URL = "https://cogniflowautomations.com/login";
+const SIGNUP_URL = "https://cogniflowautomations.com/login?mode=signup";
 
 const PLANS = [
   {
@@ -129,7 +129,7 @@ export default function Pricing() {
               </ul>
 
               <a
-                href={DASHBOARD_URL}
+                href={SIGNUP_URL}
                 className={`flex items-center justify-center gap-2 py-3 rounded-xl font-medium text-sm transition-all ${
                   plan.popular
                     ? "bg-[var(--color-brand)] text-white hover:bg-[var(--color-brand-dark)]"

@@ -25,7 +25,8 @@ const NAV_LINKS = [
   },
 ];
 
-const DASHBOARD_URL = "https://cogniflowautomations.com/login";
+const LOGIN_URL = "https://cogniflowautomations.com/login";
+const SIGNUP_URL = "https://cogniflowautomations.com/login?mode=signup";
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -95,12 +96,12 @@ export default function Navbar() {
           {/* Desktop CTAs */}
           <div className="hidden md:flex items-center gap-3">
             <a
-              href={DASHBOARD_URL}
+              href={LOGIN_URL}
               className="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
             >
               Login
             </a>
-            <a href={DASHBOARD_URL} className="btn-primary text-sm !py-2.5 !px-5">
+            <a href={SIGNUP_URL} className="btn-primary text-sm !py-2.5 !px-5">
               Get Started
             </a>
           </div>
@@ -156,10 +157,10 @@ export default function Navbar() {
           </div>
 
           <div className="mt-8 flex flex-col gap-3">
-            <a href={DASHBOARD_URL} className="btn-primary text-center justify-center">
+            <a href={SIGNUP_URL} className="btn-primary text-center justify-center">
               Get Started
             </a>
-            <a href={DASHBOARD_URL} className="btn-ghost text-center justify-center">
+            <a href={LOGIN_URL} className="btn-ghost text-center justify-center">
               Login
             </a>
           </div>

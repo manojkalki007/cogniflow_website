@@ -1,42 +1,69 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../lib/supabase";
 
 export default function AuthCallback() {
   const navigate = useNavigate();
+  const captured = useRef({
+    code: new URLSearchParams(window.location.search).get("code"),
+    hash: window.location.hash.substring(1),
+  });
 
   useEffect(() => {
+    let cancelled = false;
+
     const handle = async () => {
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get("code");
+      const { code, hash } = captured.current;
 
       if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (!error) {
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+        if (!error && data.session && !cancelled) {
           navigate("/home", { replace: true });
           return;
         }
       }
 
-      const hash = window.location.hash;
-      if (hash && hash.includes("access_token")) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          navigate("/home", { replace: true });
-          return;
+      if (hash) {
+        const hp = new URLSearchParams(hash);
+        const accessToken = hp.get("access_token");
+        const refreshToken = hp.get("refresh_token");
+        if (accessToken && refreshToken) {
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (!error && data.session && !cancelled) {
+            navigate("/home", { replace: true });
+            return;
+          }
         }
       }
 
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
+      if (session && !cancelled) {
         navigate("/home", { replace: true });
         return;
       }
 
-      navigate("/login", { replace: true });
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        (_event, session) => {
+          if (session && !cancelled) {
+            subscription.unsubscribe();
+            navigate("/home", { replace: true });
+          }
+        }
+      );
+
+      setTimeout(() => {
+        if (!cancelled) {
+          subscription.unsubscribe();
+          navigate("/login", { replace: true });
+        }
+      }, 5000);
     };
 
     handle();
+    return () => { cancelled = true; };
   }, [navigate]);
 
   return (
