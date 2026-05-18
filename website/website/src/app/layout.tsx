@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+// @ts-expect-error -- exports map missing types for /react subpath
 import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 import LenisProvider from "@/components/LenisProvider";
