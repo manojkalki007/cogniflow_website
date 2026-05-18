@@ -1,199 +1,74 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { motion } from "motion/react";
-import { Sparkles, ArrowRight } from "lucide-react";
+import { ArrowRight, Play } from "lucide-react";
 
-const ease = [0.22, 1, 0.36, 1] as const;
-
-function BlurIn({
-  children,
-  delay = 0,
-  duration = 0.6,
-  className = "",
-}: {
-  children: React.ReactNode;
-  delay?: number;
-  duration?: number;
-  className?: string;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, filter: "blur(10px)", y: 20 }}
-      animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
-      transition={{ delay, duration, ease }}
-      className={className}
-    >
-      {children}
-    </motion.div>
-  );
-}
-
-function SplitText({
-  text,
-  startIndex = 0,
-  staggerDelay = 0.08,
-  duration = 0.6,
-}: {
-  text: string;
-  startIndex?: number;
-  staggerDelay?: number;
-  duration?: number;
-}) {
-  const words = text.split(" ");
-  return (
-    <>
-      {words.map((word, i) => (
-        <motion.span
-          key={i}
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{
-            delay: (startIndex + i) * staggerDelay,
-            duration,
-            ease,
-          }}
-          className="inline-block"
-          style={{ marginRight: "0.3em" }}
-        >
-          {word}
-        </motion.span>
-      ))}
-    </>
-  );
-}
-
-const HLS_SRC =
-  "https://stream.mux.com/s8pMcOvMQXc4GD6AX4e1o01xFogFxipmuKltNfSYza0200.m3u8";
+const DASHBOARD_URL = "https://cogniflowautomations.com/login";
 
 export default function Hero() {
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    let hlsInstance: any = null;
-
-    // Safari supports HLS natively
-    if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = HLS_SRC;
-      video.play().catch(() => {});
-      return;
-    }
-
-    // Dynamic import of bundled hls.js (runs client-side only inside useEffect)
-    import("hls.js")
-      .then((mod) => {
-        const Hls = mod.default;
-        if (!Hls.isSupported()) return;
-
-        hlsInstance = new Hls();
-        hlsInstance.loadSource(HLS_SRC);
-        hlsInstance.attachMedia(video);
-        hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
-          video.play().catch(() => {});
-        });
-      })
-      .catch(() => {});
-
-    return () => {
-      hlsInstance?.destroy();
-    };
-  }, []);
-
   return (
-    <section
-      className="relative w-full h-screen overflow-hidden"
-      style={{ backgroundColor: "#070612" }}
-    >
-      {/* Background Video */}
-      <video
-        ref={videoRef}
-        autoPlay
-        loop
-        muted
-        playsInline
-        className="absolute inset-0 h-full object-cover pointer-events-none"
-        style={{
-          zIndex: 0,
-          marginLeft: "200px",
-          width: "calc(100% - 200px)",
-          transform: "scale(1.2)",
-          transformOrigin: "left center",
-        }}
-      />
+    <section className="hero-gradient pt-28 pb-20 px-4 sm:px-6">
+      <div className="max-w-6xl mx-auto text-center">
+        {/* Badge */}
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--color-brand-light)] text-[var(--color-brand-dark)] text-sm font-medium mb-8">
+          <span className="w-2 h-2 rounded-full bg-[var(--color-brand)] animate-pulse" />
+          Now with 10+ Indian language support
+        </div>
 
-      {/* Bottom fade gradient */}
-      <div
-        className="absolute bottom-0 left-0 w-full h-40"
-        style={{
-          zIndex: 10,
-          background: "linear-gradient(to top, #070612, transparent)",
-        }}
-      />
+        {/* Headline */}
+        <h1
+          className="text-3xl sm:text-4xl md:text-5xl lg:text-[56px] font-bold text-[var(--color-text)] leading-tight tracking-[-0.02em] max-w-3xl mx-auto"
+          style={{ lineHeight: 1.15 }}
+        >
+          AI Agents That Handle{" "}
+          <span className="text-[var(--color-brand)]">Your Business Calls</span>
+        </h1>
 
-      {/* Content */}
-      <div
-        className="relative mx-auto max-w-7xl h-full flex flex-col justify-center px-6 lg:px-12"
-        style={{ zIndex: 20 }}
-      >
-        <div className="flex flex-col gap-12">
-          <div className="flex flex-col gap-6">
-            {/* Badge */}
-            <BlurIn delay={0} duration={0.6}>
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/20 backdrop-blur-sm px-4 py-2 w-fit">
-                <Sparkles className="w-3 h-3 text-white/80" />
-                <span className="text-sm font-medium text-white/80">
-                  New AI Automation Ally
-                </span>
+        {/* Subheadline */}
+        <p className="mt-6 text-base sm:text-lg text-[var(--color-text-muted)] max-w-2xl mx-auto leading-relaxed">
+          Deploy AI calling agents for appointment booking, lead qualification,
+          and sales outreach — with sub-500ms response time across 10+ Indian languages.
+        </p>
+
+        {/* CTAs */}
+        <div className="flex items-center justify-center gap-4 mt-8 flex-wrap">
+          <a href={DASHBOARD_URL} className="btn-primary text-base !py-3.5 !px-7">
+            Start Free Trial <ArrowRight size={16} />
+          </a>
+          <a href="#demo" className="btn-ghost text-base !py-3.5 !px-7">
+            <Play size={16} /> Book a Demo
+          </a>
+        </div>
+
+        {/* Trust metrics */}
+        <div className="flex items-center justify-center gap-6 sm:gap-8 mt-10 text-sm text-[var(--color-text-light)]">
+          <span className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            Sub-500ms latency
+          </span>
+          <span className="hidden sm:inline text-[var(--color-border)]">|</span>
+          <span className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            10+ languages
+          </span>
+          <span className="hidden sm:inline text-[var(--color-border)]">|</span>
+          <span className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            From &#8377;2.47/min
+          </span>
+        </div>
+
+        {/* Dashboard screenshot placeholder */}
+        <div className="mt-16 relative mx-auto max-w-4xl">
+          <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-subtle)] shadow-2xl overflow-hidden aspect-[16/9] flex items-center justify-center">
+            <div className="text-center p-8">
+              <div className="w-16 h-16 rounded-2xl bg-[var(--color-brand-light)] flex items-center justify-center mx-auto mb-4">
+                <Play size={28} className="text-[var(--color-brand)] ml-1" />
               </div>
-            </BlurIn>
-
-            {/* Heading */}
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-medium leading-tight lg:leading-[1.2] text-white">
-              <span className="block">
-                <SplitText text="The AI Employee That" startIndex={0} />
-              </span>
-              <SplitText text="Outperforms Your Best" startIndex={4} />
-              <motion.span
-                initial={{ opacity: 0, y: 40 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 7 * 0.08, duration: 0.6, ease }}
-                className="inline-block italic"
-                style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}
-              >
-                SDR.
-              </motion.span>
-            </h1>
-
-            {/* Subtitle */}
-            <BlurIn delay={0.4} duration={0.6}>
-              <p className="text-white/80 text-lg font-normal leading-relaxed max-w-xl">
-                It calls. It writes hyperpersonalized emails. It follows up on
-                WhatsApp. In under 500ms. While you sleep.
-              </p>
-            </BlurIn>
-          </div>
-
-          {/* CTA Buttons */}
-          <BlurIn delay={0.6} duration={0.6}>
-            <div className="flex flex-wrap gap-4">
-              <a
-                href="/book-call"
-                className="inline-flex items-center gap-2 rounded-full bg-[#0018FF] text-white px-5 py-3 font-medium transition-transform hover:scale-105"
-              >
-                Book A Free Call
-                <ArrowRight className="w-4 h-4" />
-              </a>
-              <a
-                href="#"
-                className="inline-flex items-center rounded-full bg-white/20 backdrop-blur-sm text-white px-8 py-3 font-medium transition-colors hover:bg-white/30"
-              >
-                Learn now
-              </a>
+              <p className="text-[var(--color-text-muted)] text-sm">Dashboard Preview</p>
             </div>
-          </BlurIn>
+          </div>
+          {/* Gradient shadow */}
+          <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-3/4 h-16 bg-[var(--color-brand)] opacity-10 blur-3xl rounded-full" />
         </div>
       </div>
     </section>

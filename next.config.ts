@@ -25,7 +25,7 @@ const nextConfig: NextConfig = {
               "img-src 'self' https://images.unsplash.com https://app.cal.com data:",
               "frame-src https://app.cal.com",
               "media-src 'self' https://stream.mux.com https://*.mux.com https://*.fastly.mux.com blob:",
-              "connect-src 'self' https://stream.mux.com https://*.mux.com https://*.fastly.mux.com https://cbpzsvzfoquowbldtsrh.supabase.co https://app.cal.com",
+              "connect-src 'self' https://stream.mux.com https://*.mux.com https://*.fastly.mux.com https://afchhffhpszwrtnnzzhw.supabase.co https://app.cal.com",
               "frame-ancestors 'none'",
             ].join('; '),
           },

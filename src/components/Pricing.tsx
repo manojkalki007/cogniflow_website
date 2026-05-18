@@ -1,171 +1,150 @@
 "use client";
 
-import { useState } from "react";
-import { motion, useInView } from "framer-motion";
-import { useRef } from "react";
-import { Check } from "lucide-react";
+import { Check, ArrowRight } from "lucide-react";
+
+const DASHBOARD_URL = "https://cogniflowautomations.com/login";
 
 const PLANS = [
   {
     name: "Starter",
-    monthlyPrice: 49,
+    price: "2,999",
+    period: "/month",
+    minutes: "250 minutes included",
+    description: "Perfect for small businesses getting started with AI calling.",
     features: [
-      "1,000 minutes included",
-      "1 agent",
-      "Inbound only",
-      "Email support",
+      "1 AI agent",
+      "250 call minutes/month",
+      "5 Indian languages",
       "Basic analytics",
+      "Email support",
+      "CRM integration",
     ],
     cta: "Start Free Trial",
-    href: "#demo",
-    highlighted: false,
+    popular: false,
   },
   {
     name: "Growth",
-    monthlyPrice: 199,
-    badge: "Most Popular",
+    price: "7,999",
+    period: "/month",
+    minutes: "1,000 minutes included",
+    description: "For growing teams that need more power and flexibility.",
     features: [
-      "5,000 minutes included",
-      "5 agents",
-      "Inbound + Outbound",
-      "CRM integrations",
-      "WhatsApp handoff",
+      "5 AI agents",
+      "1,000 call minutes/month",
+      "10+ languages",
+      "Advanced analytics & sentiment",
       "Priority support",
-      "Revenue attribution",
+      "WhatsApp + Email channels",
+      "Custom agent templates",
+      "Webhook integrations",
     ],
     cta: "Start Free Trial",
-    href: "#demo",
-    highlighted: true,
+    popular: true,
   },
   {
     name: "Enterprise",
-    monthlyPrice: null,
+    price: "Custom",
+    period: "",
+    minutes: "Unlimited agents & minutes",
+    description: "For large teams with custom requirements.",
     features: [
-      "Unlimited minutes",
-      "Unlimited agents",
-      "Agent cloning",
-      "Compliance guardrails",
-      "Revenue attribution",
-      "Dedicated success manager",
-      "Custom SLA",
+      "Unlimited AI agents",
+      "Unlimited call minutes",
+      "All languages",
+      "Custom voice cloning",
+      "Dedicated account manager",
+      "SLA guarantee",
+      "On-premise deployment",
+      "Custom integrations",
     ],
-    cta: "Contact Sales",
-    href: "#demo",
-    highlighted: false,
+    cta: "Book a Demo",
+    popular: false,
   },
 ];
 
 export default function Pricing() {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
-  const [annual, setAnnual] = useState(false);
-
   return (
-    <section id="pricing" className="relative py-32 px-6" ref={ref}>
-      <div className="max-w-6xl mx-auto relative z-10">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-          className="text-center mb-12"
-        >
-          <p className="text-xs uppercase tracking-[0.2em] text-text-secondary mb-4">
-            Pricing
-          </p>
-          <h2 className="text-4xl md:text-5xl font-semibold tracking-[-0.02em] mb-4">
-            Simple, <span className="gradient-text">transparent pricing</span>
+    <section id="pricing" className="py-20 px-4 sm:px-6">
+      <div className="max-w-6xl mx-auto">
+        <div className="text-center mb-14">
+          <h2 className="text-2xl sm:text-3xl md:text-[40px] font-semibold text-[var(--color-text)] tracking-[-0.01em]">
+            Simple, transparent pricing
           </h2>
-          <p className="text-text-secondary mb-8">
-            Start free. Scale as you grow. No hidden fees.
+          <p className="mt-4 text-[var(--color-text-muted)] max-w-xl mx-auto">
+            No hidden fees. Extra minutes at &#8377;10/min. 7-day free trial on all plans.
           </p>
+        </div>
 
-          <div className="inline-flex items-center gap-3 glass-card rounded-full px-1.5 py-1.5">
-            <button
-              onClick={() => setAnnual(false)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
-                !annual
-                  ? "bg-brand text-white"
-                  : "text-text-secondary hover:text-text-primary"
-              }`}
-            >
-              Monthly
-            </button>
-            <button
-              onClick={() => setAnnual(true)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
-                annual
-                  ? "bg-brand text-white"
-                  : "text-text-secondary hover:text-text-primary"
-              }`}
-            >
-              Annual
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent/20 text-accent font-semibold">
-                Save 20%
-              </span>
-            </button>
-          </div>
-        </motion.div>
-
-        <div className="grid md:grid-cols-3 gap-6 items-start">
-          {PLANS.map((plan, i) => (
-            <motion.div
+        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          {PLANS.map((plan) => (
+            <div
               key={plan.name}
-              initial={{ opacity: 0, y: 30 }}
-              animate={isInView ? { opacity: 1, y: 0 } : {}}
-              transition={{
-                duration: 0.7,
-                delay: 0.2 + i * 0.15,
-                ease: [0.16, 1, 0.3, 1],
-              }}
-              className={`glass-card rounded-2xl p-8 relative ${
-                plan.highlighted
-                  ? "border-brand/30 shadow-[0_0_40px_rgba(0,24,255,0.1)] md:scale-105"
-                  : ""
+              className={`rounded-2xl p-7 flex flex-col ${
+                plan.popular
+                  ? "bg-[var(--color-dark-bg)] text-white ring-2 ring-[var(--color-brand)] relative"
+                  : "bg-white border border-[var(--color-border)]"
               }`}
             >
-              {plan.badge && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-brand text-white text-xs font-semibold">
-                  {plan.badge}
-                </div>
+              {plan.popular && (
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-[var(--color-brand)] text-white text-xs font-medium">
+                  Most Popular
+                </span>
               )}
 
-              <h3 className="text-xl font-semibold mb-2">{plan.name}</h3>
-
               <div className="mb-6">
-                {plan.monthlyPrice !== null ? (
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-bold">
-                      ${annual ? Math.round(plan.monthlyPrice * 0.8) : plan.monthlyPrice}
+                <h3 className={`text-lg font-semibold mb-1 ${plan.popular ? "text-white" : "text-[var(--color-text)]"}`}>
+                  {plan.name}
+                </h3>
+                <p className={`text-sm mb-4 ${plan.popular ? "text-white/60" : "text-[var(--color-text-muted)]"}`}>
+                  {plan.description}
+                </p>
+                <div className="flex items-baseline gap-1">
+                  {plan.price !== "Custom" && <span className={`text-sm ${plan.popular ? "text-white/60" : "text-[var(--color-text-light)]"}`}>&#8377;</span>}
+                  <span className={`text-4xl font-bold ${plan.popular ? "text-white" : "text-[var(--color-text)]"}`}>
+                    {plan.price}
+                  </span>
+                  {plan.period && (
+                    <span className={`text-sm ${plan.popular ? "text-white/60" : "text-[var(--color-text-light)]"}`}>
+                      {plan.period}
                     </span>
-                    <span className="text-text-tertiary text-sm">/mo</span>
-                  </div>
-                ) : (
-                  <span className="text-4xl font-bold">Custom</span>
-                )}
+                  )}
+                </div>
+                <p className={`text-xs mt-2 ${plan.popular ? "text-white/50" : "text-[var(--color-text-light)]"}`}>
+                  {plan.minutes}
+                </p>
               </div>
 
-              <ul className="space-y-3 mb-8">
+              <ul className="space-y-3 mb-8 flex-1">
                 {plan.features.map((feature) => (
-                  <li key={feature} className="flex items-start gap-3 text-sm">
-                    <Check className="w-4 h-4 text-brand shrink-0 mt-0.5" />
-                    <span className="text-text-secondary">{feature}</span>
+                  <li key={feature} className="flex items-start gap-2.5 text-sm">
+                    <Check
+                      size={16}
+                      className={`flex-shrink-0 mt-0.5 ${plan.popular ? "text-[var(--color-brand)]" : "text-[var(--color-brand)]"}`}
+                    />
+                    <span className={plan.popular ? "text-white/80" : "text-[var(--color-text-muted)]"}>
+                      {feature}
+                    </span>
                   </li>
                 ))}
               </ul>
 
               <a
-                href={plan.href}
-                className={`block w-full text-center py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                  plan.highlighted
-                    ? "bg-brand text-white hover:bg-brand-light shadow-[0_0_20px_rgba(0,24,255,0.2)]"
-                    : "border border-white/[0.08] text-text-primary hover:border-white/[0.15] hover:bg-white/[0.03]"
+                href={DASHBOARD_URL}
+                className={`flex items-center justify-center gap-2 py-3 rounded-xl font-medium text-sm transition-all ${
+                  plan.popular
+                    ? "bg-[var(--color-brand)] text-white hover:bg-[var(--color-brand-dark)]"
+                    : "bg-[var(--color-bg-subtle)] text-[var(--color-text)] hover:bg-[var(--color-border)]"
                 }`}
               >
-                {plan.cta}
+                {plan.cta} <ArrowRight size={14} />
               </a>
-            </motion.div>
+            </div>
           ))}
         </div>
+
+        <p className="text-center text-sm text-[var(--color-text-light)] mt-8">
+          No credit card required. 7-day free trial on Starter &amp; Growth plans.
+        </p>
       </div>
     </section>
   );

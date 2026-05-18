@@ -1,76 +1,64 @@
 "use client";
 
-import { motion } from "framer-motion";
-import {
-  Zap,
-  Brain,
-  MessageSquare,
-  Clock,
-  TrendingUp,
-  Sparkles,
-} from "lucide-react";
-import ScrollReveal from "./ScrollReveal";
+import { Zap, Brain, MessageSquare, Globe, Calendar, TrendingUp } from "lucide-react";
 
 const FEATURES = [
   {
     icon: Zap,
-    title: "<500ms Response",
-    copy: "Faster than your best rep's first breath.",
+    title: "Sub-500ms Latency",
+    description: "Parallel STT + LLM + TTS pipeline ensures natural, real-time conversations with zero awkward pauses.",
   },
   {
     icon: Brain,
     title: "Sentiment Analysis",
-    copy: "Reads the room. Adjusts in real time.",
+    description: "Real-time emotion detection adjusts tone and approach mid-call for higher conversion rates.",
   },
   {
     icon: MessageSquare,
     title: "Multi-Channel",
-    copy: "Calls. Emails. WhatsApp. One agent.",
+    description: "Calls, WhatsApp, and email in one unified session. Follow up on the channel your lead prefers.",
   },
   {
-    icon: Clock,
-    title: "Always On",
-    copy: "No sick days. No missed shifts. No dropped leads.",
+    icon: Globe,
+    title: "10+ Indian Languages",
+    description: "Hindi, Tamil, Telugu, Kannada, Malayalam, Bengali, Marathi, Gujarati, English, and more.",
+  },
+  {
+    icon: Calendar,
+    title: "Smart Booking",
+    description: "AI auto-detects booking intent, checks calendar availability, and schedules instantly.",
   },
   {
     icon: TrendingUp,
-    title: "Scales Instantly",
-    copy: "Handle 10 calls or 10,000. Same quality.",
-  },
-  {
-    icon: Sparkles,
-    title: "Agent Intelligence",
-    copy: "Not a script reader. A thinker.",
+    title: "Revenue Attribution",
+    description: "Track every call to meeting to deal to revenue. Know exactly what your AI agents earn.",
   },
 ];
 
 export default function FeatureGrid() {
   return (
-    <section className="max-w-7xl mx-auto py-32 px-6">
-      <ScrollReveal>
-        <h2 className="text-4xl md:text-5xl font-bold text-text-primary text-center mb-16">
-          Built different
-        </h2>
-      </ScrollReveal>
+    <section id="features" className="py-20 px-4 sm:px-6 bg-[var(--color-bg-subtle)]">
+      <div className="max-w-6xl mx-auto">
+        <div className="text-center mb-14">
+          <h2 className="text-2xl sm:text-3xl md:text-[40px] font-semibold text-[var(--color-text)] tracking-[-0.01em]">
+            Built for real conversations
+          </h2>
+          <p className="mt-4 text-[var(--color-text-muted)] max-w-xl mx-auto">
+            Every feature designed to make AI calls indistinguishable from human ones.
+          </p>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {FEATURES.map((feature, i) => (
-          <ScrollReveal key={feature.title} delay={i * 0.1}>
-            <motion.div
-              whileHover={{ y: -2 }}
-              transition={{ duration: 0.2 }}
-              className="bg-glass border border-glass-border rounded-2xl p-8 hover:border-brand-glow transition-colors duration-300 h-full"
-            >
-              <feature.icon size={24} className="text-brand/60" />
-              <h3 className="text-lg font-semibold text-text-primary mt-4">
-                {feature.title}
-              </h3>
-              <p className="text-sm text-text-secondary mt-2">
-                {feature.copy}
-              </p>
-            </motion.div>
-          </ScrollReveal>
-        ))}
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {FEATURES.map(({ icon: Icon, title, description }) => (
+            <div key={title} className="bento-card">
+              <div className="w-10 h-10 rounded-xl bg-[var(--color-brand-light)] flex items-center justify-center mb-4">
+                <Icon size={20} className="text-[var(--color-brand)]" />
+              </div>
+              <h3 className="text-base font-semibold text-[var(--color-text)] mb-2">{title}</h3>
+              <p className="text-sm text-[var(--color-text-muted)] leading-relaxed">{description}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );

@@ -1,16 +1,11 @@
-"use client";
-
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
-import DashboardScreenshot from "@/components/DashboardScreenshot";
-import ProblemStatement from "@/components/ProblemStatement";
-import MarqueeStrip from "@/components/MarqueeStrip";
-import IntelligenceSplit from "@/components/IntelligenceSplit";
-import PerformanceSplit from "@/components/PerformanceSplit";
-import LiveCallExperience from "@/components/LiveCallExperience";
-import ChannelReveal from "@/components/ChannelReveal";
-import HowItWorks from "@/components/HowItWorks";
+import SocialProof from "@/components/SocialProof";
+import TwoServices from "@/components/TwoServices";
 import FeatureGrid from "@/components/FeatureGrid";
+import HowItWorks from "@/components/HowItWorks";
+import UseCases from "@/components/UseCases";
+import Pricing from "@/components/Pricing";
 import FAQ from "@/components/FAQ";
 import FinalCTA from "@/components/FinalCTA";
 import Footer from "@/components/Footer";
@@ -21,17 +16,12 @@ export default function Home() {
       <Navbar />
       <main>
         <Hero />
-        <DashboardScreenshot />
-        <ProblemStatement />
-        <MarqueeStrip />
-        <section id="product">
-          <IntelligenceSplit />
-          <PerformanceSplit />
-        </section>
-        <LiveCallExperience />
-        <ChannelReveal />
-        <HowItWorks />
+        <SocialProof />
+        <TwoServices />
         <FeatureGrid />
+        <HowItWorks />
+        <UseCases />
+        <Pricing />
         <FAQ />
         <FinalCTA />
       </main>

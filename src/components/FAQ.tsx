@@ -1,111 +1,74 @@
 "use client";
 
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown } from "lucide-react";
-import ScrollReveal from "./ScrollReveal";
 
-const QUESTIONS = [
+const FAQS = [
   {
-    q: "How does it sound on a call?",
-    a: "Natural, not robotic. Our agents use advanced voice synthesis with real-time tone adaptation. They adjust pacing, emphasis, and warmth based on the caller's sentiment — so every conversation feels human.",
+    q: "How does the AI sound on a call?",
+    a: "Our agents use advanced neural TTS with sub-500ms latency. They sound natural, handle interruptions, and adjust tone based on sentiment. Most callers can't tell it's AI.",
   },
   {
-    q: "Can it handle complex conversations?",
-    a: "Yes. Your agent is trained on your scripts and product knowledge, adapts in real time to objections and questions, and knows when to escalate to a human. It doesn't just follow a flowchart — it thinks.",
+    q: "Which languages are supported?",
+    a: "We support 10+ Indian languages including Hindi, Tamil, Telugu, Kannada, Malayalam, Bengali, Marathi, Gujarati, and English. Mixed-language (Hinglish) conversations are handled naturally.",
   },
   {
     q: "How long does setup take?",
-    a: "Under 10 minutes. Connect your phone number, upload your scripts and contacts, configure your qualification criteria, and go live. No engineering team required.",
+    a: "Most businesses go live in under 10 minutes. Connect your phone number, pick a template, and your agent starts handling calls. Custom agents take 30-60 minutes to configure.",
   },
   {
-    q: "Does it integrate with our CRM?",
-    a: "Yes. Native integrations with Salesforce, HubSpot, and other major CRMs. Custom integrations via API. Every call, email, and WhatsApp message is automatically logged and synced.",
+    q: "Does it integrate with my CRM?",
+    a: "Yes. We integrate natively with HubSpot, Salesforce, and Google Calendar. We also support webhooks for custom CRM integrations.",
   },
   {
-    q: "What if a lead wants to talk to a human?",
-    a: "Seamless handoff. The agent detects when a human is needed, briefs your team with full context and sentiment analysis, and transfers the call — the lead never experiences a gap.",
+    q: "What if a caller wants to speak to a human?",
+    a: "The AI detects escalation intent and seamlessly transfers to a human agent. You can configure custom escalation rules based on sentiment, keywords, or caller request.",
   },
   {
-    q: "Is it compliant?",
-    a: "Built with compliance at the core. Call recording consent, GDPR-compliant data handling, DNC list management, and full audit trails. We handle the complexity so you don't have to.",
+    q: "Is it compliant with Indian regulations?",
+    a: "Yes. We follow TRAI guidelines for automated calling, support DND registry checks, and maintain call logs for compliance. All data is encrypted and stored securely.",
   },
 ];
-
-function FAQItem({
-  question,
-  answer,
-  isOpen,
-  onToggle,
-}: {
-  question: string;
-  answer: string;
-  isOpen: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <div className="border-b border-border py-5">
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between text-left group"
-      >
-        <span className="text-base font-medium text-text-primary group-hover:text-brand transition-colors pr-4">
-          {question}
-        </span>
-        <motion.div
-          animate={{ rotate: isOpen ? 180 : 0 }}
-          transition={{ duration: 0.2 }}
-          className="shrink-0"
-        >
-          <ChevronDown className="w-4 h-4 text-text-tertiary" />
-        </motion.div>
-      </button>
-
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="overflow-hidden"
-          >
-            <p className="text-sm text-text-secondary leading-relaxed pt-3">
-              {answer}
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
 
 export default function FAQ() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
-    <section id="faq" className="max-w-3xl mx-auto py-32 px-6">
-      <ScrollReveal>
-        <h2 className="text-4xl md:text-5xl font-bold text-text-primary text-center mb-16">
-          Questions
-        </h2>
-      </ScrollReveal>
+    <section id="faq" className="py-20 px-4 sm:px-6">
+      <div className="max-w-3xl mx-auto">
+        <div className="text-center mb-14">
+          <h2 className="text-2xl sm:text-3xl md:text-[40px] font-semibold text-[var(--color-text)] tracking-[-0.01em]">
+            Frequently asked questions
+          </h2>
+        </div>
 
-      <ScrollReveal delay={0.15}>
-        <div>
-          {QUESTIONS.map((faq, i) => (
-            <FAQItem
-              key={faq.q}
-              question={faq.q}
-              answer={faq.a}
-              isOpen={openIndex === i}
-              onToggle={() =>
-                setOpenIndex(openIndex === i ? null : i)
-              }
-            />
+        <div className="space-y-3">
+          {FAQS.map(({ q, a }, i) => (
+            <div
+              key={i}
+              className="border border-[var(--color-border)] rounded-xl overflow-hidden transition-colors hover:border-[var(--color-brand)]"
+            >
+              <button
+                onClick={() => setOpenIndex(openIndex === i ? null : i)}
+                className="w-full flex items-center justify-between px-6 py-4 text-left"
+              >
+                <span className="text-sm sm:text-base font-medium text-[var(--color-text)] pr-4">{q}</span>
+                <ChevronDown
+                  size={18}
+                  className={`flex-shrink-0 text-[var(--color-text-light)] transition-transform duration-200 ${
+                    openIndex === i ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+              {openIndex === i && (
+                <div className="px-6 pb-4">
+                  <p className="text-sm text-[var(--color-text-muted)] leading-relaxed">{a}</p>
+                </div>
+              )}
+            </div>
           ))}
         </div>
-      </ScrollReveal>
+      </div>
     </section>
   );
 }
