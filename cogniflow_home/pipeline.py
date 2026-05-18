@@ -258,13 +258,20 @@ class VoicePipeline:
     async def start(self):
         self._running = True
 
-        # Prewarm everything simultaneously while the caller hears ringing
-        _, _, custom_greeting, _ = await asyncio.gather(
+        results = await asyncio.gather(
             self.stt.connect(),
             self._prewarm_tts(),
             self._fetch_memory_and_prediction(),
             self.llm.prewarm(),
+            return_exceptions=True,
         )
+        for i, r in enumerate(results):
+            if isinstance(r, Exception):
+                labels = ["STT", "TTS", "Memory", "LLM"]
+                logger.error(f"{labels[i]} prewarm failed: {r}")
+        if isinstance(results[0], Exception):
+            raise RuntimeError(f"STT connect failed: {results[0]}")
+        custom_greeting = results[2] if not isinstance(results[2], Exception) else None
 
         self.speculative.set_generate_fn(self.llm.generate_stream)
         self.llm.on_tool_call = self._on_tool_call

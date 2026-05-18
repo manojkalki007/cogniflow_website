@@ -49,7 +49,15 @@ class BrowserProvider(TelephonyProvider):
                         provider="browser",
                         metadata=msg.get("metadata", {}),
                     )
-                    await on_call_start(call_info)
+                    try:
+                        await on_call_start(call_info)
+                    except Exception:
+                        logger.exception("Pipeline start failed")
+                        await websocket.send_text(json.dumps({
+                            "event": "error",
+                            "message": "Voice pipeline failed to start. Check server logs.",
+                        }))
+                        break
                     await websocket.send_text(json.dumps({
                         "event": "started",
                         "call_sid": call_info.call_sid,
