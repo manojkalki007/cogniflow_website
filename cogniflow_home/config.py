@@ -57,12 +57,17 @@ class Settings(BaseSettings):
     ]
     debug: bool = False
     max_concurrent_calls: int = 50
+    redis_url: str = ""  # Optional, for horizontal scaling
 
     # Sarvam AI (Indian languages)
     sarvam_api_key: str = ""
 
     # Smallest AI
     smallest_ai_api_key: str = ""
+
+    # ElevenLabs (premium TTS)
+    elevenlabs_api_key: str = ""
+    elevenlabs_model: str = "eleven_turbo_v2_5"
 
     # Salesforce
     salesforce_client_id: str = ""

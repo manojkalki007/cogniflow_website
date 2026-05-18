@@ -138,16 +138,15 @@ function TestCallPanel({ agent, onClose }) {
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
-      ws.onopen = () => {
+      ws.onopen = async () => {
         ws.send(JSON.stringify({ event: "start", call_sid: crypto.randomUUID() }));
         setStatus("active");
         timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
 
         const source = audioCtx.createMediaStreamSource(stream);
-        const processor = audioCtx.createScriptProcessor(4096, 1, 1);
-        processor.onaudioprocess = (e) => {
+
+        const sendPcm = (input) => {
           if (ws.readyState !== 1) return;
-          const input = e.inputBuffer.getChannelData(0);
           const pcm16 = new Int16Array(input.length);
           for (let i = 0; i < input.length; i++) {
             pcm16[i] = Math.max(-32768, Math.min(32767, Math.round(input[i] * 32768)));
@@ -157,8 +156,20 @@ function TestCallPanel({ agent, onClose }) {
           for (let i = 0; i < raw.length; i++) binary += String.fromCharCode(raw[i]);
           ws.send(JSON.stringify({ event: "audio", data: btoa(binary) }));
         };
-        source.connect(processor);
-        processor.connect(audioCtx.destination);
+
+        // Prefer AudioWorklet; fall back to ScriptProcessor for older browsers
+        try {
+          await audioCtx.audioWorklet.addModule('/audio-processor.js');
+          const workletNode = new AudioWorkletNode(audioCtx, 'audio-send-processor');
+          workletNode.port.onmessage = (e) => sendPcm(e.data);
+          source.connect(workletNode);
+          workletNode.connect(audioCtx.destination);
+        } catch {
+          const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+          processor.onaudioprocess = (e) => sendPcm(e.inputBuffer.getChannelData(0));
+          source.connect(processor);
+          processor.connect(audioCtx.destination);
+        }
       };
 
       ws.onmessage = (e) => {

@@ -687,7 +687,34 @@ function ModelSection({ form, set }) {
 
 function VoiceSection({ form, set }) {
   const voices = TTS_VOICES[form.tts_provider]?.[form.voice_gender] || [];
-  const [previewTooltip, setPreviewTooltip] = useState(null);
+  const [previewingVoice, setPreviewingVoice] = useState(null);
+
+  const playVoicePreview = async (voiceId, provider) => {
+    setPreviewingVoice(voiceId);
+    try {
+      const apiBase = (import.meta.env.VITE_API_URL || "https://api.cogniflowautomations.com").trim();
+      const res = await fetch(`${apiBase}/api/voice/preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          voice_id: voiceId,
+          provider: provider,
+          text: "Hi there! I'm your AI voice assistant. How can I help you today?",
+        }),
+      });
+      if (!res.ok) throw new Error("Preview failed");
+      const audioBlob = await res.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+        setPreviewingVoice(null);
+      };
+      await audio.play();
+    } catch {
+      setPreviewingVoice(null);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -766,19 +793,30 @@ function VoiceSection({ form, set }) {
                     {v.label}
                   </span>
                   {/* Preview button */}
-                  <Tooltip text="Preview coming soon">
-                    <span
-                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 opacity-0 group-hover:opacity-100"
-                      style={{ background: "var(--bg-muted)" }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPreviewTooltip(v.id);
-                        setTimeout(() => setPreviewTooltip(null), 1500);
-                      }}
-                    >
+                  <span
+                    className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 cursor-pointer ${
+                      previewingVoice === v.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                    }`}
+                    style={{
+                      background: previewingVoice === v.id ? "var(--accent-subtle)" : "var(--bg-muted)",
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!previewingVoice) {
+                        playVoicePreview(v.id, form.tts_provider);
+                      }
+                    }}
+                  >
+                    {previewingVoice === v.id ? (
+                      <Loader2
+                        size={12}
+                        className="animate-spin"
+                        style={{ color: "var(--accent)" }}
+                      />
+                    ) : (
                       <Play size={12} style={{ color: "var(--text-muted)" }} />
-                    </span>
-                  </Tooltip>
+                    )}
+                  </span>
                 </div>
                 <div className="text-[11px] mt-1.5" style={{ color: "var(--text-muted)" }}>
                   {v.desc}

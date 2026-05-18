@@ -60,7 +60,14 @@ from cogniflow_home.tenants.auth import AuthContext, get_auth_context, generate_
 
 logger = logging.getLogger("cogniflow_home")
 
+from cogniflow_home.scaling import get_call_state
+
+# In-process pipeline references (needed for direct pipeline access).
+# The CallStateManager in scaling.py tracks counts/metadata across instances;
+# this dict keeps the live VoicePipeline objects for this process.
 active_calls: dict[str, VoicePipeline] = {}
+call_state = get_call_state()
+
 # call_sid → agent_id override for test calls
 _pending_agent_overrides: dict[str, str] = {}
 
@@ -158,6 +165,7 @@ async def lifespan(app):
         except Exception:
             logger.exception(f"Error stopping call {call_id} during shutdown")
     active_calls.clear()
+    await call_state.clear()
     await db.close()
     logger.info("Shutdown complete")
 
@@ -222,7 +230,7 @@ app.add_middleware(CORSAndRequestIDMiddleware)
 
 @app.get("/health")
 async def health():
-    checks = {"active_calls": len(active_calls)}
+    checks = {"active_calls": await call_state.get_active_count()}
 
     try:
         await db.select("calls", select="id", limit=1)
@@ -241,6 +249,7 @@ async def health():
         "tts": {
             "sarvam": "configured" if settings.sarvam_api_key else "not_configured",
             "smallest": "configured" if settings.smallest_ai_api_key else "not_configured",
+            "elevenlabs": "configured" if settings.elevenlabs_api_key else "not_configured",
         },
     }
 
@@ -354,6 +363,100 @@ async def diagnose_voice():
         results["agent_lookup"] = f"error: {e}"
 
     return results
+
+
+# ─── Voice Preview (TTS sample playback) ───
+
+import struct as _struct
+
+_voice_preview_cache: dict[str, tuple[float, bytes]] = {}
+_PREVIEW_CACHE_TTL = 300  # 5 minutes
+
+
+def _pcm_to_wav(pcm_data: bytes, sample_rate: int = 16000, bits_per_sample: int = 16, channels: int = 1) -> bytes:
+    """Add a WAV header to raw PCM data."""
+    data_size = len(pcm_data)
+    byte_rate = sample_rate * channels * bits_per_sample // 8
+    block_align = channels * bits_per_sample // 8
+    header = _struct.pack(
+        '<4sI4s4sIHHIIHH4sI',
+        b'RIFF',
+        36 + data_size,
+        b'WAVE',
+        b'fmt ',
+        16,                 # fmt chunk size
+        1,                  # PCM format
+        channels,
+        sample_rate,
+        byte_rate,
+        block_align,
+        bits_per_sample,
+        b'data',
+        data_size,
+    )
+    return header + pcm_data
+
+
+@app.post("/api/voice/preview")
+async def voice_preview(request: Request):
+    """Synthesize a short TTS sample and return it as a WAV file."""
+    body = await request.json()
+    voice_id = body.get("voice_id", "emily")
+    provider = body.get("provider", "smallest")
+    text = body.get("text", "Hello, I'm your AI assistant.")
+
+    # Check cache
+    cache_key = f"{provider}:{voice_id}:{text}"
+    cached = _voice_preview_cache.get(cache_key)
+    if cached and (time.time() - cached[0]) < _PREVIEW_CACHE_TTL:
+        return Response(content=cached[1], media_type="audio/wav")
+
+    try:
+        pcm_chunks: list[bytes] = []
+
+        if provider == "sarvam":
+            from cogniflow_home.providers.sarvam_tts import SarvamTTS
+            tts = SarvamTTS(language="en", sample_rate=16000, voice=voice_id)
+            await tts.connect()
+            async for chunk in tts.synthesize(text):
+                pcm_chunks.append(chunk)
+            await tts.close()
+        elif provider == "elevenlabs":
+            from cogniflow_home.providers.elevenlabs_tts import ElevenLabsTTS
+            tts = ElevenLabsTTS(voice_id=voice_id, language="en", sample_rate=16000, raw_pcm=True)
+            await tts.connect()
+            async for chunk in tts.synthesize(text):
+                pcm_chunks.append(chunk)
+            await tts.close()
+        else:
+            # Default: smallest
+            from cogniflow_home.providers.smallest_tts import SmallestTTS
+            tts = SmallestTTS(voice_id=voice_id, language="en", sample_rate=16000, raw_pcm=True)
+            await tts.connect()
+            async for chunk in tts.synthesize(text):
+                pcm_chunks.append(chunk)
+            await tts.close()
+
+        if not pcm_chunks:
+            return JSONResponse({"error": "No audio generated"}, status_code=500)
+
+        pcm_data = b"".join(pcm_chunks)
+        wav_data = _pcm_to_wav(pcm_data, sample_rate=16000, bits_per_sample=16, channels=1)
+
+        # Cache the result
+        _voice_preview_cache[cache_key] = (time.time(), wav_data)
+
+        # Prune old cache entries
+        now = time.time()
+        stale_keys = [k for k, (ts, _) in _voice_preview_cache.items() if now - ts > _PREVIEW_CACHE_TTL]
+        for k in stale_keys:
+            _voice_preview_cache.pop(k, None)
+
+        return Response(content=wav_data, media_type="audio/wav")
+
+    except Exception:
+        logger.exception("Voice preview failed")
+        return JSONResponse({"error": "Voice preview failed"}, status_code=500)
 
 
 # ─── API Hub: Provider status, usage tracking ───
@@ -647,7 +750,7 @@ async def generic_inbound(provider_name: str):
 
 @app.websocket("/voice/{provider_name}/ws")
 async def voice_ws(websocket: WebSocket, provider_name: str):
-    if len(active_calls) >= settings.max_concurrent_calls:
+    if await call_state.is_at_capacity(settings.max_concurrent_calls):
         await websocket.close(code=1013, reason="Server at capacity")
         return
 
@@ -684,6 +787,10 @@ async def voice_ws(websocket: WebSocket, provider_name: str):
             pipeline.inject_context(crm_context)
 
         active_calls[call_info.call_sid] = pipeline
+        await call_state.register_call(call_info.call_sid, {
+            "provider": provider_name,
+            "caller": call_info.caller_number,
+        })
         await pipeline.start()
 
     async def on_call_end():
@@ -692,6 +799,7 @@ async def voice_ws(websocket: WebSocket, provider_name: str):
             call_sid = pipeline.state.call_sid
             await pipeline.stop()
             active_calls.pop(call_sid, None)
+            await call_state.unregister_call(call_sid)
             pipeline = None
 
     await provider.handle_websocket(websocket, on_audio, on_call_start, on_call_end)
@@ -700,7 +808,7 @@ async def voice_ws(websocket: WebSocket, provider_name: str):
 @app.websocket("/voice/browser/test")
 async def browser_voice_test(websocket: WebSocket):
     """Browser-based voice test — pass agent_id as query param."""
-    if len(active_calls) >= settings.max_concurrent_calls:
+    if await call_state.is_at_capacity(settings.max_concurrent_calls):
         await websocket.close(code=1013, reason="Server at capacity")
         return
 
@@ -750,6 +858,11 @@ async def browser_voice_test(websocket: WebSocket):
 
         pipeline.on_latency = _send_latency
         active_calls[call_info.call_sid] = pipeline
+        await call_state.register_call(call_info.call_sid, {
+            "provider": "browser",
+            "type": "test",
+            "agent_id": agent_id,
+        })
         await pipeline.start()
 
     async def on_call_end():
@@ -758,6 +871,7 @@ async def browser_voice_test(websocket: WebSocket):
             call_sid = pipeline.state.call_sid
             await pipeline.stop()
             active_calls.pop(call_sid, None)
+            await call_state.unregister_call(call_sid)
             pipeline = None
 
     await provider.handle_websocket(websocket, on_audio, on_call_start, on_call_end)
@@ -804,6 +918,7 @@ async def hangup_call(call_id: str, auth: AuthContext = Depends(get_auth_context
         return {"error": "Call not found or already ended"}
     await pipeline.stop()
     active_calls.pop(call_id, None)
+    await call_state.unregister_call(call_id)
     return {"status": "ended", "call_id": call_id}
 
 
@@ -997,7 +1112,7 @@ async def get_stats(auth: AuthContext = Depends(get_auth_context)):
         "all_time": {
             "total_calls": all_time_count,
         },
-        "active_calls": len(active_calls),
+        "active_calls": await call_state.get_active_count(),
     }
 
 
