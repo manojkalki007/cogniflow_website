@@ -46,7 +46,7 @@ class DeepgramSTT:
         headers = {"Authorization": f"Token {settings.deepgram_api_key}"}
         self._ws = await websockets.connect(
             DEEPGRAM_WS_URL + params,
-            additional_headers=headers,
+            extra_headers=headers,
             ping_interval=5,
             ping_timeout=20,
         )
