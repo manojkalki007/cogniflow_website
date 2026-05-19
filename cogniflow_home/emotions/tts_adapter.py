@@ -12,7 +12,7 @@ import logging
 
 from cogniflow_home.emotions.detector import EmotionDetector, EmotionState
 from cogniflow_home.emotions.profiles import get_emotion_profile
-from cogniflow_home.emotions.tts_params import get_tts_params, VOICE_MAP
+from cogniflow_home.emotions.tts_params import get_tts_params
 
 logger = logging.getLogger("cogniflow_home.emotions.tts_adapter")
 
