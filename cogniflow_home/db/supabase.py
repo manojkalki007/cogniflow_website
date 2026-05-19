@@ -117,6 +117,31 @@ class SupabaseClient:
         logger.error(f"Supabase delete error: {resp.status_code} {resp.text}")
         return False
 
+    async def ensure_storage_bucket(self, bucket_id: str, public: bool = True):
+        url = f"{self.url}/storage/v1/bucket"
+        headers = {"apikey": self.key, "Authorization": f"Bearer {self.key}", "Content-Type": "application/json"}
+        resp = await self._client.post(url, json={"id": bucket_id, "name": bucket_id, "public": public}, headers=headers)
+        if resp.status_code in (200, 201):
+            logger.info(f"Storage bucket '{bucket_id}' created")
+        elif resp.status_code == 409:
+            pass  # already exists
+        else:
+            logger.warning(f"Bucket create failed: {resp.status_code} {resp.text}")
+
+    async def upload_file(self, bucket: str, path: str, data: bytes, content_type: str = "application/octet-stream") -> str | None:
+        url = f"{self.url}/storage/v1/object/{bucket}/{path}"
+        headers = {
+            "apikey": self.key,
+            "Authorization": f"Bearer {self.key}",
+            "Content-Type": content_type,
+            "x-upsert": "true",
+        }
+        resp = await self._client.post(url, content=data, headers=headers)
+        if resp.status_code in (200, 201):
+            return f"{self.url}/storage/v1/object/public/{bucket}/{path}"
+        logger.error(f"Storage upload error: {resp.status_code} {resp.text}")
+        return None
+
     async def close(self):
         await self._client.aclose()
 

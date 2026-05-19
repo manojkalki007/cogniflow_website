@@ -4,7 +4,7 @@ import { api } from "../lib/api";
 import {
   PhoneIncoming, PhoneOutgoing, Clock, ChevronDown, ChevronUp,
   Search, MessageSquare, BarChart3, Phone, ArrowUpRight,
-  TrendingUp, Activity, Play, Pause, DollarSign, Zap,
+  TrendingUp, Activity, Play, Pause, DollarSign, Zap, Download,
 } from "lucide-react";
 import { Badge } from "../components/ui/badge";
 import PageHeader from "../components/PageHeader";
@@ -574,8 +574,18 @@ export default function CallLog() {
                           {formatDuration(call.duration_seconds)}
                         </span>
                         {call.recording_url && (
-                          <div className="mt-1.5">
+                          <div className="mt-1.5 flex items-center gap-1.5">
                             <AudioPlayer url={call.recording_url} />
+                            <a
+                              href={call.recording_url}
+                              download={`recording-${call.id || "call"}.wav`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 transition-colors"
+                              style={{ background: "var(--accent-subtle)", color: "var(--accent)" }}
+                              title="Download recording"
+                            >
+                              <Download size={11} />
+                            </a>
                           </div>
                         )}
                       </td>
@@ -710,7 +720,18 @@ export default function CallLog() {
                   </h3>
                 </div>
                 {expandedCall?.recording_url && (
-                  <AudioPlayer url={expandedCall.recording_url} />
+                  <div className="flex items-center gap-2">
+                    <AudioPlayer url={expandedCall.recording_url} />
+                    <a
+                      href={expandedCall.recording_url}
+                      download={`recording-${expandedCall.id || "call"}.wav`}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors"
+                      style={{ background: "var(--accent-subtle)", color: "var(--accent)" }}
+                      title="Download recording"
+                    >
+                      <Download size={13} />
+                    </a>
+                  </div>
                 )}
               </div>
 

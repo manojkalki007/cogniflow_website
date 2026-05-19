@@ -157,6 +157,11 @@ async def lifespan(app):
     except Exception:
         logger.exception("Failed to resume campaigns on startup — continuing anyway")
 
+    try:
+        await db.ensure_storage_bucket("recordings", public=True)
+    except Exception:
+        logger.debug("Storage bucket setup skipped", exc_info=True)
+
     yield
 
     for call_id, pipeline in list(active_calls.items()):
@@ -867,11 +872,12 @@ async def browser_voice_test(websocket: WebSocket):
 
     async def on_call_end():
         nonlocal pipeline
+        saved_call_sid = None
         if pipeline:
-            call_sid = pipeline.state.call_sid
+            saved_call_sid = pipeline.state.call_sid
             await pipeline.stop()
-            active_calls.pop(call_sid, None)
-            await call_state.unregister_call(call_sid)
+            active_calls.pop(saved_call_sid, None)
+            await call_state.unregister_call(saved_call_sid)
             pipeline = None
         try:
             wav_data = provider.get_recording_wav()
@@ -883,6 +889,13 @@ async def browser_voice_test(websocket: WebSocket):
                 await provider.send_event("recording", {
                     "data": _b64.b64encode(wav_data).decode("ascii"),
                 })
+                if saved_call_sid:
+                    from datetime import datetime, timezone
+                    path = f"{saved_call_sid}.wav"
+                    public_url = await db.upload_file("recordings", path, wav_data, "audio/wav")
+                    if public_url:
+                        await db.update("calls", {"id": saved_call_sid}, {"recording_url": public_url})
+                        logger.info("Recording saved: %s", public_url)
         except Exception:
             logger.exception("Recording generation failed")
 
