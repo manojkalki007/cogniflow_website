@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
   Phone, PhoneOutgoing, Users, BarChart3, Bot,
-  LayoutTemplate, Megaphone, Settings,
+  LayoutTemplate, Megaphone, Settings, Target,
   UserCircle, ShieldAlert, Cable, MessageSquare,
   Mail, DollarSign, ShieldCheck, Timer, Plug,
   PanelLeftClose, PanelLeftOpen, Search, Bell,
@@ -26,6 +26,7 @@ const NAV_CORE = [
 const NAV_CHANNELS = [
   { to: "/home/whatsapp", label: "WhatsApp", icon: MessageSquare },
   { to: "/home/email", label: "Email", icon: Mail },
+  { to: "/home/ai-sdr", label: "AI SDR", icon: Target },
   { to: "/home/integrations", label: "Integrations", icon: Plug },
 ];
 
@@ -51,6 +52,7 @@ const PAGE_TITLES = {
   "/home/campaigns": "Campaigns",
   "/home/whatsapp": "WhatsApp",
   "/home/email": "Email",
+  "/home/ai-sdr": "AI SDR",
   "/home/integrations": "Integrations",
   "/home/revenue": "Revenue",
   "/home/compliance": "Compliance",
