@@ -1123,7 +1123,54 @@ async def api_list_agents(auth: AuthContext = Depends(get_auth_context)):
     agents = await list_agents()
     if auth.tenant_id:
         agents = [a for a in agents if a.get("tenant_id") == auth.tenant_id]
-    return {"agents": agents}
+    return {"agents": [_unpack_agent(a) for a in agents]}
+
+
+_AGENT_DB_COLUMNS = {
+    "name", "instructions", "voice_id", "language", "phone_numbers", "is_active",
+    "metadata", "greeting", "guardrails", "llm_provider", "llm_model", "tts_provider",
+    "tts_voice_name", "temperature", "tools_enabled", "max_call_duration",
+    "enable_memory", "enable_prediction", "enable_emotion", "enable_language_switch",
+    "enable_rag", "tenant_id",
+}
+
+_AGENT_EXTRA_FIELDS = {
+    "emotion_profile", "voice_gender", "stt_language", "endpointing_ms", "smart_format",
+    "max_tokens", "silence_timeout", "enable_recording", "enable_barge_in",
+    "enable_speculative", "enable_filler", "webhook_url", "fallback_message",
+    "max_retries", "concurrent_call_limit",
+}
+
+
+def _pack_agent_data(body: dict, tenant_id: str = "") -> dict:
+    """Split body into DB columns + extras packed into metadata."""
+    agent_data = {}
+    extras = {}
+    for k, v in body.items():
+        if k in _AGENT_DB_COLUMNS:
+            agent_data[k] = v
+        elif k in _AGENT_EXTRA_FIELDS:
+            extras[k] = v
+    meta = agent_data.get("metadata") or {}
+    if isinstance(meta, dict):
+        meta.update(extras)
+    else:
+        meta = extras
+    agent_data["metadata"] = meta
+    if tenant_id:
+        agent_data["tenant_id"] = tenant_id
+    return agent_data
+
+
+def _unpack_agent(row: dict) -> dict:
+    """Promote extra fields from metadata back to top-level for the API response."""
+    if not row:
+        return row
+    meta = row.get("metadata") or {}
+    for field in _AGENT_EXTRA_FIELDS:
+        if field in meta and field not in row:
+            row[field] = meta[field]
+    return row
 
 
 @app.post("/api/agents")
@@ -1133,49 +1180,26 @@ async def api_create_agent(request: Request, auth: AuthContext = Depends(get_aut
     instructions = body.get("instructions")
     if not name or not instructions:
         return {"error": "name and instructions are required"}
-    agent_data = {
-        "name": name,
-        "instructions": instructions,
-        "voice_id": body.get("voice_id", ""),
-        "language": body.get("language", "en"),
-        "phone_numbers": body.get("phone_numbers", []),
-        "is_active": True,
-        "metadata": body.get("metadata", {}),
-        "greeting": body.get("greeting", ""),
-        "guardrails": body.get("guardrails", {}),
-        "llm_provider": body.get("llm_provider", "groq"),
-        "llm_model": body.get("llm_model", "llama-3.3-70b-versatile"),
-        "tts_provider": body.get("tts_provider", "smallest"),
-        "temperature": body.get("temperature", 0.7),
-        "tools_enabled": body.get("tools_enabled", []),
-        "max_call_duration": body.get("max_call_duration", 600),
-        "enable_memory": body.get("enable_memory", True),
-        "enable_prediction": body.get("enable_prediction", True),
-        "enable_emotion": body.get("enable_emotion", True),
-        "enable_language_switch": body.get("enable_language_switch", True),
-        "enable_rag": body.get("enable_rag", False),
-        "emotion_profile": body.get("emotion_profile", "friendly"),
-        "voice_gender": body.get("voice_gender", "female"),
-        "stt_language": body.get("stt_language", "en"),
-        "endpointing_ms": body.get("endpointing_ms", 300),
-        "smart_format": body.get("smart_format", True),
-        "max_tokens": body.get("max_tokens", 80),
-        "silence_timeout": body.get("silence_timeout", 10),
-        "enable_recording": body.get("enable_recording", True),
-        "enable_barge_in": body.get("enable_barge_in", True),
-        "enable_speculative": body.get("enable_speculative", True),
-        "enable_filler": body.get("enable_filler", True),
-        "webhook_url": body.get("webhook_url", ""),
-        "fallback_message": body.get("fallback_message", ""),
-        "max_retries": body.get("max_retries", 3),
-        "concurrent_call_limit": body.get("concurrent_call_limit", 5),
+    defaults = {
+        "voice_id": "", "language": "en", "phone_numbers": [], "is_active": True,
+        "greeting": "", "guardrails": {}, "llm_provider": "groq",
+        "llm_model": "llama-3.3-70b-versatile", "tts_provider": "smallest",
+        "temperature": 0.7, "tools_enabled": [], "max_call_duration": 600,
+        "enable_memory": True, "enable_prediction": True, "enable_emotion": True,
+        "enable_language_switch": True, "enable_rag": False,
+        "emotion_profile": "friendly", "voice_gender": "female",
+        "stt_language": "en", "endpointing_ms": 300, "smart_format": True,
+        "max_tokens": 80, "silence_timeout": 10, "enable_recording": True,
+        "enable_barge_in": True, "enable_speculative": True, "enable_filler": True,
+        "webhook_url": "", "fallback_message": "", "max_retries": 3,
+        "concurrent_call_limit": 5,
     }
-    if auth.tenant_id:
-        agent_data["tenant_id"] = auth.tenant_id
+    merged = {**defaults, **body, "name": name, "instructions": instructions}
+    agent_data = _pack_agent_data(merged, auth.tenant_id)
     result = await create_agent(agent_data)
     if not result:
         return JSONResponse({"error": "Failed to create agent"}, status_code=500)
-    return result
+    return _unpack_agent(result)
 
 
 @app.patch("/api/agents/{agent_id}")
@@ -1187,17 +1211,19 @@ async def api_update_agent(agent_id: str, request: Request, auth: AuthContext = 
         if not agents:
             return {"error": "Agent not found"}
     body = await request.json()
-    allowed = {"name", "instructions", "voice_id", "language", "phone_numbers", "is_active", "metadata",
-               "greeting", "guardrails", "llm_provider", "llm_model", "tts_provider", "tts_voice_name",
-               "max_call_duration", "enable_memory", "enable_prediction", "enable_emotion",
-               "enable_language_switch", "enable_rag", "temperature", "tools_enabled",
-               "emotion_profile", "voice_gender", "stt_language", "endpointing_ms", "smart_format",
-               "max_tokens", "silence_timeout", "enable_recording", "enable_barge_in",
-               "enable_speculative", "enable_filler", "webhook_url", "fallback_message",
-               "max_retries", "concurrent_call_limit"}
-    updates = {k: v for k, v in body.items() if k in allowed}
-    result = await update_agent(agent_id, updates)
-    return result or {"error": "Agent not found"}
+    allowed = _AGENT_DB_COLUMNS | _AGENT_EXTRA_FIELDS
+    filtered = {k: v for k, v in body.items() if k in allowed}
+    if not filtered:
+        return {"error": "No valid fields to update"}
+    db_updates = {k: v for k, v in filtered.items() if k in _AGENT_DB_COLUMNS}
+    extras = {k: v for k, v in filtered.items() if k in _AGENT_EXTRA_FIELDS}
+    if extras:
+        existing = await db.select("agents", {"id": agent_id})
+        old_meta = (existing[0].get("metadata") or {}) if existing else {}
+        old_meta.update(extras)
+        db_updates["metadata"] = old_meta
+    result = await update_agent(agent_id, db_updates)
+    return _unpack_agent(result) if result else {"error": "Agent not found"}
 
 
 # ─── Campaigns API ───
@@ -1653,7 +1679,7 @@ async def api_get_agent(agent_id: str, auth: AuthContext = Depends(get_auth_cont
     agents = await db.select("agents", match)
     if not agents:
         return {"error": "Agent not found"}
-    return agents[0]
+    return _unpack_agent(agents[0])
 
 
 @app.delete("/api/agents/{agent_id}")
