@@ -11,7 +11,7 @@ import logging
 import secrets
 import time
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import jwt
 from fastapi import Depends, Header, HTTPException
@@ -120,7 +120,8 @@ async def _resolve_jwt(raw_token: str) -> AuthContext:
     if tenant.get("status") == "suspended":
         raise HTTPException(status_code=403, detail="Account suspended. Contact support@cogniflow.ai")
 
-    is_admin = user_email in settings.admin_emails
+    admin_list = [e.strip() for e in settings.admin_emails.split(",") if e.strip()]
+    is_admin = user_email in admin_list
 
     return AuthContext(
         tenant_id=tenant["id"],

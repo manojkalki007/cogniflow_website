@@ -35,8 +35,8 @@ class Settings(BaseSettings):
     supabase_key: str = ""
     supabase_jwt_secret: str = ""
 
-    # Admin
-    admin_emails: list[str] = []
+    # Admin (comma-separated emails)
+    admin_emails: str = ""
 
     # HubSpot
     hubspot_api_key: str = ""
