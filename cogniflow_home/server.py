@@ -873,6 +873,18 @@ async def browser_voice_test(websocket: WebSocket):
             active_calls.pop(call_sid, None)
             await call_state.unregister_call(call_sid)
             pipeline = None
+        try:
+            wav_data = provider.get_recording_wav()
+            logger.info("Recording WAV: %d bytes (user=%d, agent=%d)",
+                        len(wav_data) if wav_data else 0,
+                        len(provider._rec_user), len(provider._rec_agent))
+            if wav_data and len(wav_data) > 44:
+                import base64 as _b64
+                await provider.send_event("recording", {
+                    "data": _b64.b64encode(wav_data).decode("ascii"),
+                })
+        except Exception:
+            logger.exception("Recording generation failed")
 
     await provider.handle_websocket(websocket, on_audio, on_call_start, on_call_end)
 

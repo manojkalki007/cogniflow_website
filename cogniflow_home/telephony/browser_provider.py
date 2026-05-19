@@ -73,6 +73,36 @@ class BrowserProvider(TelephonyProvider):
     def __init__(self):
         self._websocket: WebSocket | None = None
         self._stream_sid: str | None = None
+        self._rec_user = bytearray()
+        self._rec_agent = bytearray()
+        self._recording = True
+
+    def get_recording_wav(self) -> bytes:
+        """Mix user + agent PCM16 buffers into a mono 16kHz WAV."""
+        import io
+        import wave
+        user = self._rec_user
+        agent = self._rec_agent
+        max_len = max(len(user), len(agent))
+        if max_len == 0:
+            return b""
+        user_padded = user + bytes(max_len - len(user))
+        agent_padded = agent + bytes(max_len - len(agent))
+        n_samples = max_len // 2
+        mixed = bytearray(max_len)
+        for i in range(n_samples):
+            off = i * 2
+            u = struct.unpack_from("<h", user_padded, off)[0]
+            a = struct.unpack_from("<h", agent_padded, off)[0]
+            m = max(-32768, min(32767, (u + a * 2) // 3))
+            struct.pack_into("<h", mixed, off, m)
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(16000)
+            wf.writeframes(bytes(mixed))
+        return buf.getvalue()
 
     async def handle_websocket(self, websocket: WebSocket, on_audio, on_call_start, on_call_end):
         self._websocket = websocket
@@ -85,6 +115,8 @@ class BrowserProvider(TelephonyProvider):
 
                 if event == "start":
                     self._stream_sid = str(uuid.uuid4())
+                    self._rec_user = bytearray()
+                    self._rec_agent = bytearray()
                     call_info = CallInfo(
                         call_sid=msg.get("call_sid", str(uuid.uuid4())),
                         stream_sid=self._stream_sid,
@@ -112,6 +144,8 @@ class BrowserProvider(TelephonyProvider):
                     payload = msg.get("data", "")
                     if payload:
                         pcm16 = base64.b64decode(payload)
+                        if self._recording:
+                            self._rec_user.extend(pcm16)
                         mulaw = _pcm16_to_mulaw(pcm16)
                         await on_audio(mulaw)
 
@@ -126,6 +160,11 @@ class BrowserProvider(TelephonyProvider):
     async def send_audio(self, payload: str):
         if not self._websocket:
             return
+        if self._recording:
+            try:
+                self._rec_agent.extend(base64.b64decode(payload))
+            except Exception:
+                pass
         try:
             await self._websocket.send_text(json.dumps({
                 "event": "audio",
@@ -136,11 +175,14 @@ class BrowserProvider(TelephonyProvider):
 
     async def send_event(self, event_type: str, data: dict):
         if not self._websocket:
+            logger.warning("send_event(%s): no websocket", event_type)
             return
         try:
-            await self._websocket.send_text(json.dumps({"event": event_type, **data}))
+            payload = json.dumps({"event": event_type, **data})
+            logger.info("send_event(%s): %d bytes", event_type, len(payload))
+            await self._websocket.send_text(payload)
         except Exception:
-            pass
+            logger.exception("send_event(%s) failed", event_type)
 
     async def clear_audio(self):
         if self._websocket:

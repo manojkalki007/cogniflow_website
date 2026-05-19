@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Phone, PhoneOff, PhoneCall, X, Loader2 } from "lucide-react";
+import { Phone, PhoneOff, PhoneCall, X, Loader2, Download, Play, Pause } from "lucide-react";
 import { Button } from "./ui/button";
 
 function LatencyBar({ eot_ms, llm_ms, tts_ms, total_ms }) {
@@ -46,6 +46,10 @@ export default function TestCallPanel({ agent, onClose }) {
   const [error, setError] = useState("");
   const [duration, setDuration] = useState(0);
   const [transcript, setTranscript] = useState([]);
+  const [recordingUrl, setRecordingUrl] = useState(null);
+  const [recPlaying, setRecPlaying] = useState(false);
+  const [recProgress, setRecProgress] = useState(0);
+  const [recDuration, setRecDuration] = useState(0);
   const wsRef = useRef(null);
   const streamRef = useRef(null);
   const audioCtxRef = useRef(null);
@@ -53,6 +57,7 @@ export default function TestCallPanel({ agent, onClose }) {
   const nextPlayTimeRef = useRef(0);
   const gainNodeRef = useRef(null);
   const transcriptEndRef = useRef(null);
+  const recPlayerRef = useRef(null);
 
   useEffect(() => {
     return () => cleanup();
@@ -104,6 +109,10 @@ export default function TestCallPanel({ agent, onClose }) {
     setError("");
     setDuration(0);
     setTranscript([]);
+    if (recordingUrl) { URL.revokeObjectURL(recordingUrl); setRecordingUrl(null); }
+    setRecPlaying(false);
+    setRecProgress(0);
+    setRecDuration(0);
     setStatus("connecting");
 
     try {
@@ -181,6 +190,15 @@ export default function TestCallPanel({ agent, onClose }) {
           }]);
         } else if (msg.event === "clear") {
           nextPlayTimeRef.current = 0;
+        } else if (msg.event === "recording") {
+          try {
+            console.log("[TestCall] Recording received:", msg.data?.length, "chars");
+            const raw = atob(msg.data);
+            const bytes = new Uint8Array(raw.length);
+            for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+            const blob = new Blob([bytes], { type: "audio/wav" });
+            setRecordingUrl(URL.createObjectURL(blob));
+          } catch (err) { console.error("[TestCall] Recording decode error:", err); }
         } else if (msg.event === "error") {
           setError(msg.message || "Agent error");
           cleanup();
@@ -192,6 +210,7 @@ export default function TestCallPanel({ agent, onClose }) {
       ws.onclose = () => {
         if (status !== "idle") setStatus("ended");
         if (timerRef.current) clearInterval(timerRef.current);
+        wsRef.current = null;
       };
     } catch (err) {
       setError(err.message || "Microphone access denied");
@@ -200,7 +219,18 @@ export default function TestCallPanel({ agent, onClose }) {
   };
 
   const endCall = () => {
-    cleanup();
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    if (audioCtxRef.current) {
+      audioCtxRef.current.close().catch(() => {});
+      audioCtxRef.current = null;
+    }
+    if (wsRef.current && wsRef.current.readyState <= 1) {
+      try { wsRef.current.send(JSON.stringify({ event: "stop" })); } catch {}
+    }
     setStatus("ended");
   };
 
@@ -254,6 +284,68 @@ export default function TestCallPanel({ agent, onClose }) {
                   </div>
                 )
               )}
+            </div>
+          )}
+          {status === "ended" && recordingUrl && (
+            <div className="rounded-xl border p-3" style={{ background: 'var(--bg-muted)', borderColor: 'var(--border)' }}>
+              <audio
+                ref={recPlayerRef}
+                src={recordingUrl}
+                onLoadedMetadata={() => setRecDuration(recPlayerRef.current?.duration || 0)}
+                onTimeUpdate={() => setRecProgress(recPlayerRef.current?.currentTime || 0)}
+                onEnded={() => setRecPlaying(false)}
+                className="hidden"
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const el = recPlayerRef.current;
+                    if (!el) return;
+                    if (recPlaying) { el.pause(); setRecPlaying(false); }
+                    else { el.play(); setRecPlaying(true); }
+                  }}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors"
+                  style={{ background: 'var(--accent-subtle)', color: 'var(--accent)' }}
+                >
+                  {recPlaying ? <Pause size={14} /> : <Play size={14} />}
+                </button>
+                <div className="flex-1 min-w-0">
+                  <div
+                    className="h-1.5 rounded-full cursor-pointer"
+                    style={{ background: 'var(--border)' }}
+                    onClick={(e) => {
+                      const el = recPlayerRef.current;
+                      if (!el || !recDuration) return;
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      el.currentTime = ((e.clientX - rect.left) / rect.width) * recDuration;
+                    }}
+                  >
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{
+                        width: recDuration ? `${(recProgress / recDuration) * 100}%` : '0%',
+                        background: 'var(--accent)',
+                      }}
+                    />
+                  </div>
+                  <div className="flex justify-between mt-1">
+                    <span className="text-[9px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                      {formatTime(Math.floor(recProgress))}
+                    </span>
+                    <span className="text-[9px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                      {formatTime(Math.floor(recDuration))}
+                    </span>
+                  </div>
+                </div>
+                <a
+                  href={recordingUrl}
+                  download={`call-recording-${Date.now()}.wav`}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors"
+                  style={{ background: 'var(--accent-subtle)', color: 'var(--accent)' }}
+                >
+                  <Download size={14} />
+                </a>
+              </div>
             </div>
           )}
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Talk to this agent in real-time using your microphone.</p>
