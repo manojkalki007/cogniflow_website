@@ -48,7 +48,7 @@ class GroqLLM:
         fallback_model: str = "llama-3.1-8b-instant",
         system_prompt: str = "",
         temperature: float = 0.7,
-        max_tokens: int = 150,
+        max_tokens: int = 80,
     ):
         self.model = model
         self.fallback_model = fallback_model
