@@ -28,7 +28,8 @@ from cogniflow_home.latency.eot import SemanticEOTDetector
 from cogniflow_home.latency.filler import FillerAudioManager
 from cogniflow_home.latency.speculative import SpeculativeGenerator
 from cogniflow_home.latency.tracer import LatencyTracer
-from cogniflow_home.intelligence.emotional_mirror import EmotionalMirror
+from cogniflow_home.emotions.text_enricher import TextEnricher
+from cogniflow_home.emotions.prompt_builder import build_system_prompt, build_emotion_context
 from cogniflow_home.language.detector import LanguageDetector, LanguageRouter
 from cogniflow_home.monitoring.turn_quality import TurnEvent, TurnQualityAnalyzer
 from cogniflow_home.monitoring.barge_in import BargeInTracker
@@ -40,35 +41,6 @@ logger = logging.getLogger("cogniflow_home.pipeline")
 
 INDIAN_LANGUAGES = {"hi", "ta", "te", "kn", "ml", "bn", "mr", "gu", "pa", "od", "as", "ur", "ne", "en-in"}
 SARVAM_TTS_LANGUAGES = {"hi", "ta", "te", "kn", "ml", "bn", "mr", "gu", "pa", "od", "as", "ur", "ne", "en-in"}
-SYSTEM_PROMPT_VOICE_RULES = """
-VOICE CALL RULES — you are on a live phone call, not writing text:
-
-FORMAT:
-- Keep responses to 1-2 sentences MAX. This is a phone call — be concise.
-- Match the caller's length. If they say one sentence, reply with one sentence.
-- Keep sentences short, max 15 words each.
-- NEVER use lists, bullet points, markdown, asterisks, or any formatting.
-- Say numbers as words: "four hundred fifty" not "450".
-- If calling a tool, say a filler first: "Let me pull that up for you..."
-- NEVER repeat information you already said. Don't re-introduce yourself.
-- NEVER repeat the caller's question back to them. Just answer it directly.
-
-LISTENING RULES — these are critical:
-- NEVER cut the caller off. Wait for them to finish their full thought before responding.
-- If the caller pauses mid-sentence, WAIT. They might be thinking. Don't jump in.
-- If the caller interrupts YOU, IMMEDIATELY stop talking and listen to what they're saying. Then respond to their new input.
-- If you can't understand what the caller said, ask them to repeat: "Sorry, I didn't quite catch that. Could you say that again?"
-
-SOUND HUMAN — this is the most important part:
-- ALWAYS use contractions: "don't", "can't", "I'm", "you're", "it's", "that's", "won't", "I'll", "we're", "I'd", "they're", "haven't", "isn't", "wouldn't", "shouldn't".
-- Start responses with natural reactions: "Oh, sure!", "Ah, got it.", "Right, so...", "Hmm, let me think.", "Yeah, absolutely!"
-- Use conversational connectors between sentences: "So,", "Well,", "Actually,", "Honestly,", "You know,"
-- Vary your sentence rhythm. Mix short punchy lines with slightly longer ones.
-- Show warmth and personality. React to what the caller says. Sound like you genuinely care.
-- Use casual phrasing: "a couple of" not "several", "pretty much" not "essentially", "I'd say" not "I would estimate".
-- Add natural hedging where appropriate: "I think", "probably", "I'd say", "as far as I know".
-- NEVER sound like you're reading from a script. Be spontaneous and genuine.
-"""
 
 
 def _create_stt(language: str, sample_rate: int = 8000):
@@ -252,10 +224,11 @@ class VoicePipeline:
             template_type=emotion_profile,
             gender=voice_gender,
         )
+        self.text_enricher = TextEnricher()
 
         base_instructions = instructions_override or AGENT_INSTRUCTIONS
         emotion_instructions = self.emotion_adapter.get_llm_emotion_instructions()
-        self._instructions = base_instructions + "\n\n" + SYSTEM_PROMPT_VOICE_RULES + "\n\n" + emotion_instructions
+        self._instructions = build_system_prompt(base_instructions, emotion_instructions)
         self._greeting = greeting_override or GREETING
 
         self.stt = _create_stt(language, sample_rate=sample_rate)
@@ -279,7 +252,6 @@ class VoicePipeline:
         self.compliance = ComplianceEngine()
         self.speculative = SpeculativeGenerator(eot_threshold=0.70, min_words=5)
         self.filler = FillerAudioManager()
-        self.emotional_mirror = EmotionalMirror()
         self.language_detector = LanguageDetector(primary_language=language)
         self.language_router = LanguageRouter()
         self.turn_quality = TurnQualityAnalyzer()
@@ -541,7 +513,6 @@ class VoicePipeline:
         self._unclear_count = 0
         self.emotion_adapter.update_caller_emotion(redacted)
         current_emotion = self.emotion_adapter.current_emotion.emotion
-        self.emotional_mirror.sync_from_adapter(current_emotion)
         self.filler.set_emotion(current_emotion)
 
         self.state.transcript.append(
@@ -584,14 +555,13 @@ class VoicePipeline:
             self._turn_first_byte_ts = 0.0
             eot_ts_orig = eot_ts
 
-            emotion_prompt = self.emotional_mirror.get_prompt_injection()
-            caller_emotion_prompt = self.emotion_adapter.get_caller_emotion_prompt()
+            emotion_state = self.emotion_adapter.current_emotion
+            emotion_context = build_emotion_context(emotion_state.emotion, emotion_state.intensity)
             llm_input = user_text
-            combined_emotion = (emotion_prompt + "\n" + caller_emotion_prompt).strip()
-            if combined_emotion:
-                llm_input = f"[EMOTION CONTEXT: {combined_emotion}]\n\nCaller said: \"{user_text}\""
-            if self.emotional_mirror.should_offer_human():
-                llm_input += "\n[SYSTEM: Caller has been frustrated for 30+ seconds. Proactively offer to transfer to a human agent.]"
+            if emotion_context:
+                llm_input = f"{emotion_context}\nCaller said: \"{user_text}\""
+            if self.emotion_adapter.should_offer_human():
+                llm_input += "\n[SYSTEM: Caller has been frustrated for 5+ turns. Proactively offer to transfer to a human agent.]"
 
             try:
                 from cogniflow_home.knowledge.base import kb
@@ -763,6 +733,10 @@ class VoicePipeline:
     async def _speak(self, text: str):
         try:
             text = _humanize_for_speech(text)
+            if not text:
+                return
+            emotion = self.emotion_adapter.current_emotion
+            text = self.text_enricher.enrich(text, emotion.emotion, emotion.intensity)
             if not text:
                 return
             synth_kwargs = self._get_emotion_tts_kwargs()

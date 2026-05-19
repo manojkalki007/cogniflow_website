@@ -2097,7 +2097,7 @@ async def api_pipeline_metrics(auth: AuthContext = Depends(get_auth_context)):
         call_metrics[call_id] = {
             "turns": pipeline.turn_quality.get_summary(),
             "barge_ins": pipeline.barge_in_tracker.get_summary(),
-            "emotion_state": pipeline.emotional_mirror.current_state,
+            "emotion_state": pipeline.emotion_adapter.get_emotion_state(),
             "duration": int(time.time() - pipeline.state.started_at),
         }
 
