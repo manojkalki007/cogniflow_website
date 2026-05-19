@@ -999,7 +999,7 @@ async def list_calls(
     if caller:
         match["caller_number"] = caller
 
-    calls = await db.select("calls", match or None, order="started_at.desc", limit=limit)
+    calls = await db.select("calls", match or None, order="created_at.desc", limit=limit)
     return {"calls": calls, "count": len(calls)}
 
 
@@ -1045,7 +1045,7 @@ async def get_contact(contact_id: str, auth: AuthContext = Depends(get_auth_cont
         return {"error": "Contact not found"}
     contact = contacts[0]
     calls = await db.select("calls", {"caller_number": contact["phone_number"]},
-                            order="started_at.desc", limit=20)
+                            order="created_at.desc", limit=20)
     contact["calls"] = calls
     return contact
 
