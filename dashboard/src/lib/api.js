@@ -1,3 +1,5 @@
+import supabase from "./supabase";
+
 const BASE = (import.meta.env.VITE_API_URL || "https://api.cogniflowautomations.com").trim();
 const API_KEY = (import.meta.env.VITE_API_KEY || "").trim();
 
@@ -18,6 +20,14 @@ async function request(path, options = {}) {
     "Content-Type": "application/json",
     ...options.headers,
   };
+
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      headers["Authorization"] = `Bearer ${session.access_token}`;
+    }
+  } catch {}
+
   if (API_KEY) headers["X-Api-Key"] = API_KEY;
   if (_tenantId) headers["X-Tenant-Id"] = _tenantId;
 

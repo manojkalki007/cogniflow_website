@@ -86,9 +86,10 @@ async def get_agent_by_id(agent_id: str) -> AgentConfig | None:
     return None
 
 
-async def list_agents() -> list[dict]:
+async def list_agents(tenant_id: str = "") -> list[dict]:
     try:
-        return await db.select("agents", order="created_at.desc")
+        match = {"tenant_id": tenant_id} if tenant_id else None
+        return await db.select("agents", match, order="created_at.desc")
     except Exception:
         return []
 

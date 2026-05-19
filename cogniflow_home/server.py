@@ -1151,11 +1151,23 @@ async def get_stats(auth: AuthContext = Depends(get_auth_context)):
 
 # ─── Agents API ───
 
+@app.get("/api/me")
+async def api_me(auth: AuthContext = Depends(get_auth_context)):
+    return {
+        "tenant_id": auth.tenant_id,
+        "tenant_name": auth.tenant_name,
+        "plan": auth.plan,
+        "scopes": auth.scopes,
+        "is_admin": auth.is_admin,
+    }
+
+
 @app.get("/api/agents")
 async def api_list_agents(auth: AuthContext = Depends(get_auth_context)):
-    agents = await list_agents()
     if auth.tenant_id:
-        agents = [a for a in agents if a.get("tenant_id") == auth.tenant_id]
+        agents = await list_agents(tenant_id=auth.tenant_id)
+    else:
+        agents = await list_agents()
     return {"agents": [_unpack_agent(a) for a in agents]}
 
 
@@ -1901,9 +1913,10 @@ async def api_analytics_trends(days: int = 30, auth: AuthContext = Depends(get_a
 async def api_analytics_agents(days: int = 30, auth: AuthContext = Depends(get_auth_context)):
     from cogniflow_home.agents import list_agents
 
-    agents = await list_agents()
     if auth.tenant_id:
-        agents = [a for a in agents if a.get("tenant_id") == auth.tenant_id]
+        agents = await list_agents(tenant_id=auth.tenant_id)
+    else:
+        agents = await list_agents()
     if not agents:
         return {"agents": []}
 
@@ -2213,11 +2226,11 @@ async def api_behaviour_drift(auth: AuthContext = Depends(get_auth_context)):
         return {"status": "insufficient_data"}
 
 
-# ─── Admin: Tenant Management (master key only) ───
+# ─── Admin: Tenant Management ───
 
 @app.post("/admin/tenants")
 async def admin_create_tenant(request: Request, auth: AuthContext = Depends(get_auth_context)):
-    if auth.tenant_id:
+    if not auth.is_admin and auth.tenant_id:
         raise HTTPException(403, "Admin only")
     body = await request.json()
     from cogniflow_home.tenants.manager import create_tenant
@@ -2232,7 +2245,7 @@ async def admin_create_tenant(request: Request, auth: AuthContext = Depends(get_
 
 @app.get("/admin/tenants")
 async def admin_list_tenants(auth: AuthContext = Depends(get_auth_context)):
-    if auth.tenant_id:
+    if not auth.is_admin and auth.tenant_id:
         raise HTTPException(403, "Admin only")
     tenants = await db.select("tenants", order="created_at.desc", limit=200)
     return {"tenants": tenants}
@@ -2240,7 +2253,7 @@ async def admin_list_tenants(auth: AuthContext = Depends(get_auth_context)):
 
 @app.get("/admin/tenants/{tenant_id}")
 async def admin_get_tenant(tenant_id: str, auth: AuthContext = Depends(get_auth_context)):
-    if auth.tenant_id:
+    if not auth.is_admin and auth.tenant_id:
         raise HTTPException(403, "Admin only")
     rows = await db.select("tenants", {"id": tenant_id})
     if not rows:
@@ -2250,7 +2263,7 @@ async def admin_get_tenant(tenant_id: str, auth: AuthContext = Depends(get_auth_
 
 @app.patch("/admin/tenants/{tenant_id}")
 async def admin_update_tenant(tenant_id: str, request: Request, auth: AuthContext = Depends(get_auth_context)):
-    if auth.tenant_id:
+    if not auth.is_admin and auth.tenant_id:
         raise HTTPException(403, "Admin only")
     body = await request.json()
     allowed = {"plan", "status", "monthly_minutes_limit", "max_agents",
@@ -2262,7 +2275,7 @@ async def admin_update_tenant(tenant_id: str, request: Request, auth: AuthContex
 
 @app.post("/admin/tenants/{tenant_id}/suspend")
 async def admin_suspend_tenant(tenant_id: str, auth: AuthContext = Depends(get_auth_context)):
-    if auth.tenant_id:
+    if not auth.is_admin and auth.tenant_id:
         raise HTTPException(403, "Admin only")
     await db.update("tenants", {"id": tenant_id}, {"status": "suspended"})
     return {"ok": True}
@@ -2270,7 +2283,7 @@ async def admin_suspend_tenant(tenant_id: str, auth: AuthContext = Depends(get_a
 
 @app.get("/admin/billing")
 async def admin_billing_overview(auth: AuthContext = Depends(get_auth_context)):
-    if auth.tenant_id:
+    if not auth.is_admin and auth.tenant_id:
         raise HTTPException(403, "Admin only")
     from cogniflow_home.tenants.billing import get_all_tenants_summary
     summaries = await get_all_tenants_summary()
@@ -2565,6 +2578,21 @@ async def v1_list_agents(auth: AuthContext = Depends(get_auth_context)):
         {"id": a["id"], "name": a.get("name", ""), "status": a.get("status", "active")}
         for a in agents
     ]
+
+
+@app.post("/admin/agents/{agent_id}/assign")
+async def admin_assign_agent(agent_id: str, request: Request, auth: AuthContext = Depends(get_auth_context)):
+    if not auth.is_admin and auth.tenant_id:
+        raise HTTPException(status_code=403, detail="Admin only")
+    body = await request.json()
+    target_tenant_id = body.get("tenant_id")
+    if not target_tenant_id or not _valid_uuid(target_tenant_id):
+        raise HTTPException(status_code=400, detail="Valid tenant_id is required")
+    tenant_rows = await db.select("tenants", {"id": target_tenant_id})
+    if not tenant_rows:
+        raise HTTPException(status_code=404, detail="Target tenant not found")
+    result = await update_agent(agent_id, {"tenant_id": target_tenant_id})
+    return _unpack_agent(result) if result else JSONResponse({"error": "Agent not found"}, status_code=404)
 
 
 async def resolve_tenant(x_tenant_id: str = Header(default=""), x_api_key: str = Header(default="")):

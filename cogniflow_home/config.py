@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     # Supabase
     supabase_url: str = ""
     supabase_key: str = ""
+    supabase_jwt_secret: str = ""
+
+    # Admin
+    admin_emails: list[str] = []
 
     # HubSpot
     hubspot_api_key: str = ""
