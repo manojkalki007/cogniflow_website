@@ -14,11 +14,18 @@ class SemanticEOTDetector:
 
     TURN_FINALS = {
         "thank you", "thanks", "that's all", "that's it",
-        "please", "okay", "ok", "yes", "no", "sure",
-        "got it", "never mind", "goodbye", "bye",
+        "please", "okay", "ok", "yes", "no", "sure", "nope", "yep", "yeah",
+        "got it", "never mind", "goodbye", "bye", "alright", "fine",
         "right", "correct", "absolutely", "exactly",
         "haan", "nahi", "theek hai", "shukriya", "dhanyavaad",
-        "achha", "bas", "chalo", "thik hai",
+        "achha", "bas", "chalo", "thik hai", "bilkul",
+        "aur kuch nahi", "bas itna", "alvida",
+    }
+
+    INCOMPLETE_SUFFIXES = {
+        "and", "but", "or", "because", "so", "if", "when", "then",
+        "toh", "aur", "lekin", "ya", "kyunki", "jab", "phir",
+        "mujhe", "matlab", "like",
     }
 
     def __init__(self, threshold: float = 0.65):
@@ -48,18 +55,22 @@ class SemanticEOTDetector:
         ) and text[-1] == "?":
             score += 0.15
 
-        word_count = len(text.split())
+        words = text.split()
+        word_count = len(words)
         if word_count >= 5:
             score += 0.10
         if word_count >= 10:
             score += 0.10
+
+        if words and words[-1] in self.INCOMPLETE_SUFFIXES:
+            score -= 0.30
 
         if silence_ms >= 300:
             score += 0.15
         if silence_ms >= 500:
             score += 0.20
 
-        return min(score, 1.0)
+        return max(0.0, min(score, 1.0))
 
     async def wait_for_turn_end(
         self,

@@ -20,7 +20,7 @@ import uuid
 from dataclasses import dataclass, field
 
 from cogniflow_home.agent import AGENT_INSTRUCTIONS, AGENT_NAME, GREETING, VOICE_ID
-from cogniflow_home.audio import compute_energy_mulaw
+from cogniflow_home.audio import compute_energy_mulaw, AudioSmoother
 from cogniflow_home.compliance.engine import ComplianceEngine
 from cogniflow_home.config import settings
 from cogniflow_home.events import bus
@@ -252,6 +252,7 @@ class VoicePipeline:
         self.compliance = ComplianceEngine()
         self.speculative = SpeculativeGenerator(eot_threshold=0.70, min_words=5)
         self.filler = FillerAudioManager()
+        self.audio_smoother = AudioSmoother(sample_rate=sample_rate, crossfade_ms=8)
         self.language_detector = LanguageDetector(primary_language=language)
         self.language_router = LanguageRouter()
         self.turn_quality = TurnQualityAnalyzer()
@@ -764,21 +765,30 @@ class VoicePipeline:
                 break
 
             if self._raw_pcm:
-                payload = base64.b64encode(audio_chunk).decode("ascii")
+                smoothed = self.audio_smoother.process(audio_chunk)
+                payload = base64.b64encode(smoothed).decode("ascii")
                 await self._telephony.send_audio(payload)
                 if not self._turn_first_byte_ts:
                     self._turn_first_byte_ts = time.perf_counter() * 1000
             else:
+                smoothed = self.audio_smoother.process(audio_chunk)
                 chunk_size = self._sample_rate // 50
-                for i in range(0, len(audio_chunk), chunk_size):
+                for i in range(0, len(smoothed), chunk_size):
                     if self.state.barge_in:
                         break
-                    segment = audio_chunk[i : i + chunk_size]
+                    segment = smoothed[i : i + chunk_size]
                     payload = base64.b64encode(segment).decode("ascii")
                     await self._telephony.send_audio(payload)
                     if not self._turn_first_byte_ts:
                         self._turn_first_byte_ts = time.perf_counter() * 1000
                     await asyncio.sleep(0.018)
+
+        # Fade out final chunk
+        tail = self.audio_smoother.flush()
+        if tail and not self.state.barge_in:
+            payload = base64.b64encode(tail).decode("ascii")
+            await self._telephony.send_audio(payload)
+        self.audio_smoother.reset()
 
     async def stop(self):
         self._running = False
