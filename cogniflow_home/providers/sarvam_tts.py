@@ -3,7 +3,8 @@
 Supports Hindi, Tamil, Telugu, Kannada, Malayalam, Bengali, Marathi,
 Gujarati, Punjabi, Odia, English (Indian accent), and more.
 
-Outputs mulaw 8kHz directly — no conversion needed for telephony.
+Telephony mode: mulaw at the configured sample rate.
+Browser mode (raw_pcm=True): requests WAV, strips the header, returns raw PCM16.
 """
 
 import base64
@@ -38,13 +39,15 @@ VOICES = {
 
 class SarvamTTS:
     def __init__(self, language: str = "hi", sample_rate: int = 8000,
-                 voice: str = "", temperature: float = 0.6, pace: float = 1.0):
+                 voice: str = "", temperature: float = 0.6, pace: float = 1.0,
+                 raw_pcm: bool = False):
         voice_config = VOICES.get(language, VOICES["hi"])
         self.voice = voice or voice_config["voice"]
         self.language = voice_config["language"]
         self.sample_rate = sample_rate
         self.temperature = temperature
         self.pace = pace
+        self._raw_pcm = raw_pcm
         self._client = httpx.AsyncClient(timeout=15.0)
         self._headers = {
             "api-subscription-key": settings.sarvam_api_key,
@@ -53,7 +56,7 @@ class SarvamTTS:
 
     async def connect(self):
         logger.info(f"Sarvam TTS ready (language={self.language}, voice={self.voice}, "
-                     f"temp={self.temperature}, pace={self.pace})")
+                     f"raw_pcm={self._raw_pcm}, rate={self.sample_rate})")
 
     async def synthesize(self, text: str, **kwargs) -> AsyncIterator[bytes]:
         if not text.strip():
@@ -62,12 +65,13 @@ class SarvamTTS:
         temperature = kwargs.get("temperature", self.temperature)
         pace = kwargs.get("pace", self.pace)
 
+        audio_format = "wav" if self._raw_pcm else "mulaw"
         body = {
             "inputs": [text],
             "target_language_code": self.language,
             "speaker": kwargs.get("voice", self.voice),
             "model": "bulbul:v3",
-            "audio_format": "mulaw",
+            "audio_format": audio_format,
             "sample_rate": self.sample_rate,
             "temperature": max(0.01, min(1.0, temperature)),
             "pace": max(0.5, min(2.0, pace)),
@@ -82,6 +86,8 @@ class SarvamTTS:
                 audios = result.get("audios", [])
                 for audio_b64 in audios:
                     audio_bytes = base64.b64decode(audio_b64)
+                    if self._raw_pcm and len(audio_bytes) > 44:
+                        audio_bytes = audio_bytes[44:]
                     yield audio_bytes
             else:
                 logger.warning(f"Sarvam TTS error: {resp.status_code} {resp.text}")

@@ -55,7 +55,7 @@ def _create_tts(language: str, voice_id: str, sample_rate: int = 8000, raw_pcm: 
                  tts_provider: str = ""):
     if language in SARVAM_TTS_LANGUAGES:
         from cogniflow_home.providers.sarvam_tts import SarvamTTS
-        return SarvamTTS(language=language, sample_rate=sample_rate)
+        return SarvamTTS(language=language, sample_rate=sample_rate, raw_pcm=raw_pcm)
     if tts_provider == "elevenlabs" and settings.elevenlabs_api_key:
         from cogniflow_home.providers.elevenlabs_tts import ElevenLabsTTS
         return ElevenLabsTTS(voice_id=voice_id, language=language, sample_rate=sample_rate, raw_pcm=raw_pcm)
@@ -111,7 +111,7 @@ def _create_tts_chain(language: str, voice_id: str, sample_rate: int = 8000,
     if language in SARVAM_TTS_LANGUAGES:
         # Indian language — Sarvam primary, others as fallback
         from cogniflow_home.providers.sarvam_tts import SarvamTTS
-        providers.append(("sarvam-tts", SarvamTTS(language=language, sample_rate=sample_rate)))
+        providers.append(("sarvam-tts", SarvamTTS(language=language, sample_rate=sample_rate, raw_pcm=raw_pcm)))
         if settings.smallest_ai_api_key:
             from cogniflow_home.providers.smallest_tts import SmallestTTS
             providers.append(("smallest-tts", SmallestTTS(
@@ -138,7 +138,7 @@ def _create_tts_chain(language: str, voice_id: str, sample_rate: int = 8000,
                 sample_rate=sample_rate, raw_pcm=raw_pcm,
             )))
         from cogniflow_home.providers.sarvam_tts import SarvamTTS
-        providers.append(("sarvam-tts", SarvamTTS(language="en-in", sample_rate=sample_rate)))
+        providers.append(("sarvam-tts", SarvamTTS(language="en-in", sample_rate=sample_rate, raw_pcm=raw_pcm)))
     elif settings.smallest_ai_api_key:
         # Non-Indian language — Smallest primary, ElevenLabs + Sarvam fallback
         from cogniflow_home.providers.smallest_tts import SmallestTTS
@@ -153,7 +153,7 @@ def _create_tts_chain(language: str, voice_id: str, sample_rate: int = 8000,
                 sample_rate=sample_rate, raw_pcm=raw_pcm,
             )))
         from cogniflow_home.providers.sarvam_tts import SarvamTTS
-        providers.append(("sarvam-tts", SarvamTTS(language="en-in", sample_rate=sample_rate)))
+        providers.append(("sarvam-tts", SarvamTTS(language="en-in", sample_rate=sample_rate, raw_pcm=raw_pcm)))
     elif settings.elevenlabs_api_key:
         # Only ElevenLabs configured (no Smallest)
         from cogniflow_home.providers.elevenlabs_tts import ElevenLabsTTS
@@ -162,13 +162,13 @@ def _create_tts_chain(language: str, voice_id: str, sample_rate: int = 8000,
             sample_rate=sample_rate, raw_pcm=raw_pcm,
         )))
         from cogniflow_home.providers.sarvam_tts import SarvamTTS
-        providers.append(("sarvam-tts", SarvamTTS(language="en-in", sample_rate=sample_rate)))
+        providers.append(("sarvam-tts", SarvamTTS(language="en-in", sample_rate=sample_rate, raw_pcm=raw_pcm)))
     else:
         # Only Sarvam available
         from cogniflow_home.providers.sarvam_tts import SarvamTTS
         providers.append(("sarvam-tts", SarvamTTS(
             language=language if language in SARVAM_TTS_LANGUAGES else "en-in",
-            sample_rate=sample_rate,
+            sample_rate=sample_rate, raw_pcm=raw_pcm,
         )))
 
     chain = ProviderChain(providers, failure_threshold=3, reset_timeout=60.0)
