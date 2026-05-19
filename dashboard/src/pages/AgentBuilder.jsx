@@ -1338,7 +1338,7 @@ function AdvancedSection({ form, set }) {
    ───────────────────────────────────────────── */
 
 function Header({
-  form, set, isNew, isDirty, saving, onSave, onDelete, onClone,
+  form, set, isNew, isDirty, saving, onSave, onDelete, onClone, saveError,
 }) {
   const [editingName, setEditingName] = useState(false);
   const nameRef = useRef(null);
@@ -1413,22 +1413,32 @@ function Header({
           </>
         )}
 
-        <Button
-          size="sm"
-          onClick={onSave}
-          disabled={saving || !form.name || !form.instructions}
-          className="relative"
-        >
-          {saving ? (
-            <Loader2 size={14} className="animate-spin" />
-          ) : (
-            <Save size={14} />
+        <div className="relative">
+          <Button
+            size="sm"
+            onClick={onSave}
+            disabled={saving}
+            className="relative"
+          >
+            {saving ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Save size={14} />
+            )}
+            {saving ? "Saving..." : "Save"}
+            {isDirty && !saving && (
+              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-amber-400 border-2" style={{ borderColor: "var(--bg-card)" }} />
+            )}
+          </Button>
+          {saveError && (
+            <div
+              className="absolute top-full right-0 mt-2 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap z-50 animate-fade-in"
+              style={{ background: "rgba(239,68,68,0.95)", color: "#fff" }}
+            >
+              {saveError}
+            </div>
           )}
-          {saving ? "Saving..." : "Save"}
-          {isDirty && !saving && (
-            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-amber-400 border-2" style={{ borderColor: "var(--bg-card)" }} />
-          )}
-        </Button>
+        </div>
       </div>
     </div>
   );
@@ -1451,6 +1461,7 @@ export default function AgentBuilder() {
   const [error, setError] = useState("");
   const [showTestCall, setShowTestCall] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   /* ── Fetch existing agent ── */
   const { data: agentData, isLoading } = useQuery({
@@ -1575,7 +1586,28 @@ export default function AgentBuilder() {
     },
   });
 
-  const handleSave = () => saveMutation.mutate();
+  const handleSave = () => {
+    setSaveError("");
+    if (!form.name && !form.instructions) {
+      setSaveError("Agent name and system prompt are required");
+      setSection("agent");
+      setTimeout(() => setSaveError(""), 3000);
+      return;
+    }
+    if (!form.name) {
+      setSaveError("Agent name is required");
+      setSection("agent");
+      setTimeout(() => setSaveError(""), 3000);
+      return;
+    }
+    if (!form.instructions) {
+      setSaveError("System prompt is required");
+      setSection("agent");
+      setTimeout(() => setSaveError(""), 3000);
+      return;
+    }
+    saveMutation.mutate();
+  };
 
   const handleDelete = () => {
     if (!confirm("Delete this agent? This action cannot be undone.")) return;
@@ -1627,6 +1659,7 @@ export default function AgentBuilder() {
         onSave={handleSave}
         onDelete={handleDelete}
         onClone={handleClone}
+        saveError={saveError}
       />
 
       {/* Success banner */}
