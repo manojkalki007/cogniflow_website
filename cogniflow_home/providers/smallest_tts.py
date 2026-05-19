@@ -39,7 +39,7 @@ class SmallestTTS:
     async def connect(self):
         logger.info(f"Smallest AI TTS ready (voice={self.voice_id}, rate={self.sample_rate}, pcm={self.raw_pcm})")
 
-    async def synthesize(self, text: str, speed: float = 0.0) -> AsyncIterator[bytes]:
+    async def synthesize(self, text: str, speed: float = 0.0, **kwargs) -> AsyncIterator[bytes]:
         if not text.strip():
             return
 

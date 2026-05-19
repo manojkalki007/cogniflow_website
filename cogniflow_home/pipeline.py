@@ -413,6 +413,11 @@ class VoicePipeline:
         self.state.transcript.append(
             {"role": "agent", "text": greeting, "ts": time.time()}
         )
+        if self.on_transcript:
+            try:
+                await self.on_transcript("agent", greeting)
+            except Exception:
+                pass
 
     async def handle_audio(self, mulaw_bytes: bytes):
         if not self._running:
@@ -553,7 +558,10 @@ class VoicePipeline:
 
         speculative = await self.speculative.on_final_transcript(redacted)
         if speculative:
-            await self._speak_speculative(speculative)
+            self.llm.add_message("user", redacted)
+            spoken_text = await self._speak_speculative(speculative)
+            if spoken_text:
+                self.llm.add_message("assistant", spoken_text)
         else:
             await self._generate_and_speak(redacted, eot_ts=eot_ts)
 
@@ -677,7 +685,8 @@ class VoicePipeline:
                         **v,
                     })
 
-    async def _speak_speculative(self, sentences: list[str]):
+    async def _speak_speculative(self, sentences: list[str]) -> str:
+        """Speak pre-generated speculative sentences. Returns text actually spoken."""
         async with self._speak_lock:
             self.state.is_agent_speaking = True
             self.state.barge_in = False
@@ -696,7 +705,14 @@ class VoicePipeline:
                 self.state.transcript.append(
                     {"role": "agent", "text": full_response.strip(), "ts": time.time()}
                 )
+                if self.on_transcript:
+                    try:
+                        await self.on_transcript("agent", full_response.strip())
+                    except Exception:
+                        pass
                 logger.info("Speculative response delivered")
+
+            return full_response.strip()
 
     async def _on_tool_call(self, tool_name: str):
         filler_audio = self.filler.get_filler(tool_name)
