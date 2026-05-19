@@ -43,7 +43,6 @@ export default function Login() {
 
   useEffect(() => {
     requestAnimationFrame(() => setMounted(true));
-    document.documentElement.classList.add("dark");
   }, []);
 
   useEffect(() => {

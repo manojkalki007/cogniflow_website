@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
+import TestCallPanel from "../components/TestCallPanel";
 import {
   ArrowLeft, Save, Trash2, Copy, Loader2, Check, X,
   AlertTriangle, PhoneCall, Brain, Volume2, Mic, Settings2,
@@ -140,7 +141,7 @@ const defaultForm = {
   endpointing_ms: 300,
   smart_format: true,
   temperature: 0.7,
-  max_tokens: 150,
+  max_tokens: 80,
   max_call_duration: 600,
   silence_timeout: 10,
   enable_recording: true,
@@ -499,7 +500,7 @@ function ProviderStack({ form }) {
   );
 }
 
-function RightPanel({ form, isNew, id, onTestCall }) {
+function RightPanel({ form, isNew, id, showTestCall, onTestCall, onCloseTestCall }) {
   return (
     <div
       className="w-72 border-l flex flex-col flex-shrink-0 overflow-y-auto"
@@ -535,20 +536,24 @@ function RightPanel({ form, isNew, id, onTestCall }) {
         {/* Test call */}
         <div className="space-y-3">
           <SectionLabel>Test</SectionLabel>
-          <button
-            onClick={onTestCall}
-            disabled={isNew}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{
-              background: isNew ? "var(--bg-muted)" : "var(--accent-subtle)",
-              color: isNew ? "var(--text-muted)" : "var(--accent)",
-              border: "1px solid",
-              borderColor: isNew ? "var(--border)" : "var(--accent)",
-            }}
-          >
-            <PhoneCall size={15} />
-            {isNew ? "Save to test" : "Test Call"}
-          </button>
+          {showTestCall && !isNew ? (
+            <TestCallPanel agent={{ id, name: form.name || "Agent" }} onClose={onCloseTestCall} />
+          ) : (
+            <button
+              onClick={onTestCall}
+              disabled={isNew}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                background: isNew ? "var(--bg-muted)" : "var(--accent-subtle)",
+                color: isNew ? "var(--text-muted)" : "var(--accent)",
+                border: "1px solid",
+                borderColor: isNew ? "var(--border)" : "var(--accent)",
+              }}
+            >
+              <PhoneCall size={15} />
+              {isNew ? "Save to test" : "Test Call"}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -668,7 +673,7 @@ function ModelSection({ form, set }) {
           <input
             type="number"
             value={form.max_tokens}
-            onChange={(e) => set("max_tokens", Math.max(1, parseInt(e.target.value) || 150))}
+            onChange={(e) => set("max_tokens", Math.max(1, parseInt(e.target.value) || 80))}
             className={inputClass + " w-32 font-mono tabular-nums"}
             style={inputStyle}
           />
@@ -1444,6 +1449,8 @@ export default function AgentBuilder() {
   const [form, setForm] = useState({ ...defaultForm });
   const [initialForm, setInitialForm] = useState({ ...defaultForm });
   const [error, setError] = useState("");
+  const [showTestCall, setShowTestCall] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   /* ── Fetch existing agent ── */
   const { data: agentData, isLoading } = useQuery({
@@ -1471,7 +1478,7 @@ export default function AgentBuilder() {
         endpointing_ms: agentData.endpointing_ms ?? 300,
         smart_format: agentData.smart_format ?? true,
         temperature: agentData.temperature ?? 0.7,
-        max_tokens: agentData.max_tokens ?? 150,
+        max_tokens: agentData.max_tokens ?? 80,
         max_call_duration: agentData.max_call_duration || 600,
         silence_timeout: agentData.silence_timeout ?? 10,
         enable_recording: agentData.enable_recording ?? true,
@@ -1516,6 +1523,8 @@ export default function AgentBuilder() {
     onSuccess: (result) => {
       if (result && !result.error) {
         setInitialForm({ ...form });
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 2000);
         queryClient.invalidateQueries({ queryKey: ["agents"] });
         queryClient.invalidateQueries({ queryKey: ["agent", id] });
         if (isNew && result.id) {
@@ -1575,9 +1584,7 @@ export default function AgentBuilder() {
 
   const handleClone = () => cloneMutation.mutate();
 
-  const handleTestCall = () => {
-    // Placeholder — navigate to call page or open modal
-  };
+  const handleTestCall = () => setShowTestCall(true);
 
   /* ── Loading state ── */
   if (isLoading && !isNew) {
@@ -1621,6 +1628,20 @@ export default function AgentBuilder() {
         onDelete={handleDelete}
         onClone={handleClone}
       />
+
+      {/* Success banner */}
+      {saveSuccess && (
+        <div
+          className="mx-4 mt-3 px-4 py-3 rounded-xl flex items-center gap-2 animate-fade-in"
+          style={{
+            background: "rgba(16,185,129,0.08)",
+            border: "1px solid rgba(16,185,129,0.2)",
+          }}
+        >
+          <Check size={14} className="text-emerald-500 flex-shrink-0" />
+          <span className="text-sm text-emerald-600">Agent saved successfully</span>
+        </div>
+      )}
 
       {/* Error banner */}
       {error && (
@@ -1666,7 +1687,9 @@ export default function AgentBuilder() {
           form={form}
           isNew={isNew}
           id={id}
+          showTestCall={showTestCall}
           onTestCall={handleTestCall}
+          onCloseTestCall={() => setShowTestCall(false)}
         />
       </div>
     </div>

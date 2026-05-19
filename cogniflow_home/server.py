@@ -1156,6 +1156,19 @@ async def api_create_agent(request: Request, auth: AuthContext = Depends(get_aut
         "enable_rag": body.get("enable_rag", False),
         "emotion_profile": body.get("emotion_profile", "friendly"),
         "voice_gender": body.get("voice_gender", "female"),
+        "stt_language": body.get("stt_language", "en"),
+        "endpointing_ms": body.get("endpointing_ms", 300),
+        "smart_format": body.get("smart_format", True),
+        "max_tokens": body.get("max_tokens", 80),
+        "silence_timeout": body.get("silence_timeout", 10),
+        "enable_recording": body.get("enable_recording", True),
+        "enable_barge_in": body.get("enable_barge_in", True),
+        "enable_speculative": body.get("enable_speculative", True),
+        "enable_filler": body.get("enable_filler", True),
+        "webhook_url": body.get("webhook_url", ""),
+        "fallback_message": body.get("fallback_message", ""),
+        "max_retries": body.get("max_retries", 3),
+        "concurrent_call_limit": body.get("concurrent_call_limit", 5),
     }
     if auth.tenant_id:
         agent_data["tenant_id"] = auth.tenant_id
@@ -1178,7 +1191,10 @@ async def api_update_agent(agent_id: str, request: Request, auth: AuthContext = 
                "greeting", "guardrails", "llm_provider", "llm_model", "tts_provider", "tts_voice_name",
                "max_call_duration", "enable_memory", "enable_prediction", "enable_emotion",
                "enable_language_switch", "enable_rag", "temperature", "tools_enabled",
-               "emotion_profile", "voice_gender"}
+               "emotion_profile", "voice_gender", "stt_language", "endpointing_ms", "smart_format",
+               "max_tokens", "silence_timeout", "enable_recording", "enable_barge_in",
+               "enable_speculative", "enable_filler", "webhook_url", "fallback_message",
+               "max_retries", "concurrent_call_limit"}
     updates = {k: v for k, v in body.items() if k in allowed}
     result = await update_agent(agent_id, updates)
     return result or {"error": "Agent not found"}
@@ -1394,12 +1410,31 @@ async def api_deal_closed(request: Request, auth: AuthContext = Depends(get_auth
 
 @app.post("/api/agents/clone")
 async def api_clone_agent(request: Request, auth: AuthContext = Depends(get_auth_context)):
-    from cogniflow_home.cloning.cloner import AgentCloner
     body = await request.json()
+    source_agent_id = body.get("source_agent_id")
     recording_urls = body.get("recording_urls", [])
-    agent_name = body.get("agent_name", "Cloned Agent")
+    agent_name = body.get("name") or body.get("agent_name", "Cloned Agent")
+
+    if source_agent_id:
+        if not _valid_uuid(source_agent_id):
+            return {"error": "Invalid source_agent_id format"}
+        agents = await db.select("agents", {"id": source_agent_id})
+        if not agents:
+            return {"error": "Source agent not found"}
+        source = agents[0]
+        if auth.tenant_id and source.get("tenant_id") != auth.tenant_id:
+            return {"error": "Source agent not found"}
+        clone_fields = {k: v for k, v in source.items() if k not in ("id", "created_at", "updated_at")}
+        clone_fields["name"] = agent_name
+        clone_fields["metadata"] = {**(clone_fields.get("metadata") or {}), "cloned_from": source_agent_id}
+        if auth.tenant_id:
+            clone_fields["tenant_id"] = auth.tenant_id
+        result = await create_agent(clone_fields)
+        return result or {"error": "Failed to clone agent"}
+
     if not recording_urls:
-        return {"error": "recording_urls is required (list of audio URLs)"}
+        return {"error": "source_agent_id or recording_urls is required"}
+    from cogniflow_home.cloning.cloner import AgentCloner
     cloner = AgentCloner()
     try:
         system_prompt = await cloner.clone_from_recordings(recording_urls, agent_name)

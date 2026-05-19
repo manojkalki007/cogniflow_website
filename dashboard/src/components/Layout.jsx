@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
   Phone, PhoneOutgoing, Users, BarChart3, Bot,
-  LayoutTemplate, Megaphone, Settings, Sun, Moon,
+  LayoutTemplate, Megaphone, Settings,
   UserCircle, ShieldAlert, Cable, MessageSquare,
   Mail, DollarSign, ShieldCheck, Timer, Plug,
   PanelLeftClose, PanelLeftOpen, Search, Bell,
@@ -95,9 +95,6 @@ function SectionLabel({ children, collapsed }) {
 
 export default function Layout() {
   const { user, signOut } = useAuth();
-  const [dark, setDark] = useState(
-    () => localStorage.getItem("theme") !== "light",
-  );
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem("sidebar_collapsed") === "true",
   );
@@ -107,9 +104,8 @@ export default function Layout() {
   const userInitials = userEmail ? userEmail.substring(0, 2).toUpperCase() : "C";
 
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", dark);
-    localStorage.setItem("theme", dark ? "dark" : "light");
-  }, [dark]);
+    document.documentElement.classList.remove("dark");
+  }, []);
 
   useEffect(() => {
     localStorage.setItem("sidebar_collapsed", collapsed);
@@ -235,20 +231,8 @@ export default function Layout() {
               {(isMobile || !collapsed) && <span>Sign out</span>}
             </button>
 
-            <div
-              className={`flex items-center mt-1.5 ${
-                (!isMobile && collapsed) ? "flex-col gap-1" : "gap-1"
-              }`}
-            >
-              <button
-                onClick={() => setDark((d) => !d)}
-                className="sidebar-nav-item flex-1"
-                style={{ justifyContent: "center" }}
-                title={dark ? "Light mode" : "Dark mode"}
-              >
-                {dark ? <Sun size={15} /> : <Moon size={15} />}
-              </button>
-              {!isMobile && (
+            {!isMobile && (
+              <div className="flex items-center mt-1.5">
                 <button
                   onClick={() => setCollapsed((c) => !c)}
                   className="sidebar-nav-item flex-1"
@@ -261,8 +245,8 @@ export default function Layout() {
                     <PanelLeftClose size={15} />
                   )}
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
     </>
   );
