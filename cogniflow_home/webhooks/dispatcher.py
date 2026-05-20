@@ -26,6 +26,9 @@ def _sign_payload(payload: str, secret: str) -> str:
     return hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
 
 
+_webhook_client = httpx.AsyncClient(timeout=10.0)
+
+
 async def _fire_webhook(endpoint: dict, event: str, data: dict):
     payload = json.dumps({
         "event": event,
@@ -34,32 +37,30 @@ async def _fire_webhook(endpoint: dict, event: str, data: dict):
     }, default=str)
 
     secret = endpoint.get("secret") or settings.webhook_secret
-    signature = _sign_payload(payload, secret)
-
     headers = {
         "Content-Type": "application/json",
-        "X-CogniflowHome-Signature": signature,
         "X-CogniflowHome-Event": event,
     }
+    if secret:
+        headers["X-CogniflowHome-Signature"] = _sign_payload(payload, secret)
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        try:
-            resp = await client.post(endpoint["url"], content=payload, headers=headers)
-            if resp.status_code >= 400:
-                logger.warning(f"Webhook {endpoint['url']} returned {resp.status_code}")
-                await db.update("webhook_endpoints", {"id": endpoint["id"]}, {
-                    "failure_count": endpoint.get("failure_count", 0) + 1,
-                })
-            else:
-                await db.update("webhook_endpoints", {"id": endpoint["id"]}, {
-                    "last_triggered_at": time.time(),
-                    "failure_count": 0,
-                })
-        except Exception:
-            logger.exception(f"Webhook delivery failed: {endpoint['url']}")
+    try:
+        resp = await _webhook_client.post(endpoint["url"], content=payload, headers=headers)
+        if resp.status_code >= 400:
+            logger.warning(f"Webhook {endpoint['url']} returned {resp.status_code}")
             await db.update("webhook_endpoints", {"id": endpoint["id"]}, {
                 "failure_count": endpoint.get("failure_count", 0) + 1,
             })
+        else:
+            await db.update("webhook_endpoints", {"id": endpoint["id"]}, {
+                "last_triggered_at": time.time(),
+                "failure_count": 0,
+            })
+    except Exception:
+        logger.exception(f"Webhook delivery failed: {endpoint['url']}")
+        await db.update("webhook_endpoints", {"id": endpoint["id"]}, {
+            "failure_count": endpoint.get("failure_count", 0) + 1,
+        })
 
 
 async def dispatch_webhook(event: str, data: dict[str, Any]):

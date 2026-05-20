@@ -20,11 +20,16 @@ class SupabaseClient:
             "Content-Type": "application/json",
             "Prefer": "return=representation",
         }
-        self._client = httpx.AsyncClient(timeout=30.0)
+        self._client = httpx.AsyncClient(
+            base_url=self.url,
+            headers=self._headers,
+            timeout=30.0,
+            limits=httpx.Limits(max_connections=200, max_keepalive_connections=50),
+        )
 
     async def insert(self, table: str, data: dict) -> dict | None:
-        url = f"{self.url}/rest/v1/{table}"
-        resp = await self._client.post(url, json=data, headers=self._headers)
+        url = f"/rest/v1/{table}"
+        resp = await self._client.post(url, json=data)
         if resp.status_code in (200, 201):
             rows = resp.json()
             return rows[0] if rows else None
@@ -32,9 +37,9 @@ class SupabaseClient:
         return None
 
     async def update(self, table: str, match: dict, data: dict) -> dict | None:
-        url = f"{self.url}/rest/v1/{table}"
+        url = f"/rest/v1/{table}"
         params = {f"{k}": f"eq.{v}" for k, v in match.items()}
-        resp = await self._client.patch(url, json=data, headers=self._headers, params=params)
+        resp = await self._client.patch(url, json=data, params=params)
         if resp.status_code in (200, 204):
             rows = resp.json() if resp.text else []
             return rows[0] if rows else None
@@ -43,7 +48,7 @@ class SupabaseClient:
 
     async def select(self, table: str, match: dict | None = None, select: str = "*",
                      order: str | None = None, limit: int | None = None) -> list[dict]:
-        url = f"{self.url}/rest/v1/{table}"
+        url = f"/rest/v1/{table}"
         params: dict[str, Any] = {"select": select}
         if match:
             for k, v in match.items():
@@ -55,16 +60,18 @@ class SupabaseClient:
             params["order"] = order
         if limit:
             params["limit"] = str(limit)
-        resp = await self._client.get(url, headers=self._headers, params=params)
+        resp = await self._client.get(url, params=params)
         if resp.status_code == 200:
             return resp.json()
         logger.error(f"Supabase select error: {resp.status_code} {resp.text}")
         return []
 
     async def upsert(self, table: str, data: dict, on_conflict: str = "id") -> dict | None:
-        url = f"{self.url}/rest/v1/{table}"
-        headers = {**self._headers, "Prefer": "resolution=merge-duplicates,return=representation"}
-        resp = await self._client.post(url, json=data, headers=headers)
+        url = f"/rest/v1/{table}"
+        resp = await self._client.post(
+            url, json=data,
+            headers={"Prefer": "resolution=merge-duplicates,return=representation"},
+        )
         if resp.status_code in (200, 201):
             rows = resp.json()
             return rows[0] if rows else None
@@ -72,21 +79,15 @@ class SupabaseClient:
         return None
 
     async def rpc(self, function_name: str, params: dict | None = None) -> Any:
-        url = f"{self.url}/rest/v1/rpc/{function_name}"
-        resp = await self._client.post(url, json=params or {}, headers=self._headers)
+        url = f"/rest/v1/rpc/{function_name}"
+        resp = await self._client.post(url, json=params or {})
         if resp.status_code == 200:
             return resp.json()
         logger.error(f"Supabase RPC error: {resp.status_code} {resp.text}")
         return None
 
     async def count(self, table: str, match: dict | None = None) -> int:
-        url = f"{self.url}/rest/v1/{table}"
-        headers = {
-            **self._headers,
-            "Prefer": "count=exact",
-            "Range-Unit": "items",
-            "Range": "0-0",
-        }
+        url = f"/rest/v1/{table}"
         params: dict[str, Any] = {"select": "id"}
         if match:
             for k, v in match.items():
@@ -94,7 +95,10 @@ class SupabaseClient:
                     params[k] = v
                 else:
                     params[k] = f"eq.{v}"
-        resp = await self._client.get(url, headers=headers, params=params)
+        resp = await self._client.get(
+            url, params=params,
+            headers={"Prefer": "count=exact", "Range-Unit": "items", "Range": "0-0"},
+        )
         content_range = resp.headers.get("Content-Range", "")
         if "/" in content_range:
             try:
@@ -104,23 +108,22 @@ class SupabaseClient:
         return 0
 
     async def delete(self, table: str, match: dict) -> bool:
-        url = f"{self.url}/rest/v1/{table}"
+        url = f"/rest/v1/{table}"
         params = {}
         for k, v in match.items():
             if isinstance(v, str) and v.startswith(("eq.", "gte.", "lte.", "gt.", "lt.", "neq.")):
                 params[k] = v
             else:
                 params[k] = f"eq.{v}"
-        resp = await self._client.delete(url, headers=self._headers, params=params)
+        resp = await self._client.delete(url, params=params)
         if resp.status_code in (200, 204):
             return True
         logger.error(f"Supabase delete error: {resp.status_code} {resp.text}")
         return False
 
     async def ensure_storage_bucket(self, bucket_id: str, public: bool = True):
-        url = f"{self.url}/storage/v1/bucket"
-        headers = {"apikey": self.key, "Authorization": f"Bearer {self.key}", "Content-Type": "application/json"}
-        resp = await self._client.post(url, json={"id": bucket_id, "name": bucket_id, "public": public}, headers=headers)
+        url = f"/storage/v1/bucket"
+        resp = await self._client.post(url, json={"id": bucket_id, "name": bucket_id, "public": public})
         if resp.status_code in (200, 201):
             logger.info(f"Storage bucket '{bucket_id}' created")
         elif resp.status_code == 409:
@@ -129,14 +132,11 @@ class SupabaseClient:
             logger.warning(f"Bucket create failed: {resp.status_code} {resp.text}")
 
     async def upload_file(self, bucket: str, path: str, data: bytes, content_type: str = "application/octet-stream") -> str | None:
-        url = f"{self.url}/storage/v1/object/{bucket}/{path}"
-        headers = {
-            "apikey": self.key,
-            "Authorization": f"Bearer {self.key}",
-            "Content-Type": content_type,
-            "x-upsert": "true",
-        }
-        resp = await self._client.post(url, content=data, headers=headers)
+        url = f"/storage/v1/object/{bucket}/{path}"
+        resp = await self._client.post(
+            url, content=data,
+            headers={"Content-Type": content_type, "x-upsert": "true"},
+        )
         if resp.status_code in (200, 201):
             return f"{self.url}/storage/v1/object/public/{bucket}/{path}"
         logger.error(f"Storage upload error: {resp.status_code} {resp.text}")

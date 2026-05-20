@@ -23,6 +23,12 @@ CHUNK_OVERLAP = 50
 class KnowledgeBase:
     """Manage and query a per-agent knowledge base."""
 
+    def __init__(self):
+        self._embed_client = httpx.AsyncClient(
+            timeout=15.0,
+            headers={"Authorization": f"Bearer {settings.openai_api_key}"},
+        )
+
     async def ingest_text(self, agent_id: str, text: str, source: str):
         chunks = self._chunk_text(text)
         logger.info(f"Ingesting {len(chunks)} chunks from {source} for agent {agent_id}")
@@ -81,20 +87,21 @@ class KnowledgeBase:
 
     async def _embed(self, text: str) -> list[float]:
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                resp = await client.post(
-                    "https://api.openai.com/v1/embeddings",
-                    headers={"Authorization": f"Bearer {settings.openai_api_key}"},
-                    json={"model": EMBEDDING_MODEL, "input": text},
-                )
-                if resp.status_code != 200:
-                    logger.error(f"Embedding API error: {resp.status_code}")
-                    return [0.0] * EMBEDDING_DIM
-                data = resp.json()
-                return data["data"][0]["embedding"]
+            resp = await self._embed_client.post(
+                "https://api.openai.com/v1/embeddings",
+                json={"model": EMBEDDING_MODEL, "input": text},
+            )
+            if resp.status_code != 200:
+                logger.error(f"Embedding API error: {resp.status_code}")
+                return [0.0] * EMBEDDING_DIM
+            data = resp.json()
+            return data["data"][0]["embedding"]
         except Exception:
             logger.exception("Embedding request failed")
             return [0.0] * EMBEDDING_DIM
+
+    async def close(self):
+        await self._embed_client.aclose()
 
     async def delete_source(self, agent_id: str, source: str):
         await db.delete("knowledge_chunks", {

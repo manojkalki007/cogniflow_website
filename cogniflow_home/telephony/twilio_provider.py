@@ -79,20 +79,26 @@ class TwilioProvider(TelephonyProvider):
 
     async def send_audio(self, payload: str):
         if self._websocket and self._stream_sid:
-            msg = {
-                "event": "media",
-                "streamSid": self._stream_sid,
-                "media": {"payload": payload},
-            }
-            await self._websocket.send_json(msg)
+            try:
+                msg = {
+                    "event": "media",
+                    "streamSid": self._stream_sid,
+                    "media": {"payload": payload},
+                }
+                await self._websocket.send_json(msg)
+            except Exception:
+                logger.warning("WebSocket send failed (connection closed)")
 
     async def clear_audio(self):
         if self._websocket and self._stream_sid:
-            msg = {
-                "event": "clear",
-                "streamSid": self._stream_sid,
-            }
-            await self._websocket.send_json(msg)
+            try:
+                msg = {
+                    "event": "clear",
+                    "streamSid": self._stream_sid,
+                }
+                await self._websocket.send_json(msg)
+            except Exception:
+                logger.warning("WebSocket clear failed (connection closed)")
 
     def get_twiml_or_response(self, ws_url: str, caller: str, record: bool = True) -> str:
         response = Element("Response")
@@ -124,7 +130,8 @@ class TwilioProvider(TelephonyProvider):
             kwargs["status_callback"] = status_callback_url
             kwargs["status_callback_event"] = ["completed"]
 
-        call = client.calls.create(**kwargs)
+        import asyncio
+        call = await asyncio.to_thread(client.calls.create, **kwargs)
         logger.info(f"Twilio outbound call initiated: {call.sid} -> {to_number}")
         return OutboundCallResult(
             call_sid=call.sid, status="dialing", provider=self.name

@@ -83,20 +83,23 @@ class ExotelProvider(TelephonyProvider):
         if not self._websocket or not self._stream_sid:
             return
 
-        mulaw_bytes = base64.b64decode(payload)
-        pcm_bytes = mulaw_to_pcm16(mulaw_bytes)
+        try:
+            mulaw_bytes = base64.b64decode(payload)
+            pcm_bytes = mulaw_to_pcm16(mulaw_bytes)
 
-        # Exotel requires chunks in multiples of 320 bytes
-        CHUNK_SIZE = 320
-        for i in range(0, len(pcm_bytes), CHUNK_SIZE):
-            chunk = pcm_bytes[i : i + CHUNK_SIZE]
-            pcm_payload = base64.b64encode(chunk).decode("ascii")
-            msg = {
-                "event": "media",
-                "stream_sid": self._stream_sid,
-                "media": {"payload": pcm_payload},
-            }
-            await self._websocket.send_text(json.dumps(msg))
+            # Exotel requires chunks in multiples of 320 bytes
+            CHUNK_SIZE = 320
+            for i in range(0, len(pcm_bytes), CHUNK_SIZE):
+                chunk = pcm_bytes[i : i + CHUNK_SIZE]
+                pcm_payload = base64.b64encode(chunk).decode("ascii")
+                msg = {
+                    "event": "media",
+                    "stream_sid": self._stream_sid,
+                    "media": {"payload": pcm_payload},
+                }
+                await self._websocket.send_text(json.dumps(msg))
+        except Exception:
+            logger.warning("Exotel WebSocket send failed (connection closed)")
 
     async def clear_audio(self):
         if self._websocket and self._stream_sid:

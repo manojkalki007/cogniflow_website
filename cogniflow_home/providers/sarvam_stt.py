@@ -103,9 +103,18 @@ class SarvamSTT:
         except Exception:
             logger.exception("Sarvam STT request failed")
 
+    def flush_pending(self):
+        self._buffer.clear()
+        self._buffer_duration_ms = 0
+        while not self._transcript_queue.empty():
+            try:
+                self._transcript_queue.get_nowait()
+            except Exception:
+                break
+
     def _mulaw_to_wav(self, mulaw_data: bytes) -> bytes:
-        import audioop
-        pcm_data = audioop.ulaw2lin(mulaw_data, 2)
+        from cogniflow_home.audio import mulaw_to_pcm16
+        pcm_data = mulaw_to_pcm16(mulaw_data)
 
         buf = io.BytesIO()
         with wave.open(buf, "wb") as wf:

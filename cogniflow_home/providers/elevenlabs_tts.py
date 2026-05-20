@@ -86,7 +86,7 @@ class ElevenLabsTTS:
         if self.raw_pcm:
             output_format = "pcm_16000"
         else:
-            output_format = "pcm_16000"
+            output_format = "ulaw_8000"
 
         url = f"{ELEVENLABS_API_URL}/{voice}/stream"
         headers = {
@@ -118,11 +118,10 @@ class ElevenLabsTTS:
                     if chunk:
                         yield chunk
             else:
-                # Convert PCM 16kHz to mulaw 8kHz for telephony
-                from cogniflow_home.audio import pcm16_to_mulaw
+                # Already ulaw 8kHz from ElevenLabs — stream directly
                 async for chunk in resp.aiter_bytes(4096):
                     if chunk:
-                        yield pcm16_to_mulaw(chunk)
+                        yield chunk
 
     async def close(self):
         await self._client.aclose()

@@ -39,11 +39,15 @@ class EventBus:
 
     async def emit(self, event: str, data: dict[str, Any]):
         handlers = self._handlers.get(event, []) + self._handlers.get("*", [])
-        for handler in handlers:
-            try:
-                await handler(event, data)
-            except Exception:
-                logger.exception(f"Event handler error for {event}")
+        if not handlers:
+            return
+        results = await asyncio.gather(
+            *(h(event, data) for h in handlers),
+            return_exceptions=True,
+        )
+        for h, r in zip(handlers, results):
+            if isinstance(r, Exception):
+                logger.exception(f"Event handler error for {event}: {r}")
 
 
 bus = EventBus()

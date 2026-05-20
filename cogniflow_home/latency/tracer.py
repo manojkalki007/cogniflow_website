@@ -19,26 +19,28 @@ class LatencyTracer:
     def __init__(self, call_id: str):
         self.call_id = call_id
         self.traces: list[dict] = []
+        self._index: dict[str, dict] = {}
         self._turn_count = 0
 
     def start(self, component: str) -> str:
         trace_id = f"{component}_{time.perf_counter()}"
-        self.traces.append({
+        entry = {
             "id": trace_id,
             "component": component,
             "start": time.perf_counter(),
             "end": None,
             "duration_ms": None,
             "turn": self._turn_count,
-        })
+        }
+        self.traces.append(entry)
+        self._index[trace_id] = entry
         return trace_id
 
     def end(self, trace_id: str):
-        for t in self.traces:
-            if t["id"] == trace_id:
-                t["end"] = time.perf_counter()
-                t["duration_ms"] = (t["end"] - t["start"]) * 1000
-                break
+        t = self._index.get(trace_id)
+        if t:
+            t["end"] = time.perf_counter()
+            t["duration_ms"] = (t["end"] - t["start"]) * 1000
 
     def new_turn(self):
         self._turn_count += 1

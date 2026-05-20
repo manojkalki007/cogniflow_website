@@ -70,32 +70,34 @@ def _create_tts(language: str, voice_id: str, sample_rate: int = 8000, raw_pcm: 
 
 
 _CONTRACTIONS = [
-    (r"\bI am\b", "I'm"), (r"\bI have\b", "I've"), (r"\bI will\b", "I'll"),
-    (r"\bI would\b", "I'd"), (r"\bdo not\b", "don't"), (r"\bDo not\b", "Don't"),
-    (r"\bcannot\b", "can't"), (r"\bCannot\b", "Can't"),
-    (r"\bwill not\b", "won't"), (r"\bWill not\b", "Won't"),
-    (r"\bshould not\b", "shouldn't"), (r"\bwould not\b", "wouldn't"),
-    (r"\bcould not\b", "couldn't"), (r"\bthat is\b", "that's"),
-    (r"\bThat is\b", "That's"), (r"\bit is\b", "it's"), (r"\bIt is\b", "It's"),
-    (r"\bwhat is\b", "what's"), (r"\bWhat is\b", "What's"),
-    (r"\bhere is\b", "here's"), (r"\bHere is\b", "Here's"),
-    (r"\bthere is\b", "there's"), (r"\bThere is\b", "There's"),
-    (r"\blet us\b", "let's"), (r"\bLet us\b", "Let's"),
-    (r"\byou are\b", "you're"), (r"\bYou are\b", "You're"),
-    (r"\bthey are\b", "they're"), (r"\bThey are\b", "They're"),
-    (r"\bwe are\b", "we're"), (r"\bWe are\b", "We're"),
-    (r"\bhave not\b", "haven't"), (r"\bhas not\b", "hasn't"),
-    (r"\bdid not\b", "didn't"), (r"\bis not\b", "isn't"),
-    (r"\bare not\b", "aren't"), (r"\bwere not\b", "weren't"),
-    (r"\bwas not\b", "wasn't"), (r"\bwho is\b", "who's"),
-    (r"\bwhere is\b", "where's"), (r"\bhow is\b", "how's"),
+    (re.compile(r"\bI am\b"), "I'm"), (re.compile(r"\bI have\b"), "I've"), (re.compile(r"\bI will\b"), "I'll"),
+    (re.compile(r"\bI would\b"), "I'd"), (re.compile(r"\bdo not\b"), "don't"), (re.compile(r"\bDo not\b"), "Don't"),
+    (re.compile(r"\bcannot\b"), "can't"), (re.compile(r"\bCannot\b"), "Can't"),
+    (re.compile(r"\bwill not\b"), "won't"), (re.compile(r"\bWill not\b"), "Won't"),
+    (re.compile(r"\bshould not\b"), "shouldn't"), (re.compile(r"\bwould not\b"), "wouldn't"),
+    (re.compile(r"\bcould not\b"), "couldn't"), (re.compile(r"\bthat is\b"), "that's"),
+    (re.compile(r"\bThat is\b"), "That's"), (re.compile(r"\bit is\b"), "it's"), (re.compile(r"\bIt is\b"), "It's"),
+    (re.compile(r"\bwhat is\b"), "what's"), (re.compile(r"\bWhat is\b"), "What's"),
+    (re.compile(r"\bhere is\b"), "here's"), (re.compile(r"\bHere is\b"), "Here's"),
+    (re.compile(r"\bthere is\b"), "there's"), (re.compile(r"\bThere is\b"), "There's"),
+    (re.compile(r"\blet us\b"), "let's"), (re.compile(r"\bLet us\b"), "Let's"),
+    (re.compile(r"\byou are\b"), "you're"), (re.compile(r"\bYou are\b"), "You're"),
+    (re.compile(r"\bthey are\b"), "they're"), (re.compile(r"\bThey are\b"), "They're"),
+    (re.compile(r"\bwe are\b"), "we're"), (re.compile(r"\bWe are\b"), "We're"),
+    (re.compile(r"\bhave not\b"), "haven't"), (re.compile(r"\bhas not\b"), "hasn't"),
+    (re.compile(r"\bdid not\b"), "didn't"), (re.compile(r"\bis not\b"), "isn't"),
+    (re.compile(r"\bare not\b"), "aren't"), (re.compile(r"\bwere not\b"), "weren't"),
+    (re.compile(r"\bwas not\b"), "wasn't"), (re.compile(r"\bwho is\b"), "who's"),
+    (re.compile(r"\bwhere is\b"), "where's"), (re.compile(r"\bhow is\b"), "how's"),
 ]
 
 
 def _humanize_for_speech(text: str) -> str:
+    if not text or not text.strip():
+        return text
     t = text
     for pattern, repl in _CONTRACTIONS:
-        t = re.sub(pattern, repl, t)
+        t = pattern.sub(repl, t)
     t = re.sub(r'\*+', '', t)
     t = re.sub(r'#+\s*', '', t)
     t = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', t)
@@ -808,6 +810,7 @@ class VoicePipeline:
                 pass
         await self.stt.close()
         await self.tts.close()
+        await self.llm.close()
         # Close failover TTS providers
         for _, provider, _ in self._tts_chain._providers:
             if provider is not self.tts:

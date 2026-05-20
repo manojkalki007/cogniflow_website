@@ -81,22 +81,28 @@ class VobizProvider(TelephonyProvider):
 
     async def send_audio(self, payload: str):
         if self._websocket and self._stream_id:
-            msg = {
-                "event": "playAudio",
-                "media": {
-                    "contentType": "audio/x-mulaw",
-                    "sampleRate": "8000",
-                    "payload": payload,
-                },
-            }
-            await self._websocket.send_json(msg)
+            try:
+                msg = {
+                    "event": "playAudio",
+                    "media": {
+                        "contentType": "audio/x-mulaw",
+                        "sampleRate": "8000",
+                        "payload": payload,
+                    },
+                }
+                await self._websocket.send_json(msg)
+            except Exception:
+                logger.warning("Vobiz WebSocket send failed (connection closed)")
 
     async def clear_audio(self):
         if self._websocket and self._stream_id:
-            await self._websocket.send_json({
-                "event": "clear",
-                "streamId": self._stream_id,
-            })
+            try:
+                await self._websocket.send_json({
+                    "event": "clear",
+                    "streamId": self._stream_id,
+                })
+            except Exception:
+                logger.warning("Vobiz WebSocket clear failed (connection closed)")
 
     def get_twiml_or_response(self, ws_url: str, caller: str) -> str:
         return f"""<?xml version="1.0" encoding="UTF-8"?>
