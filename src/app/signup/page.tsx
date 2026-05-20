@@ -175,7 +175,7 @@ export default function SignupPage() {
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-10">
           <a href="/">
-            <CogniflowLogo width={160} />
+            <CogniflowLogo width={40} variant="light" />
           </a>
         </div>
 
