@@ -10,9 +10,9 @@ const FOOTER_LINKS = {
     { label: "Features", href: "#features" },
   ],
   Company: [
-    { label: "About", href: "#" },
+    { label: "About", href: "/about" },
     { label: "Blog", href: "#" },
-    { label: "Contact", href: "mailto:cogniflowautomations@gmail.com" },
+    { label: "Contact", href: "/contact" },
   ],
   Legal: [
     { label: "Privacy Policy", href: "/privacy" },
@@ -27,7 +27,7 @@ export default function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
           {/* Brand */}
           <div className="col-span-2">
-            <CogniflowLogo width={130} variant="dark" />
+            <CogniflowLogo width={28} variant="dark" />
             <p className="mt-4 text-sm text-[var(--color-text-muted)] max-w-xs leading-relaxed">
               AI voice agents for appointment booking, lead qualification, and sales outreach. Made in India.
             </p>

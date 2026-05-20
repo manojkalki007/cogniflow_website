@@ -1,8 +1,10 @@
 "use client";
 
 import { Check, ArrowRight } from "lucide-react";
+import { FadeUp, FadeIn, StaggerChildren, StaggerItem } from "./animations";
 
-const SIGNUP_URL = "https://cogniflowautomations.com/login?mode=signup";
+const SIGNUP_URL = "/signup";
+const CAL_LINK = "https://cal.com/kalki-111/book-a-call";
 
 const PLANS = [
   {
@@ -20,6 +22,7 @@ const PLANS = [
       "CRM integration",
     ],
     cta: "Start Free Trial",
+    ctaHref: SIGNUP_URL,
     popular: false,
   },
   {
@@ -39,6 +42,7 @@ const PLANS = [
       "Webhook integrations",
     ],
     cta: "Start Free Trial",
+    ctaHref: SIGNUP_URL,
     popular: true,
   },
   {
@@ -58,6 +62,7 @@ const PLANS = [
       "Custom integrations",
     ],
     cta: "Book a Demo",
+    ctaHref: CAL_LINK,
     popular: false,
   },
 ];
@@ -66,85 +71,95 @@ export default function Pricing() {
   return (
     <section id="pricing" className="py-20 px-4 sm:px-6">
       <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-14">
-          <h2 className="text-2xl sm:text-3xl md:text-[40px] font-semibold text-[var(--color-text)] tracking-[-0.01em]">
-            Simple, transparent pricing
-          </h2>
-          <p className="mt-4 text-[var(--color-text-muted)] max-w-xl mx-auto">
-            No hidden fees. Extra minutes at &#8377;10/min. 7-day free trial on all plans.
-          </p>
-        </div>
+        <FadeUp>
+          <div className="text-center mb-14">
+            <h2 className="text-2xl sm:text-3xl md:text-[40px] font-semibold text-[var(--color-text)] tracking-[-0.01em]">
+              Simple, transparent pricing
+            </h2>
+            <p className="mt-4 text-[var(--color-text-muted)] max-w-xl mx-auto">
+              No hidden fees. Extra minutes at &#8377;10/min. 7-day free trial on all plans.
+            </p>
+          </div>
+        </FadeUp>
 
-        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+        <StaggerChildren className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
           {PLANS.map((plan) => (
-            <div
-              key={plan.name}
-              className={`rounded-2xl p-7 flex flex-col ${
-                plan.popular
-                  ? "bg-[var(--color-dark-bg)] text-white ring-2 ring-[var(--color-brand)] relative"
-                  : "bg-white border border-[var(--color-border)]"
-              }`}
-            >
-              {plan.popular && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-[var(--color-brand)] text-white text-xs font-medium">
-                  Most Popular
-                </span>
-              )}
-
-              <div className="mb-6">
-                <h3 className={`text-lg font-semibold mb-1 ${plan.popular ? "text-white" : "text-[var(--color-text)]"}`}>
-                  {plan.name}
-                </h3>
-                <p className={`text-sm mb-4 ${plan.popular ? "text-white/60" : "text-[var(--color-text-muted)]"}`}>
-                  {plan.description}
-                </p>
-                <div className="flex items-baseline gap-1">
-                  {plan.price !== "Custom" && <span className={`text-sm ${plan.popular ? "text-white/60" : "text-[var(--color-text-light)]"}`}>&#8377;</span>}
-                  <span className={`text-4xl font-bold ${plan.popular ? "text-white" : "text-[var(--color-text)]"}`}>
-                    {plan.price}
-                  </span>
-                  {plan.period && (
-                    <span className={`text-sm ${plan.popular ? "text-white/60" : "text-[var(--color-text-light)]"}`}>
-                      {plan.period}
-                    </span>
-                  )}
-                </div>
-                <p className={`text-xs mt-2 ${plan.popular ? "text-white/50" : "text-[var(--color-text-light)]"}`}>
-                  {plan.minutes}
-                </p>
-              </div>
-
-              <ul className="space-y-3 mb-8 flex-1">
-                {plan.features.map((feature) => (
-                  <li key={feature} className="flex items-start gap-2.5 text-sm">
-                    <Check
-                      size={16}
-                      className={`flex-shrink-0 mt-0.5 ${plan.popular ? "text-[var(--color-brand)]" : "text-[var(--color-brand)]"}`}
-                    />
-                    <span className={plan.popular ? "text-white/80" : "text-[var(--color-text-muted)]"}>
-                      {feature}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-
-              <a
-                href={SIGNUP_URL}
-                className={`flex items-center justify-center gap-2 py-3 rounded-xl font-medium text-sm transition-all ${
+            <StaggerItem key={plan.name}>
+              <div
+                className={`rounded-2xl p-7 flex flex-col h-full relative ${
                   plan.popular
-                    ? "bg-[var(--color-brand)] text-white hover:bg-[var(--color-brand-dark)]"
-                    : "bg-[var(--color-bg-subtle)] text-[var(--color-text)] hover:bg-[var(--color-border)]"
+                    ? "bg-[var(--color-dark-bg)] text-white ring-2 ring-[var(--color-brand)]"
+                    : "bg-white border border-[var(--color-border)] hover:border-[var(--color-brand)]/40 hover:shadow-lg transition-all"
                 }`}
               >
-                {plan.cta} <ArrowRight size={14} />
-              </a>
-            </div>
-          ))}
-        </div>
+                {plan.popular && (
+                  <>
+                    <div className="absolute -inset-[1px] rounded-2xl bg-gradient-to-r from-[var(--color-brand)] via-cyan-400 to-[var(--color-brand)] opacity-20 blur-sm -z-10" />
+                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-[var(--color-brand)] text-white text-xs font-medium">
+                      Most Popular
+                    </span>
+                  </>
+                )}
 
-        <p className="text-center text-sm text-[var(--color-text-light)] mt-8">
-          No credit card required. 7-day free trial on Starter &amp; Growth plans.
-        </p>
+                <div className="mb-6">
+                  <h3 className={`text-lg font-semibold mb-1 ${plan.popular ? "text-white" : "text-[var(--color-text)]"}`}>
+                    {plan.name}
+                  </h3>
+                  <p className={`text-sm mb-4 ${plan.popular ? "text-white/60" : "text-[var(--color-text-muted)]"}`}>
+                    {plan.description}
+                  </p>
+                  <div className="flex items-baseline gap-1">
+                    {plan.price !== "Custom" && <span className={`text-sm ${plan.popular ? "text-white/60" : "text-[var(--color-text-light)]"}`}>&#8377;</span>}
+                    <span className={`text-4xl font-bold ${plan.popular ? "text-white" : "text-[var(--color-text)]"}`}>
+                      {plan.price}
+                    </span>
+                    {plan.period && (
+                      <span className={`text-sm ${plan.popular ? "text-white/60" : "text-[var(--color-text-light)]"}`}>
+                        {plan.period}
+                      </span>
+                    )}
+                  </div>
+                  <p className={`text-xs mt-2 ${plan.popular ? "text-white/50" : "text-[var(--color-text-light)]"}`}>
+                    {plan.minutes}
+                  </p>
+                </div>
+
+                <ul className="space-y-3 mb-8 flex-1">
+                  {plan.features.map((feature) => (
+                    <li key={feature} className="flex items-start gap-2.5 text-sm">
+                      <Check
+                        size={16}
+                        className="flex-shrink-0 mt-0.5 text-[var(--color-brand)]"
+                      />
+                      <span className={plan.popular ? "text-white/80" : "text-[var(--color-text-muted)]"}>
+                        {feature}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+
+                <a
+                  href={plan.ctaHref}
+                  target={plan.ctaHref.startsWith("http") ? "_blank" : undefined}
+                  rel={plan.ctaHref.startsWith("http") ? "noopener noreferrer" : undefined}
+                  className={`flex items-center justify-center gap-2 py-3 rounded-xl font-medium text-sm transition-all ${
+                    plan.popular
+                      ? "bg-[var(--color-brand)] text-white hover:bg-[var(--color-brand-dark)]"
+                      : "bg-[var(--color-bg-subtle)] text-[var(--color-text)] hover:bg-[var(--color-border)]"
+                  }`}
+                >
+                  {plan.cta} <ArrowRight size={14} />
+                </a>
+              </div>
+            </StaggerItem>
+          ))}
+        </StaggerChildren>
+
+        <FadeIn delay={0.3}>
+          <p className="text-center text-sm text-[var(--color-text-light)] mt-8">
+            No credit card required. 7-day free trial on Starter &amp; Growth plans.
+          </p>
+        </FadeIn>
       </div>
     </section>
   );

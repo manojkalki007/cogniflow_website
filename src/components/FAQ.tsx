@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { FadeUp, FadeIn } from "./animations";
 
 const FAQS = [
   {
@@ -36,38 +37,42 @@ export default function FAQ() {
   return (
     <section id="faq" className="py-20 px-4 sm:px-6">
       <div className="max-w-3xl mx-auto">
-        <div className="text-center mb-14">
-          <h2 className="text-2xl sm:text-3xl md:text-[40px] font-semibold text-[var(--color-text)] tracking-[-0.01em]">
-            Frequently asked questions
-          </h2>
-        </div>
+        <FadeUp>
+          <div className="text-center mb-14">
+            <h2 className="text-2xl sm:text-3xl md:text-[40px] font-semibold text-[var(--color-text)] tracking-[-0.01em]">
+              Frequently asked questions
+            </h2>
+          </div>
+        </FadeUp>
 
-        <div className="space-y-3">
-          {FAQS.map(({ q, a }, i) => (
-            <div
-              key={i}
-              className="border border-[var(--color-border)] rounded-xl overflow-hidden transition-colors hover:border-[var(--color-brand)]"
-            >
-              <button
-                onClick={() => setOpenIndex(openIndex === i ? null : i)}
-                className="w-full flex items-center justify-between px-6 py-4 text-left"
+        <FadeIn delay={0.2}>
+          <div className="space-y-3">
+            {FAQS.map(({ q, a }, i) => (
+              <div
+                key={i}
+                className="border border-[var(--color-border)] rounded-xl overflow-hidden transition-all hover:border-[var(--color-brand)]/40 hover:shadow-sm"
               >
-                <span className="text-sm sm:text-base font-medium text-[var(--color-text)] pr-4">{q}</span>
-                <ChevronDown
-                  size={18}
-                  className={`flex-shrink-0 text-[var(--color-text-light)] transition-transform duration-200 ${
-                    openIndex === i ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
-              {openIndex === i && (
-                <div className="px-6 pb-4">
-                  <p className="text-sm text-[var(--color-text-muted)] leading-relaxed">{a}</p>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+                <button
+                  onClick={() => setOpenIndex(openIndex === i ? null : i)}
+                  className="w-full flex items-center justify-between px-6 py-4 text-left"
+                >
+                  <span className="text-sm sm:text-base font-medium text-[var(--color-text)] pr-4">{q}</span>
+                  <ChevronDown
+                    size={18}
+                    className={`flex-shrink-0 text-[var(--color-text-light)] transition-transform duration-200 ${
+                      openIndex === i ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+                {openIndex === i && (
+                  <div className="px-6 pb-4">
+                    <p className="text-sm text-[var(--color-text-muted)] leading-relaxed">{a}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </FadeIn>
       </div>
     </section>
   );

@@ -25,8 +25,8 @@ const NAV_LINKS = [
   },
 ];
 
-const LOGIN_URL = "https://cogniflowautomations.com/login";
-const SIGNUP_URL = "https://cogniflowautomations.com/login?mode=signup";
+const LOGIN_URL = "/login";
+const SIGNUP_URL = "/signup";
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -44,6 +44,17 @@ export default function Navbar() {
     return () => { document.body.style.overflow = ""; };
   }, [mobileOpen]);
 
+  const handleSmoothScroll = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (href.startsWith("#") && href.length > 1) {
+      e.preventDefault();
+      const el = document.querySelector(href);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      setMobileOpen(false);
+    }
+  };
+
   return (
     <>
       <nav
@@ -53,7 +64,7 @@ export default function Navbar() {
       >
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
           <a href="#" className="flex items-center">
-            <CogniflowLogo width={32} variant="dark" />
+            <CogniflowLogo width={30} variant="dark" />
           </a>
 
           {/* Desktop nav */}
@@ -67,6 +78,7 @@ export default function Navbar() {
               >
                 <a
                   href={link.href}
+                  onClick={(e) => handleSmoothScroll(e, link.href)}
                   className="flex items-center gap-1 px-3 py-2 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
                 >
                   {link.label}
@@ -80,6 +92,7 @@ export default function Navbar() {
                         <a
                           key={item.label}
                           href={item.href}
+                          onClick={(e) => handleSmoothScroll(e, item.href)}
                           className="block px-3 py-2.5 rounded-lg hover:bg-[var(--color-bg-subtle)] transition-colors"
                         >
                           <div className="text-sm font-medium text-[var(--color-text)]">{item.label}</div>
@@ -133,7 +146,7 @@ export default function Navbar() {
               <div key={link.label}>
                 <a
                   href={link.href}
-                  onClick={() => !link.dropdown && setMobileOpen(false)}
+                  onClick={(e) => { if (!link.dropdown) handleSmoothScroll(e, link.href); }}
                   className="block py-3 text-lg font-medium text-[var(--color-text)]"
                 >
                   {link.label}
@@ -144,7 +157,7 @@ export default function Navbar() {
                       <a
                         key={item.label}
                         href={item.href}
-                        onClick={() => setMobileOpen(false)}
+                        onClick={(e) => handleSmoothScroll(e, item.href)}
                         className="block py-2 text-sm text-[var(--color-text-muted)]"
                       >
                         {item.label}

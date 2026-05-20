@@ -5,6 +5,7 @@ import TwoServices from "@/components/TwoServices";
 import FeatureGrid from "@/components/FeatureGrid";
 import HowItWorks from "@/components/HowItWorks";
 import UseCases from "@/components/UseCases";
+import Testimonial from "@/components/Testimonial";
 import Pricing from "@/components/Pricing";
 import FAQ from "@/components/FAQ";
 import FinalCTA from "@/components/FinalCTA";
@@ -21,6 +22,7 @@ export default function Home() {
         <FeatureGrid />
         <HowItWorks />
         <UseCases />
+        <Testimonial />
         <Pricing />
         <FAQ />
         <FinalCTA />

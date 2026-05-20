@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { SmoothScroll } from "@/components/SmoothScroll";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -41,7 +42,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full antialiased">
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <SmoothScroll />
+        {children}
+      </body>
     </html>
   );
 }
