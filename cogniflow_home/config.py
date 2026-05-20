@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     exotel_api_key: str = ""
     exotel_api_token: str = ""
     exotel_account_sid: str = ""
-    exotel_subdomain: str = ""
+    exotel_subdomain: str = "api"  # "api" (Singapore) or "api.in" (Mumbai/India)
     exotel_caller_id: str = ""
 
     # Vobiz (India)
@@ -83,6 +83,19 @@ class Settings(BaseSettings):
     google_calendar_id: str = "primary"
     google_service_account_json: str = ""
     google_service_account_path: str = ""
+
+    # MCube (India)
+    mcube_api_key: str = ""
+    mcube_api_secret: str = ""
+    mcube_phone_number: str = ""
+
+    # SIP Trunking
+    sip_trunk_host: str = ""
+    sip_trunk_port: int = 5060
+    sip_trunk_username: str = ""
+    sip_trunk_password: str = ""
+    sip_trunk_transport: str = "udp"
+    sip_outbound_proxy: str = ""
 
     # Razorpay
     razorpay_key_id: str = ""

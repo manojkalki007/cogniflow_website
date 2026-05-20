@@ -1,15 +1,23 @@
 """Vobiz telephony provider for Indian calls.
 
 Handles Vobiz XML Application + Audio Streams (WebSocket) protocol.
-Audio format: mulaw 8kHz, base64 encoded (same as Twilio).
-Vobiz docs: https://www.docs.vobiz.ai
+Supports audio formats: mulaw 8kHz, L16 8kHz/16kHz.
 
 Architecture:
-  Caller → Vobiz PSTN → XML webhook → returns <Stream> XML
-  → Vobiz opens WebSocket → bidirectional audio
-  → Pipeline: STT → LLM → TTS → audio back via WebSocket
+  Caller -> Vobiz PSTN -> XML webhook -> returns <Stream> XML
+  -> Vobiz opens WebSocket -> bidirectional audio
+  -> Pipeline: STT -> LLM -> TTS -> audio back via WebSocket
 
-Cost: ₹0.45/min voice, ₹0.65/min streaming, INR billing, TRAI compliant.
+Protocol notes (from Vobiz docs):
+  - Vobiz sends `start` as first event (no `connected` event)
+  - Send audio back with `playAudio` event (NOT `media`)
+  - Clear queued audio with `clearAudio` event (NOT `clear`)
+  - No in-band `stop` from Vobiz — WebSocket close IS the end signal
+  - L16 audio uses big-endian byte order
+  - Endpoints use capital letters (/Account/, /Call/) with trailing slashes
+
+API base: https://api.vobiz.ai/api/v1
+Auth: X-Auth-ID + X-Auth-Token headers
 """
 
 import base64
@@ -17,7 +25,7 @@ import json
 import logging
 
 import httpx
-from starlette.websockets import WebSocket
+from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from cogniflow_home.config import settings
 from cogniflow_home.telephony.base import (
@@ -28,6 +36,8 @@ from cogniflow_home.telephony.base import (
 )
 
 logger = logging.getLogger("cogniflow_home.telephony.vobiz")
+
+VOBIZ_API_BASE = "https://api.vobiz.ai/api/v1"
 
 
 class VobizProvider(TelephonyProvider):
@@ -51,15 +61,30 @@ class VobizProvider(TelephonyProvider):
                 event = message.get("event", "")
 
                 if event == "start":
-                    self._stream_id = message.get("streamId", "")
-                    custom = message.get("customParameters", {})
+                    start = message.get("start", {})
+                    self._stream_id = start.get("streamId", message.get("streamId", ""))
+                    call_id = start.get("callId", "")
+                    media_format = start.get("mediaFormat", {})
+                    extra = message.get("extra_headers", "{}")
+                    if isinstance(extra, str):
+                        try:
+                            extra = json.loads(extra)
+                        except (json.JSONDecodeError, TypeError):
+                            extra = {}
+
                     call_info = CallInfo(
-                        call_sid=message.get("callUUID", custom.get("CallUUID", "")),
+                        call_sid=call_id,
                         stream_sid=self._stream_id,
-                        caller_number=custom.get("caller", custom.get("From", "unknown")),
-                        called_number=custom.get("called", custom.get("To", "")),
-                        direction=custom.get("direction", "inbound"),
+                        caller_number=extra.get("From", "unknown"),
+                        called_number=extra.get("To", ""),
+                        direction=extra.get("Direction", "inbound"),
                         provider=self.name,
+                        metadata={
+                            "encoding": media_format.get("encoding", ""),
+                            "sample_rate": media_format.get("sampleRate", 8000),
+                            "account_id": start.get("accountId", ""),
+                            "tracks": start.get("tracks", []),
+                        },
                     )
                     await on_call_start(call_info)
 
@@ -70,10 +95,15 @@ class VobizProvider(TelephonyProvider):
                         audio_bytes = base64.b64decode(payload)
                         await on_audio(audio_bytes)
 
-                elif event == "stop":
-                    logger.info(f"Vobiz stream stopped: {self._stream_id}")
-                    break
+                elif event == "playedStream":
+                    name = message.get("name", "")
+                    logger.debug(f"Vobiz playback completed: {name}")
 
+                elif event == "clearedAudio":
+                    logger.debug("Vobiz audio queue cleared")
+
+        except WebSocketDisconnect:
+            logger.info(f"Vobiz WebSocket closed (stream end): {self._stream_id}")
         except Exception:
             logger.exception("Vobiz WebSocket error")
         finally:
@@ -86,23 +116,46 @@ class VobizProvider(TelephonyProvider):
                     "event": "playAudio",
                     "media": {
                         "contentType": "audio/x-mulaw",
-                        "sampleRate": "8000",
+                        "sampleRate": 8000,
                         "payload": payload,
                     },
                 }
-                await self._websocket.send_json(msg)
+                await self._websocket.send_text(json.dumps(msg))
             except Exception:
                 logger.warning("Vobiz WebSocket send failed (connection closed)")
+
+    async def send_checkpoint(self, name: str):
+        """Request acknowledgment when all queued audio finishes playing."""
+        if self._websocket and self._stream_id:
+            try:
+                await self._websocket.send_text(json.dumps({
+                    "event": "checkpoint",
+                    "streamId": self._stream_id,
+                    "name": name,
+                }))
+            except Exception:
+                logger.warning("Vobiz checkpoint send failed")
 
     async def clear_audio(self):
         if self._websocket and self._stream_id:
             try:
-                await self._websocket.send_json({
-                    "event": "clear",
+                await self._websocket.send_text(json.dumps({
+                    "event": "clearAudio",
                     "streamId": self._stream_id,
-                })
+                }))
             except Exception:
-                logger.warning("Vobiz WebSocket clear failed (connection closed)")
+                logger.warning("Vobiz clearAudio failed (connection closed)")
+
+    async def stop_stream(self):
+        """Terminate the stream from our side."""
+        if self._websocket and self._stream_id:
+            try:
+                await self._websocket.send_text(json.dumps({
+                    "event": "stop",
+                    "streamId": self._stream_id,
+                }))
+            except Exception:
+                pass
 
     def get_twiml_or_response(self, ws_url: str, caller: str) -> str:
         return f"""<?xml version="1.0" encoding="UTF-8"?>
@@ -125,7 +178,7 @@ class VobizProvider(TelephonyProvider):
             "to": to_number,
             "answer_url": webhook_url,
             "answer_method": "POST",
-            "hangup_url": f"{settings.public_url}/voice/vobiz/hangup",
+            "hangup_url": status_callback_url or f"{settings.public_url}/voice/vobiz/hangup",
             "hangup_method": "POST",
             "ring_url": f"{settings.public_url}/voice/vobiz/ring",
             "ring_method": "POST",
@@ -133,18 +186,17 @@ class VobizProvider(TelephonyProvider):
             "machine_detection": "true",
             "machine_detection_time": 5000,
         }
-        if status_callback_url:
-            payload["hangup_url"] = status_callback_url
 
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f"https://api.vobiz.ai/api/v1/Account/{settings.vobiz_auth_id}/Call/",
+                f"{VOBIZ_API_BASE}/Account/{settings.vobiz_auth_id}/Call/",
                 headers={
                     "X-Auth-ID": settings.vobiz_auth_id,
                     "X-Auth-Token": settings.vobiz_auth_token,
                     "Content-Type": "application/json",
                 },
                 json=payload,
+                timeout=15.0,
             )
 
         if response.status_code not in (200, 201, 202):

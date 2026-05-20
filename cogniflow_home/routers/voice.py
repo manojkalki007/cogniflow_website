@@ -214,6 +214,83 @@ async def api_vobiz_numbers(auth: AuthContext = Depends(get_auth_context)):
     return {"numbers": data.get("objects", [])}
 
 
+# ─── MCube Webhooks ───
+# MCube does NOT support WebSocket audio streaming.
+# These endpoints handle click-to-call callbacks only (hangup/status webhooks).
+
+@router.post("/voice/mcube/inbound")
+async def mcube_inbound(request: Request):
+    """MCube inbound call callback.
+
+    MCube does not support real-time audio streaming. This endpoint
+    receives call notification webhooks only. For AI voice on MCube
+    numbers, route through SIP trunk bridge.
+    """
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        try:
+            form = await request.form()
+            body = dict(form)
+        except Exception:
+            pass
+    caller = body.get("From", body.get("caller", "unknown"))
+    logger.info(f"[MCUBE] Inbound call from {caller}")
+    return {"status": "received", "note": "MCube does not support WebSocket streaming"}
+
+
+@router.post("/voice/mcube/status")
+async def mcube_status(request: Request):
+    """MCube call status/hangup callback (refurl webhook)."""
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        try:
+            form = await request.form()
+            body = dict(form)
+        except Exception:
+            pass
+    call_id = body.get("monitorUcid", body.get("call_id", ""))
+    status = body.get("status", body.get("callStatus", ""))
+    duration = body.get("duration", body.get("callDuration", ""))
+    logger.info(f"[MCUBE] Call status: {status} | ID: {call_id} | Duration: {duration}s")
+    return {"status": "ok"}
+
+
+# ─── SIP Webhooks ───
+
+@router.post("/voice/sip/inbound")
+async def sip_inbound(request: Request):
+    """SIP inbound call webhook — return WebSocket URL for PBX bridge."""
+    ws_url = settings.public_url.replace("https://", "wss://").replace("http://", "ws://")
+    ws_url = f"{ws_url}/voice/sip/ws"
+    provider = get_provider("sip")
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    caller = body.get("from", body.get("caller_id", "unknown"))
+    return json.loads(provider.get_twiml_or_response(ws_url, caller))
+
+
+@router.post("/voice/sip/outbound")
+async def sip_outbound(request: Request):
+    """SIP outbound call answered — return WebSocket URL."""
+    ws_url = settings.public_url.replace("https://", "wss://").replace("http://", "ws://")
+    ws_url = f"{ws_url}/voice/sip/ws"
+    provider = get_provider("sip")
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    called = body.get("to", body.get("did", "unknown"))
+    return json.loads(provider.get_twiml_or_response(ws_url, called))
+
+
 # ─── Generic Inbound Fallback ───
 
 @router.post("/voice/{provider_name}/inbound")

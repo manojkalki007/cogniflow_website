@@ -15,6 +15,7 @@ from cogniflow_home.routers.organizations import router as organizations_router
 from cogniflow_home.routers.templates import router as templates_router
 from cogniflow_home.routers.benchmarks import router as benchmarks_router
 from cogniflow_home.routers.v1 import router as v1_router
+from cogniflow_home.routers.numbers import router as numbers_router
 
 all_routers = [
     health_router,
@@ -32,4 +33,5 @@ all_routers = [
     templates_router,
     benchmarks_router,
     v1_router,
+    numbers_router,
 ]

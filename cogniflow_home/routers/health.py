@@ -43,6 +43,8 @@ async def health():
         "twilio": "configured" if settings.twilio_account_sid else "not_configured",
         "exotel": "configured" if settings.exotel_api_key else "not_configured",
         "vobiz": "configured" if settings.vobiz_auth_id else "not_configured",
+        "mcube": "configured" if settings.mcube_api_key else "not_configured",
+        "sip": "configured" if settings.sip_trunk_host else "not_configured",
     }
 
     checks["integrations"] = {
@@ -111,6 +113,8 @@ async def diagnose_voice():
             "twilio": bool(settings.twilio_account_sid),
             "exotel": bool(settings.exotel_api_key),
             "vobiz": bool(settings.vobiz_auth_id),
+            "mcube": bool(settings.mcube_api_key),
+            "sip": bool(settings.sip_trunk_host),
         },
     }
 
