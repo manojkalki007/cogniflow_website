@@ -1,6 +1,6 @@
 import { useRef, useEffect } from "react";
 
-export default function OTPInput({ length = 6, value = [], onChange, disabled, error }) {
+export default function OTPInput({ length = 8, value = [], onChange, disabled, error }) {
   const refs = useRef([]);
 
   useEffect(() => {

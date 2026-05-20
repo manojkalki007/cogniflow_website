@@ -61,7 +61,7 @@ export default function Login() {
   const handleOtpChange = useCallback((val) => {
     setOtp(val);
     setOtpError(false);
-    if (val.filter(Boolean).length === 6) {
+    if (val.filter(Boolean).length === 8) {
       verifyOtp(val.join(""));
     }
   }, [email]);
@@ -331,7 +331,7 @@ export default function Login() {
 
                 <h2 className="login-card-title">Check your email</h2>
                 <p className="login-card-subtitle">
-                  We sent a 6-digit code to{" "}
+                  We sent an 8-digit code to{" "}
                   <strong style={{ color: "#CBD5E1" }}>{email}</strong>
                 </p>
 
