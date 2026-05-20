@@ -8,7 +8,7 @@ import CogniflowLogo from "@/components/CogniflowLogo";
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
-  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [otp, setOtp] = useState(["", "", "", "", "", "", "", ""]);
   const [step, setStep] = useState<"email" | "otp">("email");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -40,7 +40,7 @@ export default function LoginPage() {
 
   async function handleVerifyOtp() {
     const code = otp.join("");
-    if (code.length !== 6) return;
+    if (code.length !== 8) return;
 
     setError("");
     setLoading(true);
@@ -97,14 +97,14 @@ export default function LoginPage() {
     newOtp[index] = value;
     setOtp(newOtp);
 
-    if (value && index < 5) {
+    if (value && index < 7) {
       inputRefs.current[index + 1]?.focus();
     }
 
-    if (newOtp.every((d) => d !== "") && newOtp.join("").length === 6) {
+    if (newOtp.every((d) => d !== "") && newOtp.join("").length === 8) {
       setTimeout(() => {
         const code = newOtp.join("");
-        if (code.length === 6) handleVerifyWithCode(code);
+        if (code.length === 8) handleVerifyWithCode(code);
       }, 100);
     }
   }
@@ -117,19 +117,19 @@ export default function LoginPage() {
 
   function handleOtpPaste(e: React.ClipboardEvent) {
     e.preventDefault();
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 8);
     if (!pasted) return;
 
     const newOtp = [...otp];
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 8; i++) {
       newOtp[i] = pasted[i] || "";
     }
     setOtp(newOtp);
 
-    const focusIndex = Math.min(pasted.length, 5);
+    const focusIndex = Math.min(pasted.length, 7);
     inputRefs.current[focusIndex]?.focus();
 
-    if (pasted.length === 6) {
+    if (pasted.length === 8) {
       setTimeout(() => handleVerifyWithCode(pasted), 100);
     }
   }
@@ -269,7 +269,7 @@ export default function LoginPage() {
                 Enter verification code
               </h2>
               <p className="mt-3 text-white/50 text-sm leading-relaxed">
-                We sent a 6-digit code to{" "}
+                We sent an 8-digit code to{" "}
                 <span className="text-white/70 font-medium">{email}</span>
               </p>
 
@@ -284,7 +284,7 @@ export default function LoginPage() {
                     value={digit}
                     onChange={(e) => handleOtpChange(i, e.target.value)}
                     onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                    className="w-12 h-14 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-center text-xl font-semibold focus:outline-none focus:border-[#0052CC]/50 focus:ring-1 focus:ring-[#0052CC]/25 transition-all"
+                    className="w-10 h-12 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-center text-lg font-semibold focus:outline-none focus:border-[#0052CC]/50 focus:ring-1 focus:ring-[#0052CC]/25 transition-all"
                   />
                 ))}
               </div>
@@ -297,7 +297,7 @@ export default function LoginPage() {
 
               <button
                 onClick={handleVerifyOtp}
-                disabled={loading || otp.join("").length !== 6}
+                disabled={loading || otp.join("").length !== 8}
                 className="mt-6 w-full py-3.5 rounded-full bg-[#0052CC] text-white font-semibold text-sm hover:bg-[#003d99] transition-colors disabled:opacity-60"
               >
                 {loading ? "Verifying..." : "Sign In"}
@@ -318,7 +318,7 @@ export default function LoginPage() {
               </div>
 
               <button
-                onClick={() => { setStep("email"); setOtp(["", "", "", "", "", ""]); setError(""); }}
+                onClick={() => { setStep("email"); setOtp(["", "", "", "", "", "", "", ""]); setError(""); }}
                 className="mt-3 text-sm text-white/40 hover:text-white/60 transition-colors"
               >
                 Use a different email
