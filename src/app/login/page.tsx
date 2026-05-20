@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { supabaseBrowser } from "@/lib/supabase-browser";
+import { getSupabaseBrowser } from "@/lib/supabase-browser";
 import CogniflowLogo from "@/components/CogniflowLogo";
 
 export default function LoginPage() {
@@ -20,7 +20,7 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const { error: otpError } = await supabaseBrowser.auth.signInWithOtp({
+    const { error: otpError } = await getSupabaseBrowser().auth.signInWithOtp({
       email,
       options: {
         shouldCreateUser: false,
@@ -45,7 +45,7 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const { error: verifyError } = await supabaseBrowser.auth.verifyOtp({
+    const { error: verifyError } = await getSupabaseBrowser().auth.verifyOtp({
       email,
       token: code,
       type: "email",
@@ -64,7 +64,7 @@ export default function LoginPage() {
     if (resendCooldown > 0) return;
     setError("");
 
-    const { error: resendError } = await supabaseBrowser.auth.signInWithOtp({
+    const { error: resendError } = await getSupabaseBrowser().auth.signInWithOtp({
       email,
       options: { shouldCreateUser: false },
     });
@@ -138,7 +138,7 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const { error: verifyError } = await supabaseBrowser.auth.verifyOtp({
+    const { error: verifyError } = await getSupabaseBrowser().auth.verifyOtp({
       email,
       token: code,
       type: "email",
@@ -155,7 +155,7 @@ export default function LoginPage() {
 
   async function handleGoogleLogin() {
     setError("");
-    const { error: oauthError } = await supabaseBrowser.auth.signInWithOAuth({
+    const { error: oauthError } = await getSupabaseBrowser().auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: window.location.origin + "/auth/callback",

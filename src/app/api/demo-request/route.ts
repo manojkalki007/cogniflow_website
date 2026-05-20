@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { error } = await supabase.from("demo_requests").insert({
+  const { error } = await getSupabase().from("demo_requests").insert({
     first_name: firstName.slice(0, 100),
     last_name: lastName.slice(0, 100),
     email: email.slice(0, 255),

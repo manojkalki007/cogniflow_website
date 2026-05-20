@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabaseBrowser } from "@/lib/supabase-browser";
+import { getSupabaseBrowser } from "@/lib/supabase-browser";
 import CogniflowLogo from "@/components/CogniflowLogo";
 import type { Session } from "@supabase/supabase-js";
 
@@ -12,7 +12,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabaseBrowser.auth.getSession().then(({ data: { session } }) => {
+    getSupabaseBrowser().auth.getSession().then(({ data: { session } }) => {
       if (!session) {
         router.push("/login");
         return;
@@ -23,7 +23,7 @@ export default function DashboardPage() {
 
     const {
       data: { subscription },
-    } = supabaseBrowser.auth.onAuthStateChange((_event, session) => {
+    } = getSupabaseBrowser().auth.onAuthStateChange((_event, session) => {
       if (!session) {
         router.push("/login");
         return;
@@ -35,7 +35,7 @@ export default function DashboardPage() {
   }, [router]);
 
   async function handleSignOut() {
-    await supabaseBrowser.auth.signOut();
+    await getSupabaseBrowser().auth.signOut();
     router.push("/login");
   }
 

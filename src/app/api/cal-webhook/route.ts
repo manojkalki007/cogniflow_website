@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 
 export async function POST(req: NextRequest) {
   const payload = await req.json();
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
 
     if (email && bookingUid) {
       // Update existing booking or insert new one
-      const { data: existing } = await supabase
+      const { data: existing } = await getSupabase()
         .from("call_bookings")
         .select("id")
         .eq("email", email)
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (existing) {
-        await supabase
+        await getSupabase()
           .from("call_bookings")
           .update({
             cal_booking_uid: bookingUid,
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
           })
           .eq("id", existing.id);
       } else {
-        await supabase.from("call_bookings").insert({
+        await getSupabase().from("call_bookings").insert({
           name: data?.attendees?.[0]?.name || email,
           email,
           cal_booking_uid: bookingUid,
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
   if (triggerEvent === "BOOKING_CANCELLED") {
     const bookingUid = data?.uid;
     if (bookingUid) {
-      await supabase
+      await getSupabase()
         .from("call_bookings")
         .update({
           status: "cancelled",
