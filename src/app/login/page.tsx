@@ -175,7 +175,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-10">
           <a href="/">
-            <CogniflowLogo width={40} variant="light" />
+            <CogniflowLogo width={52} variant="light" />
           </a>
         </div>
 
