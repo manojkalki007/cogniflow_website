@@ -20,22 +20,28 @@ export default function SignupPage() {
     setError("");
     setLoading(true);
 
-    const { error: otpError } = await getSupabaseBrowser().auth.signInWithOtp({
-      email,
-      options: {
-        shouldCreateUser: true,
-      },
-    });
+    try {
+      const supabase = getSupabaseBrowser();
+      const { error: otpError } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: true,
+        },
+      });
 
-    if (otpError) {
-      setError(otpError.message);
+      if (otpError) {
+        setError(otpError.message);
+        setLoading(false);
+        return;
+      }
+
+      setStep("otp");
       setLoading(false);
-      return;
+      startCooldown();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send OTP");
+      setLoading(false);
     }
-
-    setStep("otp");
-    setLoading(false);
-    startCooldown();
   }
 
   async function handleVerifyOtp() {
@@ -45,36 +51,47 @@ export default function SignupPage() {
     setError("");
     setLoading(true);
 
-    const { error: verifyError } = await getSupabaseBrowser().auth.verifyOtp({
-      email,
-      token: code,
-      type: "email",
-    });
+    try {
+      const supabase = getSupabaseBrowser();
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        email,
+        token: code,
+        type: "email",
+      });
 
-    if (verifyError) {
-      setError(verifyError.message);
+      if (verifyError) {
+        setError(verifyError.message);
+        setLoading(false);
+        return;
+      }
+
+      router.push("/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Verification failed");
       setLoading(false);
-      return;
     }
-
-    router.push("/dashboard");
   }
 
   async function handleResend() {
     if (resendCooldown > 0) return;
     setError("");
 
-    const { error: resendError } = await getSupabaseBrowser().auth.signInWithOtp({
-      email,
-      options: { shouldCreateUser: true },
-    });
+    try {
+      const supabase = getSupabaseBrowser();
+      const { error: resendError } = await supabase.auth.signInWithOtp({
+        email,
+        options: { shouldCreateUser: true },
+      });
 
-    if (resendError) {
-      setError(resendError.message);
-      return;
+      if (resendError) {
+        setError(resendError.message);
+        return;
+      }
+
+      startCooldown();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to resend OTP");
     }
-
-    startCooldown();
   }
 
   function startCooldown() {
@@ -138,32 +155,44 @@ export default function SignupPage() {
     setError("");
     setLoading(true);
 
-    const { error: verifyError } = await getSupabaseBrowser().auth.verifyOtp({
-      email,
-      token: code,
-      type: "email",
-    });
+    try {
+      const supabase = getSupabaseBrowser();
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        email,
+        token: code,
+        type: "email",
+      });
 
-    if (verifyError) {
-      setError(verifyError.message);
+      if (verifyError) {
+        setError(verifyError.message);
+        setLoading(false);
+        return;
+      }
+
+      router.push("/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Verification failed");
       setLoading(false);
-      return;
     }
-
-    router.push("/dashboard");
   }
 
   async function handleGoogleSignup() {
     setError("");
-    const { error: oauthError } = await getSupabaseBrowser().auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: window.location.origin + "/auth/callback",
-      },
-    });
 
-    if (oauthError) {
-      setError(oauthError.message);
+    try {
+      const supabase = getSupabaseBrowser();
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: window.location.origin + "/auth/callback",
+        },
+      });
+
+      if (oauthError) {
+        setError(oauthError.message);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Google sign-in failed");
     }
   }
 
