@@ -17,10 +17,10 @@ const NAV_LINKS = [
   { label: "Pricing", href: "#pricing" },
   {
     label: "Resources",
-    href: "#",
+    href: "#features",
     dropdown: [
-      { label: "Blog", href: "#", desc: "Insights on AI voice agents" },
-      { label: "Docs", href: "#", desc: "Integration guides & API reference" },
+      { label: "Book a Demo", href: "/book-call", desc: "See Cogniflow in action — live call demo" },
+      { label: "Contact Us", href: "/contact", desc: "Questions? We're here to help" },
     ],
   },
 ];

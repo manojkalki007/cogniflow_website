@@ -9,6 +9,7 @@ import Testimonial from "@/components/Testimonial";
 import Pricing from "@/components/Pricing";
 import FAQ from "@/components/FAQ";
 import FinalCTA from "@/components/FinalCTA";
+import MobileCTA from "@/components/MobileCTA";
 import Footer from "@/components/Footer";
 
 export default function Home() {
@@ -28,6 +29,7 @@ export default function Home() {
         <FinalCTA />
       </main>
       <Footer />
+      <MobileCTA />
     </>
   );
 }

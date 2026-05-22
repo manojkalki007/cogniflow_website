@@ -312,6 +312,18 @@ class VoicePipeline:
 
         return custom_greeting
 
+    async def _prewarm_kb(self):
+        try:
+            from cogniflow_home.knowledge.base import kb
+            agent_id = getattr(self, 'agent_id', None)
+            if agent_id:
+                self._kb_ready = True
+                self._kb = kb
+                logger.debug(f"KB pre-warmed for agent {agent_id}")
+        except Exception:
+            self._kb_ready = False
+            logger.debug("KB prewarm unavailable (non-fatal)", exc_info=True)
+
     async def _prewarm_tts(self):
         await self.tts.connect()
         try:
@@ -334,16 +346,20 @@ class VoicePipeline:
     async def start(self):
         self._running = True
 
+        self._kb_ready = False
+        self._kb = None
+
         results = await asyncio.gather(
             self.stt.connect(),
             self._prewarm_tts(),
             self._fetch_memory_and_prediction(),
             self.llm.prewarm(),
+            self._prewarm_kb(),
             return_exceptions=True,
         )
         for i, r in enumerate(results):
             if isinstance(r, Exception):
-                labels = ["STT", "TTS", "Memory", "LLM"]
+                labels = ["STT", "TTS", "Memory", "LLM", "KB"]
                 logger.error(f"{labels[i]} prewarm failed: {r}")
         if isinstance(results[0], Exception):
             raise RuntimeError(f"STT connect failed: {results[0]}")
@@ -566,16 +582,16 @@ class VoicePipeline:
             if self.emotion_adapter.should_offer_human():
                 llm_input += "\n[SYSTEM: Caller has been frustrated for 5+ turns. Proactively offer to transfer to a human agent.]"
 
-            try:
-                from cogniflow_home.knowledge.base import kb
-                agent_id = getattr(self, 'agent_id', None)
-                if agent_id:
-                    kb_results = await kb.query(agent_id, user_text)
-                    kb_context = kb.build_context_prompt(kb_results)
-                    if kb_context:
-                        llm_input = kb_context + "\n\n" + llm_input
-            except Exception:
-                pass
+            if self._kb_ready and self._kb:
+                try:
+                    agent_id = getattr(self, 'agent_id', None)
+                    if agent_id:
+                        kb_results = await self._kb.query(agent_id, user_text)
+                        kb_context = self._kb.build_context_prompt(kb_results)
+                        if kb_context:
+                            llm_input = kb_context + "\n\n" + llm_input
+                except Exception:
+                    pass
 
             full_response = ""
             t_llm = self.tracer.start("llm_ttft")

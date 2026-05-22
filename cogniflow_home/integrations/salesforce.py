@@ -27,6 +27,12 @@ class SalesforceIntegration:
     def _sanitize_phone(self, phone: str) -> str:
         return re.sub(r"[^\d+\s\-()]", "", phone or "")
 
+    @staticmethod
+    def _escape_soql(value: str) -> str:
+        value = value.replace("\\", "\\\\")
+        value = value.replace("'", "\\'")
+        return value
+
     async def authenticate(self):
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(
@@ -66,9 +72,9 @@ class SalesforceIntegration:
 
     async def find_contact(self, phone: str) -> dict | None:
         clean_phone = self._sanitize_phone(phone)
-        if not clean_phone:
+        if not clean_phone or not re.fullmatch(r"[\d+\s\-()]{7,20}", clean_phone):
             return None
-        safe = clean_phone.replace("'", "\\'")
+        safe = self._escape_soql(clean_phone)
         query = (
             f"SELECT Id, Name, Email, Phone, AccountId, Account.Name, Title "
             f"FROM Contact WHERE Phone = '{safe}' OR MobilePhone = '{safe}' "
@@ -80,9 +86,9 @@ class SalesforceIntegration:
 
     async def find_lead(self, phone: str) -> dict | None:
         clean_phone = self._sanitize_phone(phone)
-        if not clean_phone:
+        if not clean_phone or not re.fullmatch(r"[\d+\s\-()]{7,20}", clean_phone):
             return None
-        safe = clean_phone.replace("'", "\\'")
+        safe = self._escape_soql(clean_phone)
         query = (
             f"SELECT Id, Name, Email, Phone, Company, Status "
             f"FROM Lead WHERE Phone = '{safe}' OR MobilePhone = '{safe}' "

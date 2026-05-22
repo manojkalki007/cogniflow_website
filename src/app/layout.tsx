@@ -17,6 +17,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.cogniflowautomations.com"),
   title: "Cogniflow — AI Calling Agent & AI SDR for Indian Businesses",
   description:
     "Deploy AI voice agents for appointment booking, lead qualification, and sales outreach. Sub-500ms latency, 10+ Indian languages, starting at ₹2,999/month.",
@@ -32,10 +33,19 @@ export const metadata: Metadata = {
     url: "https://www.cogniflowautomations.com",
     siteName: "Cogniflow Automations",
     type: "website",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Cogniflow — AI Calling Agent & AI SDR for Indian Businesses",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Cogniflow — AI Calling Agent Platform",
+    images: ["/og-image.png"],
   },
   robots: {
     index: true,

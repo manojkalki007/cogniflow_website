@@ -111,6 +111,10 @@ class GoogleCalendar:
             with open(settings.google_service_account_path) as f:
                 creds = json.load(f)
         elif settings.google_service_account_json:
+            logger.warning(
+                "Using GOOGLE_SERVICE_ACCOUNT_JSON env var — prefer "
+                "GOOGLE_SERVICE_ACCOUNT_PATH with file permissions restricted to 600"
+            )
             creds = json.loads(settings.google_service_account_json)
         else:
             raise ValueError("No Google service account credentials configured")

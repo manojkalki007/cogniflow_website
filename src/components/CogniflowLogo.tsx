@@ -10,27 +10,24 @@ interface CogniflowLogoProps {
 }
 
 export function CogniflowIcon({ size = 28 }: { size?: number }) {
-  const height = Math.round(size * 0.67);
   return (
     <Image
-      src="/cogniflow-logo.png"
+      src="/cogniflow-logo.svg"
       alt="Cogniflow"
       width={size}
-      height={height}
+      height={Math.round(size * 0.67)}
       className="object-contain"
-      style={{ mixBlendMode: "multiply" }}
     />
   );
 }
 
 export function CogniflowIconLight({ size = 28 }: { size?: number }) {
-  const height = Math.round(size * 0.67);
   return (
     <Image
-      src="/cogniflow-logo.png"
+      src="/cogniflow-logo.svg"
       alt="Cogniflow"
       width={size}
-      height={height}
+      height={Math.round(size * 0.67)}
       className="object-contain brightness-0 invert"
     />
   );
