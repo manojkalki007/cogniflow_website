@@ -14,6 +14,7 @@ const INTEGRATION_META = {
   google_calendar: { icon: "📅", description: "Check availability and book appointments via Google Calendar" },
   calcom: { icon: "📆", description: "Cal.com scheduling — availability checks and auto-booking during AI calls" },
   razorpay: { icon: "💳", description: "Generate and send payment links during calls" },
+  leadrat: { icon: "🏠", description: "India real estate CRM — auto-push qualified leads with budget and property data" },
   webhook: { icon: "🔗", description: "Send call events to custom HTTP endpoints" },
 };
 
@@ -43,6 +44,10 @@ const INTEGRATION_FIELDS = {
   razorpay: [
     { key: "key_id", label: "Key ID", type: "text" },
     { key: "key_secret", label: "Key Secret", type: "password" },
+  ],
+  leadrat: [
+    { key: "api_key", label: "LeadRat API Key", type: "password" },
+    { key: "account_name", label: "Account Name", type: "text", placeholder: "your-account" },
   ],
   webhook: [
     { key: "url", label: "Webhook URL", type: "text", placeholder: "https://your-server.com/webhook" },

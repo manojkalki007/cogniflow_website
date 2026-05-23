@@ -217,6 +217,12 @@ export const api = {
     request("/api/keys", { method: "POST", body: JSON.stringify(data) }),
   revokeApiKey: (id) => request(`/api/keys/${id}`, { method: "DELETE" }),
 
+  // Test integrations
+  testEmail: (toEmail) =>
+    request("/api/test-email", { method: "POST", body: JSON.stringify({ to_email: toEmail }) }),
+  testWhatsApp: (toPhone, template = "appointment_confirmation") =>
+    request("/api/test-whatsapp", { method: "POST", body: JSON.stringify({ to_phone: toPhone, template }) }),
+
   // API Hub
   getProviders: () => request("/api/providers"),
 

@@ -20,6 +20,15 @@ class UpdateIntegrationRequest(BaseModel):
     is_active: Optional[bool] = None
 
 
+class TestEmailRequest(BaseModel):
+    to_email: str
+
+
+class TestWhatsAppRequest(BaseModel):
+    to_phone: str
+    template: str = "appointment_confirmation"
+
+
 class AddDncRequest(BaseModel):
     phone_number: str
     reason: str = "manual"
@@ -217,6 +226,54 @@ async def api_test_integration(integration_id: str, auth: AuthContext = Depends(
         return {"status": "ok", "message": f"{integration_id} credentials are configured"}
     else:
         return {"status": "error", "message": f"{integration_id} is not configured. Add API keys in Settings."}
+
+
+# ─── Test Endpoints ───
+
+@router.post("/api/test-email")
+async def api_test_email(body: TestEmailRequest, auth: AuthContext = Depends(get_auth_context)):
+    if not settings.smtp_user or not settings.smtp_password:
+        raise HTTPException(400, "SMTP not configured. Set SMTP_USER and SMTP_PASSWORD in environment.")
+    from cogniflow_home.integrations.email import email_sender
+    sent = await email_sender.send(
+        to_email=body.to_email,
+        subject="Cogniflow Test Email",
+        html_body="""
+        <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">
+            <h2 style="margin: 0 0 12px; font-size: 20px;">Email is working!</h2>
+            <p style="color: #555; font-size: 14px; line-height: 1.6;">
+                This is a test email from your Cogniflow AI calling agent.
+                If you're seeing this, your SMTP configuration is correct.
+            </p>
+            <div style="margin-top: 20px; padding: 16px; background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0;">
+                <p style="margin: 0; color: #166534; font-size: 13px;">SMTP: {host}:{port} &middot; Sender: {sender}</p>
+            </div>
+        </div>
+        """.format(host=settings.smtp_host, port=settings.smtp_port, sender=settings.smtp_from_email),
+        text_body="This is a test email from Cogniflow. Your SMTP is configured correctly.",
+    )
+    if sent:
+        return {"status": "ok", "message": f"Test email sent to {body.to_email}"}
+    raise HTTPException(500, "Failed to send test email. Check SMTP credentials.")
+
+
+@router.post("/api/test-whatsapp")
+async def api_test_whatsapp(body: TestWhatsAppRequest, auth: AuthContext = Depends(get_auth_context)):
+    if not settings.whatsapp_api_key:
+        raise HTTPException(400, "WhatsApp not configured. Set WHATSAPP_API_KEY in environment.")
+    from cogniflow_home.whatsapp.tool import WhatsAppTool
+    wa = WhatsAppTool()
+    try:
+        result = await wa.send_template(
+            to_phone=body.to_phone,
+            template_name=body.template,
+            parameters=["Test", "Now", "Cogniflow Office"],
+        )
+        if "error" in result:
+            raise HTTPException(400, result.get("error", "WhatsApp send failed"))
+        return {"status": "ok", "message": f"Test message sent to {body.to_phone}"}
+    finally:
+        await wa.close()
 
 
 # ─── DNC ───

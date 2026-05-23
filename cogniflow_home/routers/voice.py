@@ -343,6 +343,15 @@ async def voice_ws(websocket: WebSocket, provider_name: str):
             tenant_id=agent_config.tenant_id,
             emotion_profile=agent_config.emotion_profile,
             voice_gender=agent_config.voice_gender,
+            tools_enabled=agent_config.tools_enabled,
+            enable_memory=agent_config.enable_memory,
+            enable_prediction=agent_config.enable_prediction,
+            enable_emotion=agent_config.enable_emotion,
+            enable_language_switch=agent_config.enable_language_switch,
+            enable_rag=agent_config.enable_rag,
+            enable_barge_in=agent_config.enable_barge_in,
+            enable_speculative=agent_config.enable_speculative,
+            enable_filler=agent_config.enable_filler,
         )
         crm_context = await get_caller_context(call_info.caller_number)
         if crm_context:
@@ -411,6 +420,15 @@ async def browser_voice_test(websocket: WebSocket):
             tenant_id=agent_config.tenant_id,
             emotion_profile=agent_config.emotion_profile,
             voice_gender=agent_config.voice_gender,
+            tools_enabled=agent_config.tools_enabled,
+            enable_memory=agent_config.enable_memory,
+            enable_prediction=agent_config.enable_prediction,
+            enable_emotion=agent_config.enable_emotion,
+            enable_language_switch=agent_config.enable_language_switch,
+            enable_rag=agent_config.enable_rag,
+            enable_barge_in=agent_config.enable_barge_in,
+            enable_speculative=agent_config.enable_speculative,
+            enable_filler=agent_config.enable_filler,
         )
 
         async def _send_transcript(role: str, text: str):

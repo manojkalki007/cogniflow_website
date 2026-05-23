@@ -1,13 +1,23 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
-import { Calendar, CheckCircle, Clock, ExternalLink, Users } from "lucide-react";
+import { Calendar, CheckCircle, Clock, ExternalLink, Users, RefreshCw, Loader2 } from "lucide-react";
 import { Badge } from "../components/ui/badge";
+import { Button } from "../components/ui/button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
 import PageHeader from "../components/PageHeader";
 import supabase from "../lib/supabase";
 
 export default function Scheduling() {
+  const queryClient = useQueryClient();
+  const [testResult, setTestResult] = useState(null);
+
+  const testMut = useMutation({
+    mutationFn: () => api.testIntegration("calcom"),
+    onSuccess: (data) => setTestResult(data),
+  });
+
   const { data: providersData } = useQuery({
     queryKey: ["providers"],
     queryFn: () => api.getProviders(),
@@ -66,6 +76,25 @@ export default function Scheduling() {
                 ? "Cal.com API connected. Agents can check availability and book appointments."
                 : "Set CAL_API_KEY and CAL_EVENT_TYPE_ID to enable"}
             </p>
+            <div className="flex gap-2 mt-3">
+              <Button size="sm" variant="outline" onClick={() => testMut.mutate()} disabled={testMut.isPending}>
+                {testMut.isPending ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+                Test Connection
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => queryClient.invalidateQueries(["call-bookings", "providers"])}>
+                <RefreshCw size={12} /> Refresh
+              </Button>
+            </div>
+            {testResult && (
+              <div className="text-xs mt-2 p-2 rounded-lg border"
+                style={{
+                  background: testResult.status === "ok" ? 'color-mix(in srgb, var(--success) 10%, transparent)' : 'color-mix(in srgb, var(--danger) 10%, transparent)',
+                  color: testResult.status === "ok" ? 'var(--success)' : 'var(--danger)',
+                  borderColor: testResult.status === "ok" ? 'color-mix(in srgb, var(--success) 20%, transparent)' : 'color-mix(in srgb, var(--danger) 20%, transparent)',
+                }}>
+                {testResult.message || testResult.status}
+              </div>
+            )}
           </div>
 
           <div className="rounded-xl border p-5" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>

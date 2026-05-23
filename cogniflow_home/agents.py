@@ -28,6 +28,15 @@ class AgentConfig:
     tenant_id: str = ""
     emotion_profile: str = "friendly"
     voice_gender: str = "female"
+    tools_enabled: list[str] | None = None
+    enable_memory: bool = True
+    enable_prediction: bool = True
+    enable_emotion: bool = True
+    enable_language_switch: bool = True
+    enable_rag: bool = False
+    enable_barge_in: bool = True
+    enable_speculative: bool = True
+    enable_filler: bool = True
 
 
 DEFAULT_AGENT = AgentConfig(
@@ -38,6 +47,29 @@ DEFAULT_AGENT = AgentConfig(
     voice_id=VOICE_ID,
     language=LANGUAGE,
 )
+
+
+def _agent_from_row(agent: dict) -> AgentConfig:
+    return AgentConfig(
+        id=agent["id"],
+        name=agent["name"],
+        instructions=agent["instructions"],
+        greeting=agent.get("greeting", "") or agent.get("metadata", {}).get("greeting", GREETING),
+        voice_id=agent.get("voice_id", VOICE_ID),
+        language=agent.get("language", "en"),
+        tenant_id=agent.get("tenant_id", ""),
+        emotion_profile=agent.get("emotion_profile", "friendly"),
+        voice_gender=agent.get("voice_gender", "female"),
+        tools_enabled=agent.get("tools_enabled"),
+        enable_memory=agent.get("enable_memory", True),
+        enable_prediction=agent.get("enable_prediction", True),
+        enable_emotion=agent.get("enable_emotion", True),
+        enable_language_switch=agent.get("enable_language_switch", True),
+        enable_rag=agent.get("enable_rag", False),
+        enable_barge_in=agent.get("enable_barge_in", True),
+        enable_speculative=agent.get("enable_speculative", True),
+        enable_filler=agent.get("enable_filler", True),
+    )
 
 
 async def get_agent_for_number(called_number: str, tenant_id: str = "") -> AgentConfig:
@@ -52,17 +84,7 @@ async def get_agent_for_number(called_number: str, tenant_id: str = "") -> Agent
         for agent in agents:
             numbers = agent.get("phone_numbers", [])
             if called_number in numbers:
-                return AgentConfig(
-                    id=agent["id"],
-                    name=agent["name"],
-                    instructions=agent["instructions"],
-                    greeting=agent.get("metadata", {}).get("greeting", GREETING),
-                    voice_id=agent.get("voice_id", VOICE_ID),
-                    language=agent.get("language", "en"),
-                    tenant_id=agent.get("tenant_id", ""),
-                    emotion_profile=agent.get("emotion_profile", "friendly"),
-                    voice_gender=agent.get("voice_gender", "female"),
-                )
+                return _agent_from_row(agent)
     except Exception:
         logger.debug("Agent lookup failed, using default")
 
@@ -73,18 +95,7 @@ async def get_agent_by_id(agent_id: str) -> AgentConfig | None:
     try:
         agents = await db.select("agents", {"id": agent_id})
         if agents:
-            agent = agents[0]
-            return AgentConfig(
-                id=agent["id"],
-                name=agent["name"],
-                instructions=agent["instructions"],
-                greeting=agent.get("greeting", "") or agent.get("metadata", {}).get("greeting", GREETING),
-                voice_id=agent.get("voice_id", VOICE_ID),
-                language=agent.get("language", "en"),
-                tenant_id=agent.get("tenant_id", ""),
-                emotion_profile=agent.get("emotion_profile", "friendly"),
-                voice_gender=agent.get("voice_gender", "female"),
-            )
+            return _agent_from_row(agents[0])
     except Exception:
         logger.debug(f"Agent lookup by ID failed: {agent_id}")
     return None

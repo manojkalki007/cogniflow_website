@@ -1,15 +1,16 @@
 "use client";
 
-import { motion, useInView } from "framer-motion";
+import { motion, useInView, useReducedMotion } from "framer-motion";
 import { useRef, useEffect, useState, ReactNode } from "react";
 
 export function FadeUp({ children, delay = 0, className = "" }: { children: ReactNode; delay?: number; className?: string }) {
+  const reduced = useReducedMotion();
   return (
     <motion.div
-      initial={{ opacity: 0, y: 30 }}
+      initial={reduced ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-50px" }}
-      transition={{ duration: 0.5, delay, ease: "easeOut" }}
+      transition={{ duration: reduced ? 0 : 0.5, delay: reduced ? 0 : delay, ease: "easeOut" }}
       className={className}
     >
       {children}
@@ -18,12 +19,13 @@ export function FadeUp({ children, delay = 0, className = "" }: { children: Reac
 }
 
 export function FadeIn({ children, delay = 0, className = "" }: { children: ReactNode; delay?: number; className?: string }) {
+  const reduced = useReducedMotion();
   return (
     <motion.div
-      initial={{ opacity: 0 }}
+      initial={reduced ? { opacity: 1 } : { opacity: 0 }}
       whileInView={{ opacity: 1 }}
       viewport={{ once: true, margin: "-30px" }}
-      transition={{ duration: 0.6, delay, ease: "easeOut" }}
+      transition={{ duration: reduced ? 0 : 0.6, delay: reduced ? 0 : delay, ease: "easeOut" }}
       className={className}
     >
       {children}
@@ -32,6 +34,7 @@ export function FadeIn({ children, delay = 0, className = "" }: { children: Reac
 }
 
 export function StaggerChildren({ children, className = "" }: { children: ReactNode; className?: string }) {
+  const reduced = useReducedMotion();
   return (
     <motion.div
       initial="hidden"
@@ -39,7 +42,7 @@ export function StaggerChildren({ children, className = "" }: { children: ReactN
       viewport={{ once: true, margin: "-50px" }}
       variants={{
         hidden: {},
-        visible: { transition: { staggerChildren: 0.1 } },
+        visible: { transition: { staggerChildren: reduced ? 0 : 0.1 } },
       }}
       className={className}
     >
@@ -49,11 +52,12 @@ export function StaggerChildren({ children, className = "" }: { children: ReactN
 }
 
 export function StaggerItem({ children, className = "" }: { children: ReactNode; className?: string }) {
+  const reduced = useReducedMotion();
   return (
     <motion.div
       variants={{
-        hidden: { opacity: 0, y: 20 },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
+        hidden: reduced ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 },
+        visible: { opacity: 1, y: 0, transition: { duration: reduced ? 0 : 0.4 } },
       }}
       className={className}
     >
@@ -83,12 +87,13 @@ export function CountUp({ target, suffix = "", duration = 2000 }: { target: numb
 }
 
 export function ScaleUp({ children, delay = 0, className = "" }: { children: ReactNode; delay?: number; className?: string }) {
+  const reduced = useReducedMotion();
   return (
     <motion.div
-      initial={{ opacity: 0, y: 40, scale: 0.95 }}
+      initial={reduced ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 40, scale: 0.95 }}
       whileInView={{ opacity: 1, y: 0, scale: 1 }}
       viewport={{ once: true, margin: "-50px" }}
-      transition={{ duration: 0.6, delay, ease: "easeOut" }}
+      transition={{ duration: reduced ? 0 : 0.6, delay: reduced ? 0 : delay, ease: "easeOut" }}
       className={className}
     >
       {children}

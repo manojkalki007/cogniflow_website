@@ -1,9 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "../lib/api";
-import { Mail, Phone, CheckCircle, Clock, Send } from "lucide-react";
+import { Mail, Phone, CheckCircle, Clock, Send, Loader2 } from "lucide-react";
 import { Badge } from "../components/ui/badge";
+import { Button } from "../components/ui/button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../components/ui/dialog";
 import PageHeader from "../components/PageHeader";
 
 const TEMPLATES = [
@@ -46,6 +49,16 @@ const TEMPLATES = [
 ];
 
 export default function EmailAutomation() {
+  const [testDialog, setTestDialog] = useState(false);
+  const [testEmail, setTestEmail] = useState("");
+  const [testResult, setTestResult] = useState(null);
+
+  const testMut = useMutation({
+    mutationFn: () => api.testEmail(testEmail),
+    onSuccess: (data) => setTestResult(data),
+    onError: (err) => setTestResult({ status: "error", message: err.message }),
+  });
+
   const { data: callsData } = useQuery({
     queryKey: ["calls-email"],
     queryFn: () => api.getCalls({ limit: 100 }),
@@ -94,6 +107,11 @@ export default function EmailAutomation() {
             <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
               {isConnected ? "SMTP via Google Workspace (no_reply@cogniflowautomations.com)" : "Set SMTP credentials to enable email automation"}
             </p>
+            {isConnected && (
+              <Button size="sm" className="mt-3" onClick={() => { setTestResult(null); setTestDialog(true); }}>
+                <Send size={12} /> Send Test Email
+              </Button>
+            )}
           </div>
 
           <div className="rounded-xl border p-5" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
@@ -104,7 +122,7 @@ export default function EmailAutomation() {
               <p className="text-xs uppercase tracking-wider font-medium" style={{ color: 'var(--text-muted)' }}>How It Works</p>
             </div>
             <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              During live calls, the AI agent sends emails using the <Badge variant="outline" className="text-[10px]">send_email</Badge> tool with pre-defined templates.
+              During live calls, the AI agent schedules emails using the <Badge variant="outline" className="text-[10px]">send_followup</Badge> tool with pre-defined templates.
             </p>
           </div>
 
@@ -199,6 +217,38 @@ export default function EmailAutomation() {
             </div>
           </TabsContent>
         </Tabs>
+
+        <Dialog open={testDialog} onOpenChange={setTestDialog}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Send Test Email</DialogTitle>
+              <DialogDescription>Send a test email to verify your SMTP configuration.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Email Address</label>
+                <input type="email" value={testEmail} onChange={(e) => setTestEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="w-full rounded-xl px-4 py-3 outline-none border"
+                  style={{ background: 'var(--bg-muted)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
+              </div>
+              {testResult && (
+                <div className="text-sm p-3 rounded-xl border"
+                  style={{
+                    background: testResult.status === "ok" ? 'color-mix(in srgb, var(--success) 10%, transparent)' : 'color-mix(in srgb, var(--danger) 10%, transparent)',
+                    color: testResult.status === "ok" ? 'var(--success)' : 'var(--danger)',
+                    borderColor: testResult.status === "ok" ? 'color-mix(in srgb, var(--success) 20%, transparent)' : 'color-mix(in srgb, var(--danger) 20%, transparent)',
+                  }}>
+                  {testResult.message || testResult.error || testResult.status}
+                </div>
+              )}
+              <Button onClick={() => testMut.mutate()} disabled={testMut.isPending || !testEmail}>
+                {testMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                Send Test
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

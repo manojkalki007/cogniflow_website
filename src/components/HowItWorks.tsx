@@ -42,7 +42,7 @@ export default function HowItWorks() {
         <StaggerChildren className="grid md:grid-cols-3 gap-8">
           {STEPS.map(({ icon: Icon, step, title, description }, i) => (
             <StaggerItem key={step}>
-              <div className="relative text-center">
+              <div className="relative text-center card-hover rounded-2xl p-6">
                 {i < 2 && (
                   <div className="hidden md:block absolute top-8 left-[60%] w-[80%] h-[2px] overflow-hidden">
                     <div className="h-full bg-gradient-to-r from-[var(--color-brand)] to-transparent" />

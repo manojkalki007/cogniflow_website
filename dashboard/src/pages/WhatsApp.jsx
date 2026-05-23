@@ -1,9 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "../lib/api";
-import { MessageSquare, Phone, CheckCircle, Clock } from "lucide-react";
+import { MessageSquare, Phone, CheckCircle, Clock, Send, Loader2 } from "lucide-react";
 import { Badge } from "../components/ui/badge";
+import { Button } from "../components/ui/button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../components/ui/dialog";
 import PageHeader from "../components/PageHeader";
 
 const TEMPLATES = [
@@ -34,6 +37,17 @@ const TEMPLATES = [
 ];
 
 export default function WhatsApp() {
+  const [testDialog, setTestDialog] = useState(false);
+  const [testPhone, setTestPhone] = useState("");
+  const [testTemplate, setTestTemplate] = useState("appointment_confirmation");
+  const [testResult, setTestResult] = useState(null);
+
+  const testMut = useMutation({
+    mutationFn: () => api.testWhatsApp(testPhone, testTemplate),
+    onSuccess: (data) => setTestResult(data),
+    onError: (err) => setTestResult({ status: "error", message: err.message }),
+  });
+
   const { data: callsData } = useQuery({
     queryKey: ["calls-whatsapp"],
     queryFn: () => api.getCalls({ limit: 100 }),
@@ -82,6 +96,11 @@ export default function WhatsApp() {
             <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
               {isConnected ? "WhatsApp Business API via tool calling" : "Set WHATSAPP_API_KEY to enable"}
             </p>
+            {isConnected && (
+              <Button size="sm" className="mt-3" onClick={() => { setTestResult(null); setTestDialog(true); }}>
+                <Send size={12} /> Send Test Message
+              </Button>
+            )}
           </div>
 
           <div className="rounded-xl border p-5" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
@@ -183,6 +202,48 @@ export default function WhatsApp() {
             </div>
           </TabsContent>
         </Tabs>
+
+        <Dialog open={testDialog} onOpenChange={setTestDialog}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Send Test WhatsApp Message</DialogTitle>
+              <DialogDescription>Send a test template message to verify your WhatsApp integration.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Phone Number</label>
+                <input type="text" value={testPhone} onChange={(e) => setTestPhone(e.target.value)}
+                  placeholder="+919876543210"
+                  className="w-full rounded-xl px-4 py-3 outline-none border"
+                  style={{ background: 'var(--bg-muted)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
+              </div>
+              <div>
+                <label className="block text-sm mb-1.5 font-medium" style={{ color: 'var(--text-secondary)' }}>Template</label>
+                <select value={testTemplate} onChange={(e) => setTestTemplate(e.target.value)}
+                  className="w-full rounded-xl px-4 py-3 outline-none border"
+                  style={{ background: 'var(--bg-muted)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+                  {TEMPLATES.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+              {testResult && (
+                <div className="text-sm p-3 rounded-xl border"
+                  style={{
+                    background: testResult.status === "ok" ? 'color-mix(in srgb, var(--success) 10%, transparent)' : 'color-mix(in srgb, var(--danger) 10%, transparent)',
+                    color: testResult.status === "ok" ? 'var(--success)' : 'var(--danger)',
+                    borderColor: testResult.status === "ok" ? 'color-mix(in srgb, var(--success) 20%, transparent)' : 'color-mix(in srgb, var(--danger) 20%, transparent)',
+                  }}>
+                  {testResult.message || testResult.error || testResult.status}
+                </div>
+              )}
+              <Button onClick={() => testMut.mutate()} disabled={testMut.isPending || !testPhone}>
+                {testMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                Send Test
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

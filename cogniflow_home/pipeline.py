@@ -214,7 +214,12 @@ class VoicePipeline:
                  instructions_override: str = "", greeting_override: str = "",
                  language: str = "en", voice_id: str = "",
                  sample_rate: int = 8000, tenant_id: str = "",
-                 emotion_profile: str = "friendly", voice_gender: str = "female"):
+                 emotion_profile: str = "friendly", voice_gender: str = "female",
+                 tools_enabled: list[str] | None = None,
+                 enable_memory: bool = True, enable_prediction: bool = True,
+                 enable_emotion: bool = True, enable_language_switch: bool = True,
+                 enable_rag: bool = False, enable_barge_in: bool = True,
+                 enable_speculative: bool = True, enable_filler: bool = True):
         call_id = call_info.call_sid or str(uuid.uuid4())
         self._sample_rate = sample_rate
         self.state = CallState(
@@ -287,6 +292,21 @@ class VoicePipeline:
         self._speak_lock = asyncio.Lock()
         self._pending_final_task: asyncio.Task | None = None
 
+        self._enable_memory = enable_memory
+        self._enable_prediction = enable_prediction
+        self._enable_emotion = enable_emotion
+        self._enable_language_switch = enable_language_switch
+        self._enable_rag = enable_rag
+        self._enable_barge_in = enable_barge_in
+        self._enable_speculative = enable_speculative
+        self._enable_filler = enable_filler
+
+        from cogniflow_home.providers.tools import TOOL_DEFINITIONS
+        if tools_enabled is not None:
+            self._tools = [t for t in TOOL_DEFINITIONS if t["function"]["name"] in tools_enabled]
+        else:
+            self._tools = TOOL_DEFINITIONS
+
     def inject_context(self, context: str):
         if context:
             self.llm.conversation_history.insert(1, {
@@ -296,28 +316,31 @@ class VoicePipeline:
 
     async def _fetch_memory_and_prediction(self) -> str | None:
         custom_greeting = None
-        try:
-            from cogniflow_home.memory.caller_memory import caller_memory
-            profile = await caller_memory.recall(self.state.caller_number)
-            if profile:
-                memory_prompt = caller_memory.build_memory_prompt(profile)
-                self._instructions = self._instructions + memory_prompt
-                self.llm.conversation_history[0]["content"] = self._instructions
-                logger.info(f"Loaded memory for {self.state.caller_number}: {profile.get('name')}")
-        except Exception:
-            logger.debug("Memory recall unavailable (non-fatal)", exc_info=True)
 
-        try:
-            from cogniflow_home.intelligence.predictor import pre_call_predictor
-            prediction = await pre_call_predictor.predict(self.state.caller_number)
-            if prediction and prediction["confidence"] >= 0.6:
-                prediction_prompt = pre_call_predictor.build_prediction_prompt(prediction)
-                self._instructions = self._instructions + prediction_prompt
-                self.llm.conversation_history[0]["content"] = self._instructions
-                if prediction["confidence"] >= 0.7:
-                    custom_greeting = prediction["suggested_greeting"]
-        except Exception:
-            logger.debug("Pre-call prediction unavailable (non-fatal)", exc_info=True)
+        if self._enable_memory:
+            try:
+                from cogniflow_home.memory.caller_memory import caller_memory
+                profile = await caller_memory.recall(self.state.caller_number)
+                if profile:
+                    memory_prompt = caller_memory.build_memory_prompt(profile)
+                    self._instructions = self._instructions + memory_prompt
+                    self.llm.conversation_history[0]["content"] = self._instructions
+                    logger.info(f"Loaded memory for {self.state.caller_number}: {profile.get('name')}")
+            except Exception:
+                logger.debug("Memory recall unavailable (non-fatal)", exc_info=True)
+
+        if self._enable_prediction:
+            try:
+                from cogniflow_home.intelligence.predictor import pre_call_predictor
+                prediction = await pre_call_predictor.predict(self.state.caller_number)
+                if prediction and prediction["confidence"] >= 0.6:
+                    prediction_prompt = pre_call_predictor.build_prediction_prompt(prediction)
+                    self._instructions = self._instructions + prediction_prompt
+                    self.llm.conversation_history[0]["content"] = self._instructions
+                    if prediction["confidence"] >= 0.7:
+                        custom_greeting = prediction["suggested_greeting"]
+            except Exception:
+                logger.debug("Pre-call prediction unavailable (non-fatal)", exc_info=True)
 
         return custom_greeting
 
@@ -378,15 +401,17 @@ class VoicePipeline:
             """Wrapper that prevents speculative runs from mutating conversation history."""
             history_snapshot = list(self.llm.conversation_history)
             try:
-                async for sentence in self.llm.generate_stream(text):
+                async for sentence in self.llm.generate_stream(text, tools=self._tools or None):
                     yield sentence
             finally:
                 self.llm.conversation_history = history_snapshot
 
-        self.speculative.set_generate_fn(_speculative_generate)
+        if self._enable_speculative:
+            self.speculative.set_generate_fn(_speculative_generate)
         self.llm.on_tool_call = self._on_tool_call
-        _filler_task = asyncio.create_task(self.filler.initialize(self.tts))
-        _filler_task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
+        if self._enable_filler:
+            _filler_task = asyncio.create_task(self.filler.initialize(self.tts))
+            _filler_task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
 
         greeting = custom_greeting or self._greeting
 
@@ -438,7 +463,7 @@ class VoicePipeline:
         else:
             await self.stt.send_audio(mulaw_bytes)
 
-            if energy > self._speech_energy_threshold:
+            if self._enable_barge_in and energy > self._speech_energy_threshold:
                 self._silence_chunks = 0
                 self._audio_chunk_count += 1
                 if self._audio_chunk_count >= 20:
@@ -448,7 +473,8 @@ class VoicePipeline:
                     self.state.is_agent_speaking = False
                     self._audio_chunk_count = 0
                     self.eot.cancel()
-                    self.speculative.cancel()
+                    if self._enable_speculative:
+                        self.speculative.cancel()
                     if self._pending_final_task and not self._pending_final_task.done():
                         self._pending_final_task.cancel()
                         self._pending_final_task = None
@@ -478,12 +504,14 @@ class VoicePipeline:
 
                 if not result.is_final:
                     eot_prob = self.eot.predict(result.transcript)
-                    await self.speculative.on_partial_transcript(
-                        result.transcript, eot_prob
-                    )
-                    new_lang = self.language_detector.should_switch(result.transcript)
-                    if new_lang:
-                        await self._switch_language(new_lang)
+                    if self._enable_speculative:
+                        await self.speculative.on_partial_transcript(
+                            result.transcript, eot_prob
+                        )
+                    if self._enable_language_switch:
+                        new_lang = self.language_detector.should_switch(result.transcript)
+                        if new_lang:
+                            await self._switch_language(new_lang)
                     continue
 
                 if result.speech_final:
@@ -543,9 +571,10 @@ class VoicePipeline:
             return
 
         self._unclear_count = 0
-        self.emotion_adapter.update_caller_emotion(redacted)
-        current_emotion = self.emotion_adapter.current_emotion.emotion
-        self.filler.set_emotion(current_emotion)
+        if self._enable_emotion:
+            self.emotion_adapter.update_caller_emotion(redacted)
+            current_emotion = self.emotion_adapter.current_emotion.emotion
+            self.filler.set_emotion(current_emotion)
 
         self.state.transcript.append(
             {"role": "user", "text": redacted, "ts": time.time()}
@@ -559,12 +588,17 @@ class VoicePipeline:
         self.tracer.new_turn()
         eot_ts = time.perf_counter() * 1000
 
-        speculative = await self.speculative.on_final_transcript(redacted)
-        if speculative:
-            self.llm.add_message("user", redacted)
-            spoken_text = await self._speak_speculative(speculative)
-            if spoken_text:
-                self.llm.add_message("assistant", spoken_text)
+        if self._enable_speculative:
+            speculative = await self.speculative.on_final_transcript(redacted)
+            if speculative:
+                self.llm.add_message("user", redacted)
+                spoken_text = await self._speak_speculative(speculative)
+                if spoken_text:
+                    self.llm.add_message("assistant", spoken_text)
+                else:
+                    await self._generate_and_speak(redacted, eot_ts=eot_ts)
+            else:
+                await self._generate_and_speak(redacted, eot_ts=eot_ts)
         else:
             await self._generate_and_speak(redacted, eot_ts=eot_ts)
 
@@ -596,10 +630,10 @@ class VoicePipeline:
                 )
 
             llm_input = user_text
-            if self.emotion_adapter.should_offer_human():
+            if self._enable_emotion and self.emotion_adapter.should_offer_human():
                 llm_input += "\n[Offer to transfer to a human agent.]"
 
-            if self._kb_ready and self._kb:
+            if self._enable_rag and self._kb_ready and self._kb:
                 try:
                     agent_id = getattr(self, 'agent_id', None)
                     if agent_id:
@@ -615,7 +649,7 @@ class VoicePipeline:
             first_sentence = True
 
             try:
-                async for sentence in self.llm.generate_stream(llm_input):
+                async for sentence in self.llm.generate_stream(llm_input, tools=self._tools or None):
                     if first_sentence:
                         self.tracer.end(t_llm)
                         first_sentence = False
@@ -722,6 +756,8 @@ class VoicePipeline:
             return full_response.strip()
 
     async def _on_tool_call(self, tool_name: str):
+        if not self._enable_filler:
+            return
         filler_audio = self.filler.get_filler(tool_name)
         if filler_audio:
             chunk_size = self._sample_rate // 50
@@ -772,11 +808,14 @@ class VoicePipeline:
             text = _humanize_for_speech(text)
             if not text:
                 return
-            emotion = self.emotion_adapter.current_emotion
-            text = self.text_enricher.enrich(text, emotion.emotion, emotion.intensity)
-            if not text:
-                return
-            synth_kwargs = self._get_emotion_tts_kwargs()
+            if self._enable_emotion:
+                emotion = self.emotion_adapter.current_emotion
+                text = self.text_enricher.enrich(text, emotion.emotion, emotion.intensity)
+                if not text:
+                    return
+                synth_kwargs = self._get_emotion_tts_kwargs()
+            else:
+                synth_kwargs = {}
 
             try:
                 await self._stream_tts_audio(self.tts.synthesize(text, **synth_kwargs))
