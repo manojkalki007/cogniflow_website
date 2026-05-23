@@ -89,6 +89,11 @@ class Settings(BaseSettings):
     cal_event_type_id: str = ""
     cal_api_url: str = "https://api.cal.com/v2"
 
+    # LeadRat CRM (Real Estate)
+    leadrat_api_key: str = ""
+    leadrat_account_name: str = ""
+    leadrat_base_url: str = "https://connect.leadrat.com/api/v1/integration"
+
     # MCube (India)
     mcube_api_key: str = ""
     mcube_api_secret: str = ""

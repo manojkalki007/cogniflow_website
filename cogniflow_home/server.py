@@ -34,6 +34,7 @@ async def lifespan(app):
 
     from cogniflow_home.memory import register as register_memory
     from cogniflow_home.integrations import salesforce
+    from cogniflow_home.integrations import leadrat as leadrat_integration
     from cogniflow_home.analysis import behaviour as behaviour_analysis
     from cogniflow_home.notifications import confirmations
 
@@ -47,6 +48,7 @@ async def lifespan(app):
     revenue_tracker.register()
     register_memory()
     salesforce.register()
+    leadrat_integration.register()
     logger.info("All modules registered")
 
     critical_vars = {

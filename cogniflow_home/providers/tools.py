@@ -145,6 +145,26 @@ TOOL_DEFINITIONS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "push_to_leadrat",
+            "description": "Save this lead to LeadRat CRM. Use after qualifying — when you have their name, budget, and property interest.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Lead's full name"},
+                    "budget": {"type": "string", "description": "Budget range, e.g. '50-75 Lakhs'"},
+                    "property_type": {"type": "string", "description": "e.g. '3BHK Apartment'"},
+                    "location": {"type": "string", "description": "Preferred area, e.g. 'Whitefield'"},
+                    "interested": {"type": "boolean", "description": "Is the lead interested?"},
+                    "site_visit_date": {"type": "string", "description": "Site visit date if booked (YYYY-MM-DD)"},
+                    "notes": {"type": "string", "description": "Additional notes from conversation"},
+                },
+                "required": ["name", "interested"],
+            },
+        },
+    },
 ]
 
 
@@ -361,6 +381,11 @@ async def _create_payment_link(args: dict, ctx: dict) -> str:
         return "I'm unable to create the payment link right now. Our team will follow up with you."
 
 
+async def _push_to_leadrat(args: dict, ctx: dict) -> str:
+    from cogniflow_home.integrations.leadrat import handle_push_to_leadrat
+    return await handle_push_to_leadrat(args, ctx)
+
+
 TOOL_HANDLERS = {
     "book_appointment": _book_appointment,
     "transfer_call": _transfer_call,
@@ -369,4 +394,5 @@ TOOL_HANDLERS = {
     "send_whatsapp": _send_whatsapp,
     "check_availability": _check_availability,
     "create_payment_link": _create_payment_link,
+    "push_to_leadrat": _push_to_leadrat,
 }

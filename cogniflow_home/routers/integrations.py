@@ -106,6 +106,10 @@ async def api_provider_status(auth: AuthContext = Depends(get_auth_context)):
          "configured": bool(settings.cal_api_key and settings.cal_event_type_id),
          "docs": "https://cal.com/docs/api-reference/v2", "pricing": "https://cal.com/pricing",
          "description": "Scheduling & appointment booking. Availability checks + auto-booking during calls.", "unit": "api calls", "rate_per_unit": 0.0},
+        {"id": "leadrat", "name": "LeadRat CRM", "category": "crm",
+         "configured": bool(settings.leadrat_api_key and settings.leadrat_account_name),
+         "docs": "https://apidocs.leadrat.com", "pricing": "https://www.leadrat.com/pricing",
+         "description": "India real estate CRM. Auto-push leads from AI calls with qualification data.", "unit": "api calls", "rate_per_unit": 0.0},
         {"id": "smtp", "name": "Email (SMTP)", "category": "messaging",
          "configured": bool(settings.smtp_user and settings.smtp_password),
          "docs": "", "pricing": "",
@@ -159,6 +163,7 @@ async def api_list_integrations(auth: AuthContext = Depends(get_auth_context)):
             {"type": "zoho", "name": "Zoho CRM", "status": "disconnected"},
             {"type": "google_calendar", "name": "Google Calendar", "status": "disconnected"},
             {"type": "calcom", "name": "Cal.com", "status": "disconnected"},
+            {"type": "leadrat", "name": "LeadRat CRM", "status": "disconnected"},
             {"type": "razorpay", "name": "Razorpay", "status": "disconnected"},
             {"type": "webhook", "name": "Custom Webhook", "status": "disconnected"},
         ]
@@ -200,6 +205,7 @@ async def api_test_integration(integration_id: str, auth: AuthContext = Depends(
         "salesforce": lambda: bool(settings.salesforce_client_id),
         "google_calendar": lambda: bool(settings.google_service_account_json or settings.google_service_account_path),
         "calcom": lambda: bool(settings.cal_api_key and settings.cal_event_type_id and settings.cal_event_type_id.isdigit()),
+        "leadrat": lambda: bool(settings.leadrat_api_key and settings.leadrat_account_name),
         "razorpay": lambda: bool(settings.razorpay_key_id),
         "whatsapp": lambda: bool(settings.whatsapp_api_key),
     }
