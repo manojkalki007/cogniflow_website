@@ -40,6 +40,14 @@ export default function WhatsApp() {
     refetchInterval: 30_000,
   });
 
+  const { data: providersData } = useQuery({
+    queryKey: ["providers"],
+    queryFn: () => api.getProviders(),
+  });
+
+  const whatsappProvider = providersData?.providers?.find((p) => p.id === "whatsapp");
+  const isConnected = whatsappProvider?.configured ?? false;
+
   const calls = callsData?.calls || [];
   const whatsappCalls = calls.filter((c) =>
     c.transcript?.some((t) => t.text?.toLowerCase().includes("whatsapp"))
@@ -59,10 +67,21 @@ export default function WhatsApp() {
               <p className="text-xs uppercase tracking-wider font-medium" style={{ color: 'var(--text-muted)' }}>Status</p>
             </div>
             <div className="flex items-center gap-2">
-              <CheckCircle size={18} style={{ color: 'var(--success)' }} />
-              <span className="text-lg font-semibold" style={{ color: 'var(--success)' }}>Connected</span>
+              {isConnected ? (
+                <>
+                  <CheckCircle size={18} style={{ color: 'var(--success)' }} />
+                  <span className="text-lg font-semibold" style={{ color: 'var(--success)' }}>Connected</span>
+                </>
+              ) : (
+                <>
+                  <Clock size={18} style={{ color: 'var(--warning)' }} />
+                  <span className="text-lg font-semibold" style={{ color: 'var(--warning)' }}>Not Connected</span>
+                </>
+              )}
             </div>
-            <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>WhatsApp Business API via tool calling</p>
+            <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
+              {isConnected ? "WhatsApp Business API via tool calling" : "Set WHATSAPP_API_KEY to enable"}
+            </p>
           </div>
 
           <div className="rounded-xl border p-5" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>

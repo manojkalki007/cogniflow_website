@@ -52,6 +52,14 @@ export default function EmailAutomation() {
     refetchInterval: 30_000,
   });
 
+  const { data: providersData } = useQuery({
+    queryKey: ["providers"],
+    queryFn: () => api.getProviders(),
+  });
+
+  const smtpProvider = providersData?.providers?.find((p) => p.id === "smtp");
+  const isConnected = smtpProvider?.configured ?? false;
+
   const calls = callsData?.calls || [];
   const emailCalls = calls.filter((c) =>
     c.transcript?.some((t) => t.text?.toLowerCase().includes("email"))
@@ -71,10 +79,21 @@ export default function EmailAutomation() {
               <p className="text-xs uppercase tracking-wider font-medium" style={{ color: 'var(--text-muted)' }}>Status</p>
             </div>
             <div className="flex items-center gap-2">
-              <CheckCircle size={18} style={{ color: 'var(--success)' }} />
-              <span className="text-lg font-semibold" style={{ color: 'var(--success)' }}>Connected</span>
+              {isConnected ? (
+                <>
+                  <CheckCircle size={18} style={{ color: 'var(--success)' }} />
+                  <span className="text-lg font-semibold" style={{ color: 'var(--success)' }}>Connected</span>
+                </>
+              ) : (
+                <>
+                  <Clock size={18} style={{ color: 'var(--warning)' }} />
+                  <span className="text-lg font-semibold" style={{ color: 'var(--warning)' }}>Not Connected</span>
+                </>
+              )}
             </div>
-            <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>SMTP via Google Workspace (no_reply@cogniflowautomations.com)</p>
+            <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
+              {isConnected ? "SMTP via Google Workspace (no_reply@cogniflowautomations.com)" : "Set SMTP credentials to enable email automation"}
+            </p>
           </div>
 
           <div className="rounded-xl border p-5" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
