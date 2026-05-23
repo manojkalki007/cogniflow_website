@@ -57,7 +57,7 @@ async def api_provider_status(auth: AuthContext = Depends(get_auth_context)):
         {"id": "smallest", "name": "Smallest AI", "category": "tts",
          "configured": bool(settings.smallest_ai_api_key),
          "docs": "https://smallest.ai", "pricing": "https://smallest.ai/pricing",
-         "description": "Lightning TTS with emotion control. Low-latency streaming.", "unit": "1K chars", "rate_per_unit": 0.05},
+         "description": "Lightning v3.1 TTS. 217 voices, 15 languages, ~200ms TTFB.", "unit": "1K chars", "rate_per_unit": 0.025},
         {"id": "twilio", "name": "Twilio", "category": "telephony",
          "configured": bool(settings.twilio_account_sid),
          "docs": "https://console.twilio.com", "pricing": "https://www.twilio.com/en-us/voice/pricing",

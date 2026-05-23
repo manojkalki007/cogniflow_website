@@ -1,10 +1,7 @@
-"""Smallest AI Text-to-Speech.
+"""Smallest AI Lightning v3.1 Text-to-Speech.
 
-Production-grade TTS with:
-- Proper error propagation (no silent failures)
-- Configurable chunk size for low-latency streaming
-- Speed/voice control
-- Connection health monitoring
+Lightning v3.1 — 217 voices, 15 languages, ~200ms TTFB, $0.025/1K chars.
+Native 44.1kHz, auto language detection, mid-sentence code-mixing.
 """
 
 import logging
@@ -17,27 +14,26 @@ from cogniflow_home.config import settings
 
 logger = logging.getLogger("cogniflow_home.tts.smallest")
 
-SMALLEST_API_URL = "https://waves-api.smallest.ai/api/v1/lightning/get_speech"
+API_URL = "https://api.smallest.ai/waves/v1/lightning-v3.1/get_speech"
+
+LANGUAGE_CODES = {
+    "en", "hi", "ta", "kn", "te", "ml", "mr", "gu",
+    "es", "fr", "it", "de", "nl", "sv", "pt",
+}
 
 
 class SmallestTTS:
-    VALID_VOICES = {
-        "emily", "jasmine", "arman", "james", "mithali", "aravind",
-        "raman", "diya", "ananya", "chetan", "deepika", "nisha", "raj",
-        "arnav", "george", "judi", "aarav", "raghav", "kajal", "mansi",
-        "saurabh", "pooja", "saina", "sanya", "ankur", "enola", "rebecca",
-        "abhinav", "sushma", "ashish", "shweta", "karen", "pragya",
-    }
 
-    def __init__(self, voice_id: str = "", language: str = "en", sample_rate: int = 8000, raw_pcm: bool = False):
-        self.voice_id = voice_id if voice_id in self.VALID_VOICES else "emily"
-        self.language = language
+    def __init__(self, voice_id: str = "emily", language: str = "en", sample_rate: int = 8000, raw_pcm: bool = False):
+        self.voice_id = voice_id or "emily"
+        self.language = language if language in LANGUAGE_CODES else "en"
         self.sample_rate = sample_rate
         self.raw_pcm = raw_pcm
-        self._client = httpx.AsyncClient(timeout=8.0)
+        self._client = httpx.AsyncClient(timeout=10.0)
 
     async def connect(self):
-        logger.info(f"Smallest AI TTS ready (voice={self.voice_id}, rate={self.sample_rate}, pcm={self.raw_pcm})")
+        logger.info("Smallest AI Lightning v3.1 ready (voice=%s, lang=%s, rate=%d, pcm=%s)",
+                     self.voice_id, self.language, self.sample_rate, self.raw_pcm)
 
     async def synthesize(self, text: str, speed: float = 0.0, **kwargs) -> AsyncIterator[bytes]:
         if not text.strip():
@@ -47,18 +43,18 @@ class SmallestTTS:
             "Authorization": f"Bearer {settings.smallest_ai_api_key}",
             "Content-Type": "application/json",
         }
+        effective_speed = max(0.5, min(2.0, speed)) if speed > 0 else 1.0
         body = {
             "text": text,
             "voice_id": self.voice_id,
             "sample_rate": self.sample_rate,
-            "speed": speed if speed > 0 else 1.0,
+            "speed": effective_speed,
+            "language": self.language,
             "add_wav_header": False,
         }
 
         chunk_bytes = 4096 if self.raw_pcm else 320
-        async with self._client.stream(
-            "POST", SMALLEST_API_URL, json=body, headers=headers
-        ) as resp:
+        async with self._client.stream("POST", API_URL, json=body, headers=headers) as resp:
             if resp.status_code != 200:
                 error = await resp.aread()
                 raise RuntimeError(
