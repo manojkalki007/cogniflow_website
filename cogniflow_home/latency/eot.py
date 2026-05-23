@@ -65,9 +65,9 @@ class SemanticEOTDetector:
         if words and words[-1] in self.INCOMPLETE_SUFFIXES:
             score -= 0.30
 
-        if silence_ms >= 300:
+        if silence_ms >= 400:
             score += 0.15
-        if silence_ms >= 500:
+        if silence_ms >= 650:
             score += 0.20
 
         return max(0.0, min(score, 1.0))

@@ -13,9 +13,6 @@ class TextEnricher:
     """Enhance LLM output text with prosody cues for Sarvam Bulbul V3."""
 
     def enrich(self, text: str, emotion: str, intensity: float) -> str:
-        text = self._ensure_filler_pauses(text)
-        text = self._add_emotion_markers(text, emotion, intensity)
-        text = self._ensure_trail_offs(text)
         text = self._clean_for_tts(text)
         return text
 

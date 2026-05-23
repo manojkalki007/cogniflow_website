@@ -48,7 +48,7 @@ class GroqLLM:
         fallback_model: str = "llama-3.1-8b-instant",
         system_prompt: str = "",
         temperature: float = 0.7,
-        max_tokens: int = 80,
+        max_tokens: int = 40,
     ):
         self.model = model
         self.fallback_model = fallback_model
@@ -231,7 +231,7 @@ class GroqLLM:
                         if sentence:
                             first_chunk_sent = True
                             yield sentence
-                    elif not first_chunk_sent and word_count >= 6:
+                    elif not first_chunk_sent and word_count >= 3:
                         text = buffer.strip()
                         buffer = ""
                         if text:

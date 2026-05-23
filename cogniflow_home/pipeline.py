@@ -102,7 +102,15 @@ def _humanize_for_speech(text: str) -> str:
     t = re.sub(r'#+\s*', '', t)
     t = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', t)
     t = re.sub(r'\s{2,}', ' ', t)
-    return t.strip()
+    t = _enforce_brevity(t.strip())
+    return t
+
+
+def _enforce_brevity(text: str) -> str:
+    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+    if len(sentences) > 2:
+        return ' '.join(sentences[:2])
+    return text
 
 
 def _create_tts_chain(language: str, voice_id: str, sample_rate: int = 8000,
@@ -273,6 +281,7 @@ class VoicePipeline:
         self._turn_first_byte_ts = 0.0
         self._unclear_count = 0
         self._last_agent_text = ""
+        self._agent_speech_ended_at = 0.0
         self.on_transcript = None
         self.on_latency = None
         self._speak_lock = asyncio.Lock()
@@ -478,6 +487,10 @@ class VoicePipeline:
                     continue
 
                 if result.speech_final:
+                    if self._agent_speech_ended_at:
+                        elapsed_ms = (time.perf_counter() - self._agent_speech_ended_at) * 1000
+                        if elapsed_ms < 400:
+                            await asyncio.sleep((400 - elapsed_ms) / 1000)
                     if self._pending_final_task and not self._pending_final_task.done():
                         self._pending_final_task.cancel()
                         self._pending_final_task = None
@@ -574,13 +587,9 @@ class VoicePipeline:
             self._turn_first_byte_ts = 0.0
             eot_ts_orig = eot_ts
 
-            emotion_state = self.emotion_adapter.current_emotion
-            emotion_context = build_emotion_context(emotion_state.emotion, emotion_state.intensity)
             llm_input = user_text
-            if emotion_context:
-                llm_input = f"{emotion_context}\nCaller said: \"{user_text}\""
             if self.emotion_adapter.should_offer_human():
-                llm_input += "\n[SYSTEM: Caller has been frustrated for 5+ turns. Proactively offer to transfer to a human agent.]"
+                llm_input += "\n[Offer to transfer to a human agent.]"
 
             if self._kb_ready and self._kb:
                 try:
@@ -633,6 +642,7 @@ class VoicePipeline:
                 self.tracer.end(t_llm)
 
             self.state.is_agent_speaking = False
+            self._agent_speech_ended_at = time.perf_counter()
 
             if full_response.strip():
                 self._last_agent_text = full_response.strip().lower()
