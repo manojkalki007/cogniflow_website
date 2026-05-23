@@ -15,9 +15,13 @@ logger = logging.getLogger(__name__)
 class RazorpayIntegration:
     BASE_URL = "https://api.razorpay.com/v1"
 
-    def __init__(self):
-        self.key_id = settings.razorpay_key_id
-        self.key_secret = settings.razorpay_key_secret
+    def __init__(self, key_id: str = "", key_secret: str = ""):
+        self.key_id = key_id or settings.razorpay_key_id
+        self.key_secret = key_secret or settings.razorpay_key_secret
+
+    @property
+    def configured(self) -> bool:
+        return bool(self.key_id and self.key_secret)
 
     async def create_payment_link(
         self,
@@ -107,3 +111,12 @@ class RazorpayIntegration:
 
 
 razorpay = RazorpayIntegration()
+
+
+async def get_razorpay(tenant_id: str = "") -> RazorpayIntegration:
+    from cogniflow_home.credentials.resolver import credentials
+    config = await credentials.get(tenant_id, "razorpay")
+    return RazorpayIntegration(
+        key_id=config.get("key_id", ""),
+        key_secret=config.get("key_secret", ""),
+    )

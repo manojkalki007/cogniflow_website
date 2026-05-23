@@ -22,16 +22,17 @@ BASE_URL = "https://api.hubapi.com"
 
 
 class HubSpotClient:
-    def __init__(self):
+    def __init__(self, api_key: str = ""):
+        self._api_key = api_key or settings.hubspot_api_key
         self._client = httpx.AsyncClient(timeout=15.0)
         self._headers = {
-            "Authorization": f"Bearer {settings.hubspot_api_key}",
+            "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
         }
 
     @property
     def enabled(self) -> bool:
-        return bool(settings.hubspot_api_key)
+        return bool(self._api_key)
 
     async def find_contact_by_phone(self, phone: str) -> dict | None:
         url = f"{BASE_URL}/crm/v3/objects/contacts/search"
@@ -93,15 +94,23 @@ class HubSpotClient:
 hubspot = HubSpotClient()
 
 
+async def get_hubspot(tenant_id: str = "") -> HubSpotClient:
+    from cogniflow_home.credentials.resolver import credentials
+    config = await credentials.get(tenant_id, "hubspot")
+    return HubSpotClient(api_key=config.get("api_key", ""))
+
+
 async def on_call_completed(event: str, data: dict[str, Any]):
-    if not hubspot.enabled:
+    tenant_id = data.get("tenant_id", "")
+    client = await get_hubspot(tenant_id) if tenant_id else hubspot
+    if not client.enabled:
         return
 
     phone = data.get("caller_number", "")
     if not phone:
         return
 
-    contact = await hubspot.find_contact_by_phone(phone)
+    contact = await client.find_contact_by_phone(phone)
     transcript = data.get("transcript", [])
     summary = data.get("summary", "")
     if not summary:
@@ -120,7 +129,7 @@ async def on_call_completed(event: str, data: dict[str, Any]):
             {"hubspot_id": hubspot_id},
         )
     else:
-        new_contact = await hubspot.create_contact({"phone": phone})
+        new_contact = await client.create_contact({"phone": phone})
         if new_contact:
             contact_id = new_contact["id"]
             await db.update(
@@ -131,7 +140,7 @@ async def on_call_completed(event: str, data: dict[str, Any]):
         else:
             return
 
-    await hubspot.log_call(contact_id, summary, transcript_text, duration_ms, direction)
+    await client.log_call(contact_id, summary, transcript_text, duration_ms, direction)
     logger.info(f"HubSpot: logged call for contact {contact_id}")
 
 

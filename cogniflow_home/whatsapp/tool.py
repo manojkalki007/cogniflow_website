@@ -34,10 +34,10 @@ TEMPLATES = {
 
 class WhatsAppTool:
 
-    def __init__(self):
+    def __init__(self, api_key: str = "", api_url: str = ""):
         self._client = httpx.AsyncClient(
-            base_url=settings.whatsapp_api_url,
-            headers={"Authorization": f"Bearer {settings.whatsapp_api_key}"},
+            base_url=api_url or settings.whatsapp_api_url,
+            headers={"Authorization": f"Bearer {api_key or settings.whatsapp_api_key}"},
             timeout=15.0,
         )
 
@@ -134,3 +134,12 @@ if you've received it?" Wait for confirmation before continuing.
 NEVER send WhatsApp messages unless the information is genuinely useful.
 Don't send for simple yes/no answers that can be handled by voice.
 """
+
+
+async def get_whatsapp(tenant_id: str = "") -> WhatsAppTool:
+    from cogniflow_home.credentials.resolver import credentials
+    config = await credentials.get(tenant_id, "whatsapp")
+    return WhatsAppTool(
+        api_key=config.get("api_key", ""),
+        api_url=config.get("api_url", ""),
+    )

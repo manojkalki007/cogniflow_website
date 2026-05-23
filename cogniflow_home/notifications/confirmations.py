@@ -7,7 +7,6 @@ Sends confirmations automatically — no manual action needed.
 import logging
 from typing import Any
 
-from cogniflow_home.config import settings
 from cogniflow_home.db.supabase import db
 from cogniflow_home.events import bus
 from cogniflow_home.integrations.email import email_sender
@@ -33,14 +32,11 @@ async def _get_contact_name(phone: str) -> str:
     return ""
 
 
-async def _send_whatsapp_confirmation(phone: str, name: str, date: str, time: str):
-    if not settings.whatsapp_api_key:
-        logger.debug("WhatsApp not configured — skipping confirmation")
-        return
-
+async def _send_whatsapp_confirmation(phone: str, name: str, date: str, time: str,
+                                      tenant_id: str = ""):
     try:
-        from cogniflow_home.whatsapp.tool import WhatsAppTool
-        wa = WhatsAppTool()
+        from cogniflow_home.whatsapp.tool import WhatsAppTool, get_whatsapp
+        wa = await get_whatsapp(tenant_id) if tenant_id else WhatsAppTool()
         try:
             await wa.send_template(
                 to_phone=phone,
@@ -62,6 +58,7 @@ async def on_appointment_booked(event: str, data: dict[str, Any]):
     phone = data.get("phone", "")
     notes = data.get("notes", "")
     email = data.get("email", "")
+    tenant_id = data.get("tenant_id", "")
 
     if not name or not date or not time:
         return
@@ -91,6 +88,7 @@ async def on_appointment_booked(event: str, data: dict[str, Any]):
             date=date,
             time=time,
             notes=notes,
+            tenant_id=tenant_id,
         )
         if sent:
             logger.info(f"Booking email sent to {email} for {name}")
@@ -99,7 +97,7 @@ async def on_appointment_booked(event: str, data: dict[str, Any]):
 
     # Send WhatsApp confirmation
     if phone:
-        await _send_whatsapp_confirmation(phone, name, date, time)
+        await _send_whatsapp_confirmation(phone, name, date, time, tenant_id=tenant_id)
 
 
 async def on_followup_scheduled(event: str, data: dict[str, Any]):
@@ -108,6 +106,7 @@ async def on_followup_scheduled(event: str, data: dict[str, Any]):
     details = data.get("details", "")
     phone = data.get("caller_number", "")
     when = data.get("when", "immediately")
+    tenant_id = data.get("tenant_id", "")
 
     if action == "email":
         email = await _get_contact_email(phone)
@@ -117,6 +116,7 @@ async def on_followup_scheduled(event: str, data: dict[str, Any]):
                 to_email=email,
                 name=name,
                 details=details,
+                tenant_id=tenant_id,
             )
             logger.info(f"Follow-up email sent to {email}")
         else:
@@ -124,7 +124,6 @@ async def on_followup_scheduled(event: str, data: dict[str, Any]):
 
     elif action == "sms":
         logger.info(f"SMS follow-up scheduled for {phone}: {details}")
-        # SMS integration placeholder
 
     elif action == "callback":
         logger.info(f"Callback scheduled for {phone}: {details} ({when})")

@@ -18,10 +18,19 @@ logger = logging.getLogger(__name__)
 class GoogleCalendar:
     """Check availability and create events on Google Calendar."""
 
-    def __init__(self):
-        self.calendar_id = settings.google_calendar_id or "primary"
+    def __init__(self, service_account_json: str = "", calendar_id: str = ""):
+        self.calendar_id = calendar_id or settings.google_calendar_id or "primary"
+        self._service_account_json = service_account_json
         self._cached_token = None
         self._token_expires = 0
+
+    @property
+    def configured(self) -> bool:
+        return bool(
+            self._service_account_json
+            or settings.google_service_account_json
+            or settings.google_service_account_path
+        )
 
     async def get_available_slots(
         self,
@@ -107,14 +116,12 @@ class GoogleCalendar:
 
         import jwt as pyjwt
 
-        if settings.google_service_account_path:
+        if self._service_account_json:
+            creds = json.loads(self._service_account_json)
+        elif settings.google_service_account_path:
             with open(settings.google_service_account_path) as f:
                 creds = json.load(f)
         elif settings.google_service_account_json:
-            logger.warning(
-                "Using GOOGLE_SERVICE_ACCOUNT_JSON env var — prefer "
-                "GOOGLE_SERVICE_ACCOUNT_PATH with file permissions restricted to 600"
-            )
             creds = json.loads(settings.google_service_account_json)
         else:
             raise ValueError("No Google service account credentials configured")
@@ -143,3 +150,12 @@ class GoogleCalendar:
 
 
 gcal = GoogleCalendar()
+
+
+async def get_gcal(tenant_id: str = "") -> GoogleCalendar:
+    from cogniflow_home.credentials.resolver import credentials
+    config = await credentials.get(tenant_id, "google_calendar")
+    return GoogleCalendar(
+        service_account_json=config.get("service_account_json", ""),
+        calendar_id=config.get("calendar_id", ""),
+    )

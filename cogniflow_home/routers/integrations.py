@@ -20,6 +20,12 @@ class UpdateIntegrationRequest(BaseModel):
     is_active: Optional[bool] = None
 
 
+class SaveTenantIntegrationRequest(BaseModel):
+    credentials: dict = Field(default_factory=dict)
+    config: dict = Field(default_factory=dict)
+    setup_mode: str = "self"
+
+
 class TestEmailRequest(BaseModel):
     to_email: str
 
@@ -186,24 +192,34 @@ async def api_update_integration(integration_id: str, body: UpdateIntegrationReq
     if not updates:
         raise HTTPException(400, "No fields to update")
     if valid_uuid(integration_id):
+        from cogniflow_home.credentials.resolver import credentials as cred_resolver
+        if updates.get("config"):
+            updates["config"] = cred_resolver.encrypt_config(updates["config"])
         match = {"id": integration_id}
         if auth.tenant_id:
             match["tenant_id"] = auth.tenant_id
         result = await db.update("integrations", match, updates)
         if not result:
             raise HTTPException(404, "Integration not found")
+        if auth.tenant_id and result.get("type"):
+            cred_resolver.invalidate(auth.tenant_id, result["type"])
         return result
+    from cogniflow_home.credentials.resolver import credentials
+    raw_config = updates.get("config", {})
+    encrypted_config = credentials.encrypt_config(raw_config) if raw_config else {}
     upsert_data = {
         "type": integration_id,
         "name": updates.get("name", integration_id),
         "status": updates.get("status", "connected"),
-        "config": updates.get("config", {}),
+        "config": encrypted_config,
     }
     if auth.tenant_id:
         upsert_data["tenant_id"] = auth.tenant_id
     result = await db.upsert("integrations", upsert_data)
     if not result:
         raise HTTPException(500, "Failed to update integration")
+    if auth.tenant_id:
+        credentials.invalidate(auth.tenant_id, integration_id)
     return result
 
 
@@ -306,6 +322,84 @@ async def remove_dnc(phone_number: str, auth: AuthContext = Depends(get_auth_con
         match["tenant_id"] = auth.tenant_id
     await db.delete("dnc_list", match)
     return {"status": "removed"}
+
+
+# ─── Tenant Integrations (multi-tenant credential management) ───
+
+@router.get("/api/tenant-integrations")
+async def api_list_tenant_integrations(auth: AuthContext = Depends(get_auth_context)):
+    """List all integrations for the tenant. NO credentials returned."""
+    if not auth.tenant_id:
+        raise HTTPException(403, "Tenant context required")
+    from cogniflow_home.integrations.manager import integration_manager
+    integrations = await integration_manager.list_integrations(auth.tenant_id)
+    return {"integrations": integrations}
+
+
+@router.post("/api/tenant-integrations/{integration}")
+async def api_save_tenant_integration(
+    integration: str,
+    body: SaveTenantIntegrationRequest,
+    auth: AuthContext = Depends(get_auth_context),
+):
+    """Save credentials for a tenant integration."""
+    if not auth.tenant_id:
+        raise HTTPException(403, "Tenant context required")
+    if not body.credentials:
+        raise HTTPException(400, "Credentials are required")
+    from cogniflow_home.integrations.manager import integration_manager
+    result = await integration_manager.save_integration(
+        tenant_id=auth.tenant_id,
+        integration=integration,
+        credentials_data=body.credentials,
+        config=body.config,
+        setup_mode=body.setup_mode,
+    )
+    return {"status": "saved", "integration": integration, "record": result}
+
+
+@router.post("/api/tenant-integrations/{integration}/test")
+async def api_test_tenant_integration(
+    integration: str,
+    auth: AuthContext = Depends(get_auth_context),
+):
+    """Live-test a tenant integration's credentials."""
+    if not auth.tenant_id:
+        raise HTTPException(403, "Tenant context required")
+    from cogniflow_home.integrations.manager import integration_manager
+    result = await integration_manager.test_integration(auth.tenant_id, integration)
+    return result
+
+
+@router.delete("/api/tenant-integrations/{integration}")
+async def api_disconnect_tenant_integration(
+    integration: str,
+    auth: AuthContext = Depends(get_auth_context),
+):
+    """Disconnect a tenant integration (clear credentials)."""
+    if not auth.tenant_id:
+        raise HTTPException(403, "Tenant context required")
+    from cogniflow_home.integrations.manager import integration_manager
+    result = await integration_manager.disconnect_integration(auth.tenant_id, integration)
+    return {"status": "disconnected", "integration": integration, "record": result}
+
+
+@router.post("/api/tenant-integrations/{integration}/request-setup")
+async def api_request_managed_setup(
+    integration: str,
+    auth: AuthContext = Depends(get_auth_context),
+):
+    """Request managed setup for an integration (Cogniflow team configures it)."""
+    if not auth.tenant_id:
+        raise HTTPException(403, "Tenant context required")
+    from cogniflow_home.integrations.manager import integration_manager
+    result = await integration_manager.save_managed_request(auth.tenant_id, integration)
+    return {
+        "status": "pending_setup",
+        "integration": integration,
+        "message": "Setup request received. Our team will configure this integration for you.",
+        "record": result,
+    }
 
 
 # ─── Revenue Attribution ───

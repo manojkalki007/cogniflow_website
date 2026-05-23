@@ -43,10 +43,10 @@ Return ONLY the JSON object, no other text."""
 
 class LeadRatCRM:
 
-    def __init__(self):
-        self.api_key = settings.leadrat_api_key
-        self.account_name = settings.leadrat_account_name
-        self.base_url = settings.leadrat_base_url.rstrip("/")
+    def __init__(self, api_key: str = "", account_name: str = "", base_url: str = ""):
+        self.api_key = api_key or settings.leadrat_api_key
+        self.account_name = account_name or settings.leadrat_account_name
+        self.base_url = (base_url or settings.leadrat_base_url).rstrip("/")
         self._client = httpx.AsyncClient(
             timeout=httpx.Timeout(connect=5.0, read=10.0, write=5.0, pool=5.0)
         )
@@ -106,6 +106,16 @@ class LeadRatCRM:
 leadrat = LeadRatCRM()
 
 
+async def get_leadrat(tenant_id: str = "") -> LeadRatCRM:
+    from cogniflow_home.credentials.resolver import credentials
+    config = await credentials.get(tenant_id, "leadrat")
+    return LeadRatCRM(
+        api_key=config.get("api_key", ""),
+        account_name=config.get("account_name", ""),
+        base_url=config.get("base_url", ""),
+    )
+
+
 # ── Post-call hook ──
 
 _llm = None
@@ -145,7 +155,9 @@ async def _extract_qualification(transcript: list[dict]) -> dict:
 
 
 async def on_call_completed(event: str, data: dict[str, Any]):
-    if not leadrat.configured:
+    tenant_id = data.get("tenant_id", "")
+    client = await get_leadrat(tenant_id) if tenant_id else leadrat
+    if not client.configured:
         return
 
     transcript = data.get("transcript", [])
@@ -183,7 +195,7 @@ async def on_call_completed(event: str, data: dict[str, Any]):
     if budget_num:
         lead_data["leadExpectedBudget"] = str(budget_num)
 
-    result = await leadrat.push_lead(lead_data)
+    result = await client.push_lead(lead_data)
 
     if result.get("status") == "success":
         try:
@@ -278,6 +290,9 @@ LEADRAT_TOOL_DEFINITION = {
 
 
 async def handle_push_to_leadrat(args: dict, ctx: dict) -> str:
+    tenant_id = ctx.get("tenant_id", "")
+    client = await get_leadrat(tenant_id) if tenant_id else leadrat
+
     phone = ctx.get("caller_number", "")
     if phone.startswith("+91"):
         phone = phone[3:]
@@ -299,7 +314,7 @@ async def handle_push_to_leadrat(args: dict, ctx: dict) -> str:
     if budget_num:
         lead_data["leadExpectedBudget"] = str(budget_num)
 
-    result = await leadrat.push_lead(lead_data)
+    result = await client.push_lead(lead_data)
 
     if result.get("status") == "success":
         return "Lead saved to CRM successfully."

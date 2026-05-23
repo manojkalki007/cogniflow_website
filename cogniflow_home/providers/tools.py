@@ -10,7 +10,6 @@ import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from cogniflow_home.config import settings
 from cogniflow_home.db.supabase import db
 from cogniflow_home.events import bus
 
@@ -202,12 +201,14 @@ async def _book_appointment(args: dict, ctx: dict) -> str:
     if not _TIME_RE.match(time_str):
         return "I need the time like 10:00 or 14:30. What time works for you?"
 
+    tenant_id = ctx.get("tenant_id", "")
     cal_booking_uid = ""
     start_iso = f"{date}T{time_str}:00+05:30"
     try:
-        from cogniflow_home.integrations.calcom import calcom
-        if calcom.configured and email:
-            result = await calcom.create_booking(
+        from cogniflow_home.integrations.calcom import calcom, get_calcom
+        cal_client = await get_calcom(tenant_id) if tenant_id else calcom
+        if cal_client.configured and email:
+            result = await cal_client.create_booking(
                 start_iso=start_iso,
                 attendee_name=name,
                 attendee_email=email,
@@ -221,10 +222,11 @@ async def _book_appointment(args: dict, ctx: dict) -> str:
 
     if not cal_booking_uid:
         try:
-            from cogniflow_home.integrations.google_calendar import gcal
-            if gcal.configured:
+            from cogniflow_home.integrations.google_calendar import gcal, get_gcal
+            gcal_client = await get_gcal(tenant_id) if tenant_id else gcal
+            if gcal_client.configured:
                 end_dt = datetime.fromisoformat(start_iso) + timedelta(minutes=30)
-                await gcal.create_event(
+                await gcal_client.create_event(
                     title=f"Appointment: {name}",
                     start_iso=start_iso,
                     end_iso=end_dt.isoformat(),
@@ -302,17 +304,9 @@ async def _send_whatsapp(args: dict, ctx: dict) -> str:
     if not caller:
         return "I don't have a phone number to send the WhatsApp message to."
 
-    if not settings.whatsapp_api_key:
-        await bus.emit("whatsapp.requested", {
-            "call_id": ctx.get("call_id", ""),
-            "caller_number": caller,
-            "template": args.get("template", ""),
-            "parameters": args.get("parameters", []),
-        })
-        return "I've noted that down and we'll send it to your WhatsApp shortly."
-
-    from cogniflow_home.whatsapp.tool import WhatsAppTool
-    wa = WhatsAppTool()
+    tenant_id = ctx.get("tenant_id", "")
+    from cogniflow_home.whatsapp.tool import WhatsAppTool, get_whatsapp
+    wa = await get_whatsapp(tenant_id) if tenant_id else WhatsAppTool()
     try:
         result = await wa.send_template(
             to_phone=caller,
@@ -343,13 +337,16 @@ async def _check_availability(args: dict, ctx: dict) -> str:
     date = args.get("date", "")
     if not date:
         return "I need a date to check availability. What date would you prefer?"
+    tenant_id = ctx.get("tenant_id", "")
     try:
-        from cogniflow_home.integrations.calcom import calcom
-        if calcom.configured:
-            slots = await calcom.get_available_slots(date)
+        from cogniflow_home.integrations.calcom import calcom, get_calcom
+        cal_client = await get_calcom(tenant_id) if tenant_id else calcom
+        if cal_client.configured:
+            slots = await cal_client.get_available_slots(date)
         else:
-            from cogniflow_home.integrations.google_calendar import gcal
-            slots = await gcal.get_available_slots(date)
+            from cogniflow_home.integrations.google_calendar import gcal, get_gcal
+            gcal_client = await get_gcal(tenant_id) if tenant_id else gcal
+            slots = await gcal_client.get_available_slots(date)
         if not slots:
             return f"Sorry, there are no available slots on {date}. Would you like to try another date?"
         slot_list = ", ".join(f"{s['start']} to {s['end']}" for s in slots[:5])
@@ -363,11 +360,13 @@ async def _create_payment_link(args: dict, ctx: dict) -> str:
     amount = args.get("amount", 0)
     description = args.get("description", "Payment")
     caller = ctx.get("caller_number", "")
+    tenant_id = ctx.get("tenant_id", "")
     if not amount:
         return "I need an amount to create the payment link."
     try:
-        from cogniflow_home.integrations.razorpay import razorpay
-        result = await razorpay.create_payment_link(
+        from cogniflow_home.integrations.razorpay import razorpay, get_razorpay
+        rzp = await get_razorpay(tenant_id) if tenant_id else razorpay
+        result = await rzp.create_payment_link(
             amount_inr=amount,
             description=description,
             customer_phone=caller,

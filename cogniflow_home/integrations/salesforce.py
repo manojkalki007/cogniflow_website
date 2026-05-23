@@ -20,9 +20,18 @@ SFDC_BASE = "https://login.salesforce.com"
 
 
 class SalesforceIntegration:
-    def __init__(self):
+    def __init__(self, client_id: str = "", client_secret: str = "",
+                 username: str = "", password: str = ""):
+        self._client_id = client_id or settings.salesforce_client_id
+        self._client_secret = client_secret or settings.salesforce_client_secret
+        self._username = username or settings.salesforce_username
+        self._password = password or settings.salesforce_password
         self.access_token = None
         self.instance_url = None
+
+    @property
+    def configured(self) -> bool:
+        return bool(self._client_id and self._client_secret)
 
     def _sanitize_phone(self, phone: str) -> str:
         return re.sub(r"[^\d+\s\-()]", "", phone or "")
@@ -39,10 +48,10 @@ class SalesforceIntegration:
                 f"{SFDC_BASE}/services/oauth2/token",
                 data={
                     "grant_type": "password",
-                    "client_id": settings.salesforce_client_id,
-                    "client_secret": settings.salesforce_client_secret,
-                    "username": settings.salesforce_username,
-                    "password": settings.salesforce_password,
+                    "client_id": self._client_id,
+                    "client_secret": self._client_secret,
+                    "username": self._username,
+                    "password": self._password,
                 },
             )
             data = resp.json()
@@ -126,6 +135,17 @@ class SalesforceIntegration:
 sfdc = SalesforceIntegration()
 
 
+async def get_salesforce(tenant_id: str = "") -> SalesforceIntegration:
+    from cogniflow_home.credentials.resolver import credentials
+    config = await credentials.get(tenant_id, "salesforce")
+    return SalesforceIntegration(
+        client_id=config.get("client_id", ""),
+        client_secret=config.get("client_secret", ""),
+        username=config.get("username", ""),
+        password=config.get("password", ""),
+    )
+
+
 def register():
     if settings.salesforce_client_id:
         bus.on("call.completed", _on_call_completed)
@@ -133,6 +153,11 @@ def register():
 
 
 async def _on_call_completed(event: str, data: dict):
+    tenant_id = data.get("tenant_id", "")
+    client = await get_salesforce(tenant_id) if tenant_id else sfdc
+    if not client.configured:
+        return
+
     phone = data.get("caller_number")
     summary = data.get("summary", "AI call completed")
 
@@ -140,25 +165,25 @@ async def _on_call_completed(event: str, data: dict):
         return
 
     try:
-        contact = await sfdc.find_contact(phone)
+        contact = await client.find_contact(phone)
         if contact:
-            await sfdc.create_task(
+            await client.create_task(
                 contact["Id"],
                 f"AI Call — {data.get('disposition', 'completed')}",
                 summary,
             )
             return
 
-        lead = await sfdc.find_lead(phone)
+        lead = await client.find_lead(phone)
         if lead:
-            await sfdc.create_task(
+            await client.create_task(
                 lead["Id"],
                 f"AI Call — {data.get('disposition', 'completed')}",
                 summary,
             )
             return
 
-        await sfdc.create_lead(phone)
+        await client.create_lead(phone)
 
     except Exception as e:
         logger.exception(f"Salesforce sync failed: {e}")

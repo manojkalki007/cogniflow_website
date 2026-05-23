@@ -145,7 +145,7 @@ export const api = {
       body: JSON.stringify({ message, messages }),
     }),
 
-  // Integrations
+  // Integrations (legacy)
   getIntegrations: () => request("/api/integrations"),
   updateIntegration: (id, data) =>
     request(`/api/integrations/${id}`, {
@@ -154,6 +154,23 @@ export const api = {
     }),
   testIntegration: (id) =>
     request(`/api/integrations/${id}/test`, { method: "POST" }),
+
+  // Tenant Integrations (multi-tenant setup wizard)
+  getTenantIntegrations: () => request("/api/tenant-integrations"),
+  saveTenantIntegration: (integration, data) =>
+    request(`/api/tenant-integrations/${integration}`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  testTenantIntegration: (integration) =>
+    request(`/api/tenant-integrations/${integration}/test`, { method: "POST" }),
+  disconnectTenantIntegration: (integration) =>
+    request(`/api/tenant-integrations/${integration}`, { method: "DELETE" }),
+  requestManagedSetup: (integration, contactInfo) =>
+    request(`/api/tenant-integrations/${integration}/request-setup`, {
+      method: "POST",
+      body: JSON.stringify(contactInfo || {}),
+    }),
 
   // Analytics
   getAnalyticsTrends: (days = 30) =>

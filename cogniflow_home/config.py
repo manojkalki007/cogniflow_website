@@ -122,6 +122,9 @@ class Settings(BaseSettings):
     smtp_from_email: str = "no_reply@cogniflowautomations.com"
     smtp_from_name: str = "Cogniflow"
 
+    # Credential encryption (32-byte hex key for AES-256-GCM)
+    credential_encryption_key: str = ""
+
     # Alerting
     alert_webhook: str = ""
 

@@ -23,13 +23,19 @@ class EmailSender:
         subject: str,
         html_body: str,
         text_body: str = "",
+        tenant_id: str = "",
     ) -> bool:
-        if not settings.smtp_user or not settings.smtp_password:
+        from cogniflow_home.credentials.resolver import credentials
+        config = await credentials.get(tenant_id, "smtp")
+
+        smtp_user = config.get("user", "")
+        smtp_password = config.get("password", "")
+        if not smtp_user or not smtp_password:
             logger.warning("SMTP not configured — email not sent")
             return False
 
         msg = MIMEMultipart("alternative")
-        msg["From"] = f"{settings.smtp_from_name} <{settings.smtp_from_email}>"
+        msg["From"] = f"{config.get('from_name', 'Cogniflow')} <{config.get('from_email', settings.smtp_from_email)}>"
         msg["To"] = to_email
         msg["Subject"] = subject
 
@@ -40,10 +46,10 @@ class EmailSender:
         try:
             await aiosmtplib.send(
                 msg,
-                hostname=settings.smtp_host,
-                port=settings.smtp_port,
-                username=settings.smtp_user,
-                password=settings.smtp_password,
+                hostname=config.get("host", settings.smtp_host),
+                port=int(config.get("port", settings.smtp_port)),
+                username=smtp_user,
+                password=smtp_password,
                 start_tls=True,
             )
             logger.info(f"Email sent to {to_email}: {subject}")
@@ -60,6 +66,7 @@ class EmailSender:
         time: str,
         notes: str = "",
         company: str = "Cogniflow",
+        tenant_id: str = "",
     ) -> bool:
         subject = f"Booking Confirmed — {date} at {time}"
 
@@ -113,7 +120,7 @@ class EmailSender:
             f"— {company}"
         )
 
-        return await self.send(to_email, subject, html_body, text_body)
+        return await self.send(to_email, subject, html_body, text_body, tenant_id=tenant_id)
 
     async def send_followup(
         self,
@@ -121,6 +128,7 @@ class EmailSender:
         name: str,
         details: str,
         company: str = "Cogniflow",
+        tenant_id: str = "",
     ) -> bool:
         subject = f"Following up — {company}"
 
@@ -139,7 +147,7 @@ class EmailSender:
         </div>
         """
 
-        return await self.send(to_email, subject, html_body)
+        return await self.send(to_email, subject, html_body, tenant_id=tenant_id)
 
 
 email_sender = EmailSender()

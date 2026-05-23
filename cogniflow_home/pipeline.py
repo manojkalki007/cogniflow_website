@@ -253,6 +253,7 @@ class VoicePipeline:
             "caller_number": call_info.caller_number,
             "called_number": call_info.called_number,
             "direction": call_info.direction,
+            "tenant_id": tenant_id,
         }
         self.tts = _create_tts(language, voice_id or VOICE_ID, sample_rate=sample_rate, raw_pcm=self._raw_pcm)
 
@@ -911,6 +912,7 @@ class VoicePipeline:
             "transcript": self.state.transcript,
             "turn_quality": turn_summary,
             "barge_in_quality": barge_summary,
+            "tenant_id": self.state.tenant_id,
         })
 
         if self.state.tenant_id and duration > 0:

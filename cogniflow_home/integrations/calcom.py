@@ -12,9 +12,10 @@ logger = logging.getLogger(__name__)
 
 class CalCom:
 
-    def __init__(self):
-        self.api_url = settings.cal_api_url.rstrip("/")
-        self._raw_event_type_id = settings.cal_event_type_id
+    def __init__(self, api_key: str = "", api_url: str = "", event_type_id: str = ""):
+        self.api_url = (api_url or settings.cal_api_url).rstrip("/")
+        self._api_key = api_key or settings.cal_api_key
+        self._raw_event_type_id = event_type_id or settings.cal_event_type_id
         self._client = httpx.AsyncClient(
             timeout=httpx.Timeout(connect=5.0, read=15.0, write=5.0, pool=5.0)
         )
@@ -30,11 +31,11 @@ class CalCom:
 
     @property
     def configured(self) -> bool:
-        return bool(settings.cal_api_key and self._event_type_id)
+        return bool(self._api_key and self._event_type_id)
 
     def _headers(self) -> dict:
         return {
-            "Authorization": f"Bearer {settings.cal_api_key}",
+            "Authorization": f"Bearer {self._api_key}",
             "cal-api-version": "2024-08-13",
             "Content-Type": "application/json",
         }
@@ -156,3 +157,13 @@ class CalCom:
 
 
 calcom = CalCom()
+
+
+async def get_calcom(tenant_id: str = "") -> CalCom:
+    from cogniflow_home.credentials.resolver import credentials
+    config = await credentials.get(tenant_id, "calcom")
+    return CalCom(
+        api_key=config.get("api_key", ""),
+        api_url=config.get("api_url", ""),
+        event_type_id=config.get("event_type_id", ""),
+    )
