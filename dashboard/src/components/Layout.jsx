@@ -156,11 +156,24 @@ export default function Layout() {
               src="/cogniflow-logo.png"
               alt="Cogniflow"
               style={{
-                height: (!isMobile && collapsed) ? 36 : 44,
+                height: (!isMobile && collapsed) ? 40 : 52,
                 width: "auto",
                 objectFit: "contain",
               }}
             />
+            {(isMobile || !collapsed) && (
+              <span
+                style={{
+                  fontSize: 17,
+                  fontWeight: 700,
+                  letterSpacing: "0.08em",
+                  color: "var(--sidebar-text)",
+                  marginLeft: 6,
+                }}
+              >
+                COGNIFLOW
+              </span>
+            )}
           </div>
 
           {/* Navigation */}
