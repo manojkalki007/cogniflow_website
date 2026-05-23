@@ -46,12 +46,12 @@ export default function Sidebar({ onSignOut }: { onSignOut: () => void }) {
     >
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 h-16 border-b" style={{ borderColor: "var(--d-border)" }}>
-        <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-          style={{ background: "var(--d-primary-muted)", border: "1px solid rgba(0,221,179,0.2)" }}
-        >
-          <Zap size={16} style={{ color: "var(--d-primary)" }} />
-        </div>
+        <img
+          src="/cogniflow-logo.png"
+          alt="Cogniflow"
+          className="shrink-0 object-contain"
+          style={{ height: collapsed ? 32 : 36, width: "auto" }}
+        />
         {!collapsed && (
           <span className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--d-text)" }}>
             Cogniflow
