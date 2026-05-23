@@ -53,8 +53,8 @@ export default function Sidebar({ onSignOut }: { onSignOut: () => void }) {
           style={{ height: collapsed ? 40 : 48, width: "auto" }}
         />
         {!collapsed && (
-          <span className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--d-text)" }}>
-            Cogniflow
+          <span className="text-[17px] font-bold tracking-[0.08em]" style={{ color: "var(--d-text)" }}>
+            COGNIFLOW
           </span>
         )}
       </div>
