@@ -9,7 +9,7 @@ interface CogniflowLogoProps {
   showText?: boolean;
 }
 
-export function CogniflowIcon({ size = 36 }: { size?: number }) {
+export function CogniflowIcon({ size = 48 }: { size?: number }) {
   return (
     <Image
       src="/cogniflow-logo.png"
@@ -21,7 +21,7 @@ export function CogniflowIcon({ size = 36 }: { size?: number }) {
   );
 }
 
-export function CogniflowIconLight({ size = 36 }: { size?: number }) {
+export function CogniflowIconLight({ size = 48 }: { size?: number }) {
   return (
     <Image
       src="/cogniflow-logo.png"
@@ -34,7 +34,7 @@ export function CogniflowIconLight({ size = 36 }: { size?: number }) {
 }
 
 export default function CogniflowLogo({
-  width = 40,
+  width = 52,
   className = "",
   variant = "dark",
   showText = true,

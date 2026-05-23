@@ -50,7 +50,7 @@ export default function Sidebar({ onSignOut }: { onSignOut: () => void }) {
           src="/cogniflow-logo.png"
           alt="Cogniflow"
           className="shrink-0 object-contain"
-          style={{ height: collapsed ? 32 : 36, width: "auto" }}
+          style={{ height: collapsed ? 40 : 48, width: "auto" }}
         />
         {!collapsed && (
           <span className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--d-text)" }}>

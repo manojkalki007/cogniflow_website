@@ -64,7 +64,7 @@ export default function Navbar() {
       >
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
           <a href="#" className="flex items-center">
-            <CogniflowLogo width={44} variant="dark" />
+            <CogniflowLogo width={56} variant="dark" />
           </a>
 
           {/* Desktop nav */}
