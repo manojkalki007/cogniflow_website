@@ -114,15 +114,17 @@ async def api_provider_status(auth: AuthContext = Depends(get_auth_context)):
     ]
 
     usage_by_provider = {}
-    if auth.tenant_id:
-        month = datetime.now(timezone.utc).strftime("%Y-%m")
-        records = await db.select("usage_records", {"tenant_id": auth.tenant_id}, limit=5000)
-        for r in records:
-            if (r.get("recorded_at") or "")[:7] == month:
-                p = r.get("provider", "")
-                usage_by_provider[p] = usage_by_provider.get(p, 0) + r.get("duration_seconds", 0)
-
     month_start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0).isoformat()
+    if auth.tenant_id:
+        records = await db.select(
+            "usage_records",
+            {"tenant_id": auth.tenant_id, "recorded_at": f"gte.{month_start}"},
+            limit=5000,
+        )
+        for r in records:
+            p = r.get("provider", "")
+            usage_by_provider[p] = usage_by_provider.get(p, 0) + r.get("duration_seconds", 0)
+
     call_match = {"created_at": f"gte.{month_start}"}
     if auth.tenant_id:
         call_match["tenant_id"] = auth.tenant_id
@@ -197,7 +199,7 @@ async def api_test_integration(integration_id: str, auth: AuthContext = Depends(
         "hubspot": lambda: bool(settings.hubspot_api_key),
         "salesforce": lambda: bool(settings.salesforce_client_id),
         "google_calendar": lambda: bool(settings.google_service_account_json or settings.google_service_account_path),
-        "calcom": lambda: bool(settings.cal_api_key and settings.cal_event_type_id),
+        "calcom": lambda: bool(settings.cal_api_key and settings.cal_event_type_id and settings.cal_event_type_id.isdigit()),
         "razorpay": lambda: bool(settings.razorpay_key_id),
         "whatsapp": lambda: bool(settings.whatsapp_api_key),
     }

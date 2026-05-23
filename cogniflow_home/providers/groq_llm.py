@@ -133,7 +133,9 @@ class GroqLLM:
                     )
             else:
                 logger.exception("Groq LLM failed (no fallback model)")
-            yield "I'm sorry, I'm having trouble right now. Could you repeat that?"
+            fallback_msg = "I'm sorry, I'm having trouble right now. Could you repeat that?"
+            self.add_message("assistant", fallback_msg)
+            yield fallback_msg
 
     async def _try_stream(
         self,
@@ -153,7 +155,7 @@ class GroqLLM:
             "messages": self.conversation_history,
             "stream": True,
             "temperature": self.temperature,
-            "max_tokens": self.max_tokens,
+            "max_tokens": max(self.max_tokens, 200) if tools else self.max_tokens,
         }
         if tools:
             body["tools"] = tools
@@ -231,7 +233,7 @@ class GroqLLM:
                         if sentence:
                             first_chunk_sent = True
                             yield sentence
-                    elif not first_chunk_sent and word_count >= 3:
+                    elif not first_chunk_sent and word_count >= 5:
                         text = buffer.strip()
                         buffer = ""
                         if text:
@@ -280,7 +282,7 @@ class GroqLLM:
                     "content": result,
                 })
 
-            async for sentence in self._try_stream(api_key, model, depth=depth + 1):
+            async for sentence in self._try_stream(api_key, model, tools=tools, depth=depth + 1):
                 yield sentence
 
         if full_response.strip() and not tool_calls_data:

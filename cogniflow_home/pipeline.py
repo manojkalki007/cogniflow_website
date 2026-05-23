@@ -587,6 +587,14 @@ class VoicePipeline:
             self._turn_first_byte_ts = 0.0
             eot_ts_orig = eot_ts
 
+            if self._turn_number == 1:
+                disclosure = "Just so you know, this call is recorded."
+                await self._speak(disclosure)
+                self.llm.add_message("assistant", disclosure)
+                self.state.transcript.append(
+                    {"role": "agent", "text": disclosure, "ts": time.time()}
+                )
+
             llm_input = user_text
             if self.emotion_adapter.should_offer_human():
                 llm_input += "\n[Offer to transfer to a human agent.]"

@@ -6,12 +6,16 @@ Add new tools by defining the function and adding it to TOOL_REGISTRY.
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+import re
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from cogniflow_home.config import settings
 from cogniflow_home.db.supabase import db
 from cogniflow_home.events import bus
+
+_DATE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+_TIME_RE = re.compile(r'^\d{1,2}:\d{2}$')
 
 logger = logging.getLogger("cogniflow_home.tools")
 
@@ -173,11 +177,16 @@ async def _book_appointment(args: dict, ctx: dict) -> str:
     phone = args.get("phone", caller)
     notes = args.get("notes", "")
 
+    if not _DATE_RE.match(date):
+        return "I need the date in a format like 2026-05-25. Could you say the date again?"
+    if not _TIME_RE.match(time_str):
+        return "I need the time like 10:00 or 14:30. What time works for you?"
+
     cal_booking_uid = ""
+    start_iso = f"{date}T{time_str}:00+05:30"
     try:
         from cogniflow_home.integrations.calcom import calcom
         if calcom.configured and email:
-            start_iso = f"{date}T{time_str}:00+05:30"
             result = await calcom.create_booking(
                 start_iso=start_iso,
                 attendee_name=name,
@@ -188,7 +197,23 @@ async def _book_appointment(args: dict, ctx: dict) -> str:
             cal_booking_uid = result.get("uid", "")
             logger.info("Cal.com booking created: %s", cal_booking_uid)
     except Exception:
-        logger.exception("Cal.com booking failed, saving locally")
+        logger.exception("Cal.com booking failed, trying fallback")
+
+    if not cal_booking_uid:
+        try:
+            from cogniflow_home.integrations.google_calendar import gcal
+            if gcal.configured:
+                end_dt = datetime.fromisoformat(start_iso) + timedelta(minutes=30)
+                await gcal.create_event(
+                    title=f"Appointment: {name}",
+                    start_iso=start_iso,
+                    end_iso=end_dt.isoformat(),
+                    attendee_email=email or None,
+                    description=notes,
+                )
+                logger.info("Google Calendar booking created as fallback")
+        except Exception:
+            logger.debug("Google Calendar fallback unavailable", exc_info=True)
 
     appointment = {
         "name": name,

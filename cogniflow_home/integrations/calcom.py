@@ -14,11 +14,23 @@ class CalCom:
 
     def __init__(self):
         self.api_url = settings.cal_api_url.rstrip("/")
-        self.event_type_id = settings.cal_event_type_id
+        self._raw_event_type_id = settings.cal_event_type_id
+        self._client = httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=5.0, read=15.0, write=5.0, pool=5.0)
+        )
+
+        if self._raw_event_type_id:
+            try:
+                self._event_type_id = int(self._raw_event_type_id)
+            except ValueError:
+                logger.error("CAL_EVENT_TYPE_ID must be numeric, got: %r", self._raw_event_type_id)
+                self._event_type_id = 0
+        else:
+            self._event_type_id = 0
 
     @property
     def configured(self) -> bool:
-        return bool(settings.cal_api_key and self.event_type_id)
+        return bool(settings.cal_api_key and self._event_type_id)
 
     def _headers(self) -> dict:
         return {
@@ -32,23 +44,30 @@ class CalCom:
         date: str,
         duration_minutes: int = 30,
     ) -> list[dict]:
+        try:
+            start_dt = datetime.fromisoformat(date)
+        except (ValueError, TypeError):
+            logger.warning("Invalid date for availability check: %s", date)
+            return []
+
         start = f"{date}T00:00:00Z"
-        end_date = (datetime.fromisoformat(date) + timedelta(days=1)).strftime("%Y-%m-%d")
+        end_date = (start_dt + timedelta(days=1)).strftime("%Y-%m-%d")
         end = f"{end_date}T00:00:00Z"
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(
-                f"{self.api_url}/slots/available",
-                headers=self._headers(),
-                params={
-                    "startTime": start,
-                    "endTime": end,
-                    "eventTypeId": self.event_type_id,
-                    "duration": str(duration_minutes),
-                },
-            )
-            resp.raise_for_status()
-            data = resp.json()
+        resp = await self._client.get(
+            f"{self.api_url}/slots/available",
+            headers=self._headers(),
+            params={
+                "startTime": start,
+                "endTime": end,
+                "eventTypeId": str(self._event_type_id),
+                "duration": str(duration_minutes),
+            },
+        )
+        if resp.status_code != 200:
+            logger.error("Cal.com availability check failed: %d %s", resp.status_code, resp.text[:200])
+            return []
+        data = resp.json()
 
         slots_by_date = data.get("data", {}).get("slots", {})
         result = []
@@ -74,7 +93,7 @@ class CalCom:
     ) -> dict:
         body = {
             "start": start_iso,
-            "eventTypeId": int(self.event_type_id),
+            "eventTypeId": self._event_type_id,
             "attendee": {
                 "name": attendee_name,
                 "email": attendee_email,
@@ -87,48 +106,53 @@ class CalCom:
         if notes:
             body["metadata"]["notes"] = notes
 
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post(
-                f"{self.api_url}/bookings",
-                headers=self._headers(),
-                json=body,
-            )
-            resp.raise_for_status()
-            data = resp.json().get("data", {})
-            return {
-                "uid": data.get("uid", ""),
-                "start_time": data.get("start", ""),
-                "end_time": data.get("end", ""),
-                "status": data.get("status", ""),
-                "meeting_url": data.get("metadata", {}).get("videoCallUrl", ""),
-            }
+        resp = await self._client.post(
+            f"{self.api_url}/bookings",
+            headers=self._headers(),
+            json=body,
+        )
+        if resp.status_code not in (200, 201):
+            error_detail = resp.text[:300]
+            logger.error("Cal.com booking failed: %d %s", resp.status_code, error_detail)
+            raise RuntimeError(f"Cal.com booking error {resp.status_code}: {error_detail}")
+        data = resp.json().get("data", {})
+        return {
+            "uid": data.get("uid", ""),
+            "start_time": data.get("start", ""),
+            "end_time": data.get("end", ""),
+            "status": data.get("status", ""),
+            "meeting_url": data.get("metadata", {}).get("videoCallUrl", ""),
+        }
 
     async def cancel_booking(self, booking_uid: str, reason: str = "") -> bool:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(
-                f"{self.api_url}/bookings/{booking_uid}/cancel",
-                headers=self._headers(),
-                json={"cancellationReason": reason} if reason else {},
-            )
-            return resp.status_code in (200, 204)
+        resp = await self._client.post(
+            f"{self.api_url}/bookings/{booking_uid}/cancel",
+            headers=self._headers(),
+            json={"cancellationReason": reason} if reason else {},
+        )
+        return resp.status_code in (200, 204)
 
     async def get_event_types(self) -> list[dict]:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(
-                f"{self.api_url}/event-types",
-                headers=self._headers(),
-            )
-            resp.raise_for_status()
-            items = resp.json().get("data", [])
-            return [
-                {
-                    "id": et.get("id"),
-                    "title": et.get("title", ""),
-                    "slug": et.get("slug", ""),
-                    "length": et.get("length", 0),
-                }
-                for et in items
-            ]
+        resp = await self._client.get(
+            f"{self.api_url}/event-types",
+            headers=self._headers(),
+        )
+        if resp.status_code != 200:
+            logger.error("Cal.com event types fetch failed: %d", resp.status_code)
+            return []
+        items = resp.json().get("data", [])
+        return [
+            {
+                "id": et.get("id"),
+                "title": et.get("title", ""),
+                "slug": et.get("slug", ""),
+                "length": et.get("length", 0),
+            }
+            for et in items
+        ]
+
+    async def close(self):
+        await self._client.aclose()
 
 
 calcom = CalCom()

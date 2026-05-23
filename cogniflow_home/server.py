@@ -49,6 +49,22 @@ async def lifespan(app):
     salesforce.register()
     logger.info("All modules registered")
 
+    critical_vars = {
+        "SUPABASE_URL": settings.supabase_url,
+        "SUPABASE_KEY": settings.supabase_key,
+        "GROQ_API_KEY": settings.groq_api_key,
+    }
+    missing = [k for k, v in critical_vars.items() if not v]
+    if missing:
+        logger.error("CRITICAL: Missing required env vars: %s — server may not function correctly", ", ".join(missing))
+
+    stt_ok = settings.deepgram_api_key or settings.sarvam_api_key
+    tts_ok = settings.smallest_ai_api_key or settings.sarvam_api_key or settings.elevenlabs_api_key
+    if not stt_ok:
+        logger.warning("No STT provider configured (DEEPGRAM_API_KEY or SARVAM_API_KEY)")
+    if not tts_ok:
+        logger.warning("No TTS provider configured (SMALLEST_AI_API_KEY, SARVAM_API_KEY, or ELEVENLABS_API_KEY)")
+
     if not settings.webhook_secret:
         logger.warning(
             "WEBHOOK_SECRET is not set. Webhooks will be sent without "
