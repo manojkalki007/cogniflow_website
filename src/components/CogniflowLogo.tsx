@@ -9,32 +9,32 @@ interface CogniflowLogoProps {
   showText?: boolean;
 }
 
-export function CogniflowIcon({ size = 28 }: { size?: number }) {
+export function CogniflowIcon({ size = 36 }: { size?: number }) {
   return (
     <Image
-      src="/cogniflow-logo.svg"
+      src="/cogniflow-logo.png"
       alt="Cogniflow"
       width={size}
-      height={Math.round(size * 0.67)}
+      height={size}
       className="object-contain"
     />
   );
 }
 
-export function CogniflowIconLight({ size = 28 }: { size?: number }) {
+export function CogniflowIconLight({ size = 36 }: { size?: number }) {
   return (
     <Image
-      src="/cogniflow-logo.svg"
+      src="/cogniflow-logo.png"
       alt="Cogniflow"
       width={size}
-      height={Math.round(size * 0.67)}
+      height={size}
       className="object-contain brightness-0 invert"
     />
   );
 }
 
 export default function CogniflowLogo({
-  width = 32,
+  width = 40,
   className = "",
   variant = "dark",
   showText = true,

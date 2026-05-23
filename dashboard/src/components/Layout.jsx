@@ -156,7 +156,7 @@ export default function Layout() {
               src="/cogniflow-logo.png"
               alt="Cogniflow"
               style={{
-                height: (!isMobile && collapsed) ? 28 : 32,
+                height: (!isMobile && collapsed) ? 36 : 44,
                 width: "auto",
                 objectFit: "contain",
               }}

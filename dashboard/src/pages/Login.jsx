@@ -184,7 +184,7 @@ export default function Login() {
         {/* ──── Left: Brand Panel ──── */}
         <div className="login-brand" style={fade(0)}>
           <div className="login-brand-inner">
-            <img src="/cogniflow-logo.png" alt="Cogniflow" className="login-logo" />
+            <img src="/cogniflow-logo.png" alt="Cogniflow" className="login-logo" style={{ height: 56 }} />
 
             <h1 className="login-headline">
               AI agents that
@@ -230,7 +230,7 @@ export default function Login() {
             )}
 
             <div className="login-mobile-logo">
-              <img src="/cogniflow-logo.png" alt="Cogniflow" style={{ height: 32 }} />
+              <img src="/cogniflow-logo.png" alt="Cogniflow" style={{ height: 40 }} />
             </div>
 
             {/* ── Step: Email ── */}
