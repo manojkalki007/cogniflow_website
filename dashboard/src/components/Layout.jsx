@@ -5,7 +5,7 @@ import {
   Phone, PhoneOutgoing, Users, BarChart3, Bot,
   LayoutTemplate, Megaphone, Settings, Target,
   UserCircle, ShieldAlert, Cable, MessageSquare,
-  Mail, DollarSign, ShieldCheck, Timer, Plug,
+  Mail, DollarSign, ShieldCheck, Timer, Plug, Calendar,
   PanelLeftClose, PanelLeftOpen, Search, Bell,
   ChevronRight, Command, LogOut, Menu, X,
 } from "lucide-react";
@@ -26,6 +26,7 @@ const NAV_CORE = [
 const NAV_CHANNELS = [
   { to: "/home/whatsapp", label: "WhatsApp", icon: MessageSquare },
   { to: "/home/email", label: "Email", icon: Mail },
+  { to: "/home/scheduling", label: "Scheduling", icon: Calendar },
   { to: "/home/ai-sdr", label: "AI SDR", icon: Target },
   { to: "/home/integrations", label: "Integrations", icon: Plug },
 ];

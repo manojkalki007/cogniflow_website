@@ -12,6 +12,7 @@ const INTEGRATION_META = {
   hubspot: { icon: "🟠", description: "Push call data and contact updates to HubSpot CRM" },
   zoho: { icon: "🔵", description: "Connect to Zoho CRM for lead and contact sync" },
   google_calendar: { icon: "📅", description: "Check availability and book appointments via Google Calendar" },
+  calcom: { icon: "📆", description: "Cal.com scheduling — availability checks and auto-booking during AI calls" },
   razorpay: { icon: "💳", description: "Generate and send payment links during calls" },
   webhook: { icon: "🔗", description: "Send call events to custom HTTP endpoints" },
 };
@@ -34,6 +35,10 @@ const INTEGRATION_FIELDS = {
   google_calendar: [
     { key: "calendar_id", label: "Calendar ID", type: "text", placeholder: "primary" },
     { key: "service_account_json", label: "Service Account JSON", type: "textarea" },
+  ],
+  calcom: [
+    { key: "api_key", label: "Cal.com API Key", type: "password" },
+    { key: "event_type_id", label: "Event Type ID", type: "text", placeholder: "123456" },
   ],
   razorpay: [
     { key: "key_id", label: "Key ID", type: "text" },

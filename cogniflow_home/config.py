@@ -84,6 +84,11 @@ class Settings(BaseSettings):
     google_service_account_json: str = ""
     google_service_account_path: str = ""
 
+    # Cal.com
+    cal_api_key: str = ""
+    cal_event_type_id: str = ""
+    cal_api_url: str = "https://api.cal.com/v2"
+
     # MCube (India)
     mcube_api_key: str = ""
     mcube_api_secret: str = ""

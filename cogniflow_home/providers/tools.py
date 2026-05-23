@@ -116,7 +116,7 @@ TOOL_DEFINITIONS = [
         "type": "function",
         "function": {
             "name": "check_availability",
-            "description": "Check available appointment slots on a given date using Google Calendar.",
+            "description": "Check available appointment slots on a given date.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -167,18 +167,43 @@ async def _book_appointment(args: dict, ctx: dict) -> str:
         if contacts and contacts[0].get("email"):
             email = contacts[0]["email"]
 
+    name = args.get("name", "")
+    date = args.get("date", "")
+    time_str = args.get("time", "")
+    phone = args.get("phone", caller)
+    notes = args.get("notes", "")
+
+    cal_booking_uid = ""
+    try:
+        from cogniflow_home.integrations.calcom import calcom
+        if calcom.configured and email:
+            start_iso = f"{date}T{time_str}:00+05:30"
+            result = await calcom.create_booking(
+                start_iso=start_iso,
+                attendee_name=name,
+                attendee_email=email,
+                attendee_phone=phone,
+                notes=notes,
+            )
+            cal_booking_uid = result.get("uid", "")
+            logger.info("Cal.com booking created: %s", cal_booking_uid)
+    except Exception:
+        logger.exception("Cal.com booking failed, saving locally")
+
     appointment = {
-        "name": args.get("name", ""),
-        "date": args.get("date", ""),
-        "time": args.get("time", ""),
-        "phone": args.get("phone", caller),
+        "name": name,
+        "date": date,
+        "time": time_str,
+        "phone": phone,
         "email": email,
-        "notes": args.get("notes", ""),
+        "notes": notes,
         "call_id": ctx.get("call_id", ""),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
+    if cal_booking_uid:
+        appointment["cal_booking_uid"] = cal_booking_uid
 
-    contact_updates = {"name": args.get("name", ""), "metadata": {"last_appointment": appointment}}
+    contact_updates = {"name": name, "metadata": {"last_appointment": appointment}}
     if email:
         contact_updates["email"] = email
     if caller:
@@ -186,7 +211,7 @@ async def _book_appointment(args: dict, ctx: dict) -> str:
 
     await bus.emit("appointment.booked", appointment)
 
-    confirmation = f"Appointment booked for {args['name']} on {args['date']} at {args['time']}."
+    confirmation = f"Appointment booked for {name} on {date} at {time_str}."
     if email:
         confirmation += " A confirmation has been sent to your email and WhatsApp."
     elif caller:
@@ -274,8 +299,12 @@ async def _check_availability(args: dict, ctx: dict) -> str:
     if not date:
         return "I need a date to check availability. What date would you prefer?"
     try:
-        from cogniflow_home.integrations.google_calendar import gcal
-        slots = await gcal.get_available_slots(date)
+        from cogniflow_home.integrations.calcom import calcom
+        if calcom.configured:
+            slots = await calcom.get_available_slots(date)
+        else:
+            from cogniflow_home.integrations.google_calendar import gcal
+            slots = await gcal.get_available_slots(date)
         if not slots:
             return f"Sorry, there are no available slots on {date}. Would you like to try another date?"
         slot_list = ", ".join(f"{s['start']} to {s['end']}" for s in slots[:5])

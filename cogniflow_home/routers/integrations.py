@@ -102,6 +102,10 @@ async def api_provider_status(auth: AuthContext = Depends(get_auth_context)):
          "configured": bool(settings.google_service_account_json or settings.google_service_account_path),
          "docs": "https://console.cloud.google.com", "pricing": "https://workspace.google.com/pricing",
          "description": "Calendar booking & appointment scheduling.", "unit": "api calls", "rate_per_unit": 0.0},
+        {"id": "calcom", "name": "Cal.com", "category": "scheduling",
+         "configured": bool(settings.cal_api_key and settings.cal_event_type_id),
+         "docs": "https://cal.com/docs/api-reference/v2", "pricing": "https://cal.com/pricing",
+         "description": "Scheduling & appointment booking. Availability checks + auto-booking during calls.", "unit": "api calls", "rate_per_unit": 0.0},
         {"id": "smtp", "name": "Email (SMTP)", "category": "messaging",
          "configured": bool(settings.smtp_user and settings.smtp_password),
          "docs": "", "pricing": "",
@@ -152,6 +156,7 @@ async def api_list_integrations(auth: AuthContext = Depends(get_auth_context)):
             {"type": "hubspot", "name": "HubSpot", "status": "disconnected"},
             {"type": "zoho", "name": "Zoho CRM", "status": "disconnected"},
             {"type": "google_calendar", "name": "Google Calendar", "status": "disconnected"},
+            {"type": "calcom", "name": "Cal.com", "status": "disconnected"},
             {"type": "razorpay", "name": "Razorpay", "status": "disconnected"},
             {"type": "webhook", "name": "Custom Webhook", "status": "disconnected"},
         ]
@@ -192,6 +197,7 @@ async def api_test_integration(integration_id: str, auth: AuthContext = Depends(
         "hubspot": lambda: bool(settings.hubspot_api_key),
         "salesforce": lambda: bool(settings.salesforce_client_id),
         "google_calendar": lambda: bool(settings.google_service_account_json or settings.google_service_account_path),
+        "calcom": lambda: bool(settings.cal_api_key and settings.cal_event_type_id),
         "razorpay": lambda: bool(settings.razorpay_key_id),
         "whatsapp": lambda: bool(settings.whatsapp_api_key),
     }
