@@ -100,6 +100,9 @@ class Settings(BaseSettings):
     # Razorpay
     razorpay_key_id: str = ""
     razorpay_key_secret: str = ""
+    razorpay_plan_starter: str = ""
+    razorpay_plan_growth: str = ""
+    razorpay_webhook_secret: str = ""
 
     # SMTP (Email)
     smtp_host: str = "smtp.gmail.com"
@@ -108,6 +111,9 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from_email: str = "no_reply@cogniflowautomations.com"
     smtp_from_name: str = "Cogniflow"
+
+    # Alerting
+    alert_webhook: str = ""
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

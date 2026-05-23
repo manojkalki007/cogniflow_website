@@ -79,7 +79,7 @@ async def record_call_usage(
     stt = int(duration_minutes * 50)     # Sarvam STT: 50 paise/min
     llm = int(duration_minutes * 11)     # Groq: ~11 paise/min
     tts = int(duration_minutes * 90)     # Sarvam TTS: ~90 paise/min
-    tel_rates = {"twilio": 64, "exotel": 30, "telnyx": 25, "browser": 0}
+    tel_rates = {"twilio": 64, "exotel": 30, "vobiz": 45, "mcube": 60, "sip": 0, "browser": 0}
     tel = int(duration_minutes * tel_rates.get(provider, 64))
     server = int(duration_minutes * 51)  # Server share: ~51 paise/min
     total = stt + llm + tts + tel + server

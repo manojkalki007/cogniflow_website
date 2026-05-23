@@ -2,7 +2,7 @@
 
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from cogniflow_home.config import settings
 from cogniflow_home.db.supabase import db
@@ -16,6 +16,21 @@ router = APIRouter(tags=["health"])
 
 @router.get("/health")
 async def health():
+    """Minimal public health endpoint. Returns ok/degraded/error without
+    leaking which providers are configured (use /api/providers/health for that)."""
+    try:
+        await db.select("calls", select="id", limit=1)
+        db_status = "ok"
+    except Exception:
+        db_status = "error"
+    return {"status": "ok" if db_status == "ok" else "error", "database": db_status}
+
+
+@router.get("/health/detailed")
+async def health_detailed(auth: AuthContext = Depends(get_auth_context)):
+    """Detailed health — admin only. Lists configured providers."""
+    if not auth.is_admin:
+        raise HTTPException(403, "Admin only")
     checks = {"active_calls": await call_state.get_active_count()}
 
     try:
@@ -71,7 +86,9 @@ async def health():
 
 
 @router.get("/api/providers/health")
-async def providers_health():
+async def providers_health(auth: AuthContext = Depends(get_auth_context)):
+    if not auth.is_admin:
+        raise HTTPException(403, "Admin only")
     results = {}
     import httpx
 
@@ -100,7 +117,9 @@ async def providers_health():
 
 
 @router.get("/api/voice/diagnose")
-async def diagnose_voice():
+async def diagnose_voice(auth: AuthContext = Depends(get_auth_context)):
+    if not auth.is_admin:
+        raise HTTPException(403, "Admin only")
     diag = {
         "stt": {"deepgram": bool(settings.deepgram_api_key), "sarvam": bool(settings.sarvam_api_key)},
         "llm": {"groq": bool(settings.groq_api_key)},

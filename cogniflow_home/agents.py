@@ -40,11 +40,15 @@ DEFAULT_AGENT = AgentConfig(
 )
 
 
-async def get_agent_for_number(called_number: str) -> AgentConfig:
+async def get_agent_for_number(called_number: str, tenant_id: str = "") -> AgentConfig:
     """Look up which agent handles a given phone number.
-    Falls back to default agent if no match found."""
+    Falls back to default agent if no match found.
+    If tenant_id is provided, only agents owned by that tenant are considered."""
     try:
-        agents = await db.select("agents", {"is_active": "true"})
+        match = {"is_active": "true"}
+        if tenant_id:
+            match["tenant_id"] = tenant_id
+        agents = await db.select("agents", match)
         for agent in agents:
             numbers = agent.get("phone_numbers", [])
             if called_number in numbers:
@@ -101,5 +105,10 @@ async def create_agent(data: dict) -> dict | None:
     return result
 
 
-async def update_agent(agent_id: str, data: dict) -> dict | None:
-    return await db.update("agents", {"id": agent_id}, data)
+async def update_agent(agent_id: str, data: dict, tenant_id: str = "") -> dict | None:
+    """Update an agent. If tenant_id is provided, the update is scoped to that tenant
+    (prevents TOCTOU race where an agent was re-assigned between check and update)."""
+    match = {"id": agent_id}
+    if tenant_id:
+        match["tenant_id"] = tenant_id
+    return await db.update("agents", match, data)

@@ -131,24 +131,23 @@ const EVENT_COLOR_MAP: Record<EventItem["color"], string> = {
    COMPONENTS
    ═══════════════════════════════════════════════════════════ */
 
+// Deterministic heights to avoid SSR/CSR hydration mismatches. CSS animation gives the visual variance.
+const WAVE_BAR_HEIGHTS = [12, 22, 10, 26, 16, 24, 14, 20];
+
 function WaveformBars() {
-  const bars = 8;
   return (
     <div className="flex items-end gap-[3px]" style={{ height: 28 }}>
-      {Array.from({ length: bars }).map((_, i) => {
-        const h = 8 + Math.random() * 20;
-        return (
-          <div
-            key={i}
-            className="dash-wave-bar"
-            style={{
-              height: h,
-              animationDelay: `${i * 0.1}s`,
-              animationDuration: `${0.6 + Math.random() * 0.5}s`,
-            }}
-          />
-        );
-      })}
+      {WAVE_BAR_HEIGHTS.map((h, i) => (
+        <div
+          key={i}
+          className="dash-wave-bar"
+          style={{
+            height: h,
+            animationDelay: `${i * 0.1}s`,
+            animationDuration: `${0.6 + (i % 3) * 0.15}s`,
+          }}
+        />
+      ))}
     </div>
   );
 }
@@ -444,8 +443,8 @@ export default function LiveCallsPage() {
         </div>
       </div>
 
-      {/* ───────── Main Area (65/35 split) ───────── */}
-      <div className="grid gap-6" style={{ gridTemplateColumns: "1fr 380px" }}>
+      {/* ───────── Main Area (65/35 split, stacks on tablet/mobile) ───────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
         {/* Left: Active Call Cards */}
         <div className="space-y-4">
           <div className="flex items-center gap-2 mb-2">
@@ -457,7 +456,7 @@ export default function LiveCallsPage() {
               Active Sessions
             </h2>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {MOCK_CALLS.map((call, i) => (
               <motion.div
                 key={call.id}

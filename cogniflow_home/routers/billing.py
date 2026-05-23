@@ -1,12 +1,26 @@
 """API keys, usage tracking, and billing endpoints."""
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, Field
 
 from cogniflow_home.db.supabase import db
 from cogniflow_home.state import active_calls
 from cogniflow_home.tenants.auth import AuthContext, generate_api_key, get_auth_context
 
 router = APIRouter(tags=["billing"])
+
+
+class CreateApiKeyRequest(BaseModel):
+    name: str = "New Key"
+    scopes: list[str] = Field(default=["calls:read", "calls:write"])
+    rate_limit_rpm: int = 60
+    expires_at: Optional[str] = None
+
+
+class SubscribeRequest(BaseModel):
+    plan: str = Field(..., pattern="^(starter|growth)$")
 
 
 @router.get("/api/keys")
@@ -27,17 +41,16 @@ async def list_api_keys(auth: AuthContext = Depends(get_auth_context)):
 
 
 @router.post("/api/keys")
-async def create_api_key_endpoint(request: Request, auth: AuthContext = Depends(get_auth_context)):
-    body = await request.json()
+async def create_api_key_endpoint(body: CreateApiKeyRequest, auth: AuthContext = Depends(get_auth_context)):
     raw_key, key_hash, key_prefix = generate_api_key()
     await db.insert("api_keys", {
         "tenant_id": auth.tenant_id,
-        "name": body.get("name", "New Key"),
+        "name": body.name,
         "key_hash": key_hash,
         "key_prefix": key_prefix,
-        "scopes": body.get("scopes", ["calls:read", "calls:write"]),
-        "rate_limit_rpm": body.get("rate_limit_rpm", 60),
-        "expires_at": body.get("expires_at"),
+        "scopes": body.scopes,
+        "rate_limit_rpm": body.rate_limit_rpm,
+        "expires_at": body.expires_at,
     })
     return {
         "key": raw_key,
@@ -85,3 +98,46 @@ async def get_live_usage(auth: AuthContext = Depends(get_auth_context)):
         "monthly_limit": auth.monthly_minutes_limit,
         "usage_pct": round(auth.current_month_minutes / max(auth.monthly_minutes_limit, 1) * 100, 1),
     }
+
+
+@router.post("/api/billing/subscribe")
+async def subscribe(body: SubscribeRequest, auth: AuthContext = Depends(get_auth_context)):
+    from cogniflow_home.integrations.razorpay import razorpay
+    result = await razorpay.create_subscription(
+        tenant_id=auth.tenant_id,
+        plan_id=body.plan,
+        email=auth.email,
+    )
+    await db.update("tenants", {"id": auth.tenant_id}, {
+        "subscription_id": result["subscription_id"],
+        "plan": body.plan,
+        "status": "pending",
+    })
+    return result
+
+
+@router.post("/api/billing/webhook")
+async def razorpay_webhook(request: Request):
+    raw_body = await request.body()
+    signature = request.headers.get("x-razorpay-signature", "")
+    from cogniflow_home.integrations.razorpay import razorpay
+    if not await razorpay.verify_signature(raw_body, signature):
+        raise HTTPException(400, "Invalid signature")
+    import json as _json
+    payload = _json.loads(raw_body)
+    event = payload.get("event", "")
+    entity = payload.get("payload", {}).get("subscription", {}).get("entity", {})
+    tenant_id = entity.get("notes", {}).get("tenant_id")
+    if not tenant_id:
+        return {"ok": True, "skipped": "no tenant_id in notes"}
+    if event == "subscription.activated":
+        plan = entity.get("notes", {}).get("plan", "starter")
+        await db.update("tenants", {"id": tenant_id}, {
+            "status": "active",
+            "plan": plan,
+        })
+    elif event == "subscription.halted":
+        await db.update("tenants", {"id": tenant_id}, {"status": "suspended"})
+    elif event == "subscription.cancelled":
+        await db.update("tenants", {"id": tenant_id}, {"status": "cancelled"})
+    return {"ok": True}

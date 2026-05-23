@@ -7,6 +7,7 @@ Supports:
 """
 
 import hashlib
+import hmac
 import logging
 import secrets
 import time
@@ -21,6 +22,20 @@ from cogniflow_home.db.supabase import db
 logger = logging.getLogger("cogniflow_home.tenants.auth")
 
 _rate_counters: dict[str, list[float]] = defaultdict(list)
+_jwks_client = None
+
+
+def _get_jwks_client():
+    global _jwks_client
+    if _jwks_client is None:
+        from cogniflow_home.config import settings
+        if settings.supabase_url:
+            _jwks_client = jwt.PyJWKClient(
+                f"{settings.supabase_url}/auth/v1/.well-known/jwks.json",
+                cache_jwk_set=True,
+                lifespan=300,
+            )
+    return _jwks_client
 
 _ROLE_SCOPES = {
     "owner": ["*"],
@@ -44,6 +59,7 @@ class AuthContext:
     monthly_minutes_limit: int
     current_month_minutes: int
     is_admin: bool = False
+    email: str = ""
 
 
 def generate_api_key() -> tuple[str, str, str]:
@@ -63,26 +79,56 @@ def _check_rate_limit(key_id: str, rpm_limit: int) -> bool:
     now = time.time()
     timestamps = _rate_counters[key_id]
     _rate_counters[key_id] = [t for t in timestamps if now - t < 60.0]
+    if not _rate_counters[key_id]:
+        del _rate_counters[key_id]
     if len(_rate_counters[key_id]) >= rpm_limit:
         return False
     _rate_counters[key_id].append(now)
     return True
 
 
+def check_api_key_rate_limit(key_id: str, rpm_limit: int) -> bool:
+    """Public alias for rate-limit check (used by tests and external callers)."""
+    return _check_rate_limit(key_id, rpm_limit)
+
+
 async def _resolve_jwt(raw_token: str) -> AuthContext:
     """Verify a Supabase JWT and resolve the user's tenant."""
     from cogniflow_home.config import settings
 
-    try:
-        payload = jwt.decode(
-            raw_token,
-            settings.supabase_jwt_secret,
-            algorithms=["HS256"],
-            audience="authenticated",
-        )
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.InvalidTokenError:
+    payload = None
+
+    jwks = _get_jwks_client()
+    if jwks:
+        try:
+            signing_key = jwks.get_signing_key_from_jwt(raw_token)
+            payload = jwt.decode(
+                raw_token,
+                signing_key.key,
+                algorithms=["ES256", "EdDSA", "RS256", "HS256"],
+                audience="authenticated",
+            )
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(status_code=401, detail="Token expired")
+        except jwt.InvalidTokenError:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        except Exception as e:
+            logger.debug("JWKS verification unavailable, trying legacy: %s", e)
+
+    if payload is None and settings.supabase_jwt_secret:
+        try:
+            payload = jwt.decode(
+                raw_token,
+                settings.supabase_jwt_secret,
+                algorithms=["HS256"],
+                audience="authenticated",
+            )
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(status_code=401, detail="Token expired")
+        except jwt.InvalidTokenError:
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+    if payload is None:
         raise HTTPException(status_code=401, detail="Invalid token")
 
     user_email = payload.get("email", "")
@@ -149,7 +195,7 @@ async def get_auth_context(
         raise HTTPException(status_code=401, detail="Missing or invalid API key")
 
     # Master key → admin
-    if settings.api_secret_key and raw_key == settings.api_secret_key:
+    if settings.api_secret_key and hmac.compare_digest(raw_key, settings.api_secret_key):
         return AuthContext(
             tenant_id="",
             tenant_name="Master",
@@ -206,7 +252,7 @@ async def get_auth_context(
         )
 
     # Supabase JWT → tenant-scoped with auto-provisioning
-    if settings.supabase_jwt_secret:
+    if settings.supabase_jwt_secret or settings.supabase_url:
         return await _resolve_jwt(raw_key)
 
     raise HTTPException(status_code=401, detail="Missing or invalid API key")

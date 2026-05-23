@@ -14,6 +14,7 @@ import {
   ChevronRight,
   LogOut,
   Zap,
+  Crown,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -36,7 +37,7 @@ export default function Sidebar({ onSignOut }: { onSignOut: () => void }) {
 
   return (
     <aside
-      className="fixed left-0 top-0 bottom-0 z-40 flex flex-col border-r transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
+      className="fixed left-0 top-0 bottom-0 z-40 flex flex-col border-r transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] max-md:hidden"
       style={{
         width: collapsed ? 72 : 240,
         background: "var(--d-surface)",
@@ -106,8 +107,30 @@ export default function Sidebar({ onSignOut }: { onSignOut: () => void }) {
 
       {/* Bottom */}
       <div className="px-3 pb-4 space-y-2">
+        <Link
+          href="/dashboard/billing"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all"
+          style={{
+            background: "linear-gradient(135deg, rgba(0,188,212,0.15), rgba(0,188,212,0.05))",
+            color: "var(--d-primary)",
+            border: "1px solid rgba(0,188,212,0.2)",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "linear-gradient(135deg, rgba(0,188,212,0.25), rgba(0,188,212,0.1))";
+            e.currentTarget.style.borderColor = "rgba(0,188,212,0.4)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "linear-gradient(135deg, rgba(0,188,212,0.15), rgba(0,188,212,0.05))";
+            e.currentTarget.style.borderColor = "rgba(0,188,212,0.2)";
+          }}
+        >
+          <Crown size={18} />
+          {!collapsed && <span>Upgrade Plan</span>}
+        </Link>
+
         <button
           onClick={onSignOut}
+          aria-label="Sign out"
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
           style={{ color: "var(--d-text-3)" }}
           onMouseEnter={(e) => {
@@ -125,6 +148,7 @@ export default function Sidebar({ onSignOut }: { onSignOut: () => void }) {
 
         <button
           onClick={() => setCollapsed(!collapsed)}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           className="w-full flex items-center justify-center py-2 rounded-lg transition-colors"
           style={{ color: "var(--d-text-3)", border: "1px solid var(--d-border)" }}
           onMouseEnter={(e) => (e.currentTarget.style.background = "var(--d-surface-2)")}

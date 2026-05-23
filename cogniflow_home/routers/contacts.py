@@ -41,7 +41,10 @@ async def get_contact(contact_id: str, auth: AuthContext = Depends(get_auth_cont
     if not contacts:
         return {"error": "Contact not found"}
     contact = contacts[0]
-    calls = await db.select("calls", {"caller_number": contact["phone_number"]},
+    calls_match = {"caller_number": contact["phone_number"]}
+    if auth.tenant_id:
+        calls_match["tenant_id"] = auth.tenant_id
+    calls = await db.select("calls", calls_match,
                             order="created_at.desc", limit=20)
     contact["calls"] = calls
     return contact

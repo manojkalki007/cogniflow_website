@@ -59,4 +59,51 @@ class RazorpayIntegration:
             }
 
 
+    async def create_subscription(self, tenant_id: str, plan_id: str, email: str = None) -> dict:
+        """Create a Razorpay subscription for a tenant."""
+        PLAN_MAP = {
+            "starter": settings.razorpay_plan_starter,
+            "growth": settings.razorpay_plan_growth,
+        }
+        rzp_plan_id = PLAN_MAP.get(plan_id)
+        if not rzp_plan_id:
+            raise ValueError(f"Unknown plan: {plan_id}")
+
+        payload = {
+            "plan_id": rzp_plan_id,
+            "total_count": 12,
+            "quantity": 1,
+            "notes": {"tenant_id": tenant_id, "plan": plan_id},
+        }
+        if email:
+            payload["notify_info"] = {"notify_email": email}
+
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                f"{self.BASE_URL}/subscriptions",
+                auth=(self.key_id, self.key_secret),
+                json=payload,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return {
+                "subscription_id": data["id"],
+                "short_url": data.get("short_url"),
+                "status": data.get("status"),
+            }
+
+    async def verify_signature(self, payload_bytes: bytes, signature: str) -> bool:
+        """Verify Razorpay webhook signature against raw request body bytes."""
+        if not settings.razorpay_webhook_secret:
+            return False
+        import hmac
+        import hashlib
+        expected = hmac.new(
+            settings.razorpay_webhook_secret.encode(),
+            payload_bytes,
+            hashlib.sha256,
+        ).hexdigest()
+        return hmac.compare_digest(expected, signature)
+
+
 razorpay = RazorpayIntegration()

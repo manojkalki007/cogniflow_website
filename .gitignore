@@ -47,10 +47,14 @@ yarn-error.log*
 
 # vercel
 .vercel
+vercel.env
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# nested duplicate
+website/
 
 # AI agent config
 .agents/

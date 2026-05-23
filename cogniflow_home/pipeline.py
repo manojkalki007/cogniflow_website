@@ -555,7 +555,7 @@ class VoicePipeline:
         else:
             await self._generate_and_speak(redacted, eot_ts=eot_ts)
 
-        self.tracer.check_alert()
+        await self.tracer.check_alert()
 
     async def _call_timeout_watchdog(self):
         """Auto-stop pipeline after 45 minutes to prevent zombie calls."""

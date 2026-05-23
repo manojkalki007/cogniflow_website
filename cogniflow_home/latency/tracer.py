@@ -7,6 +7,8 @@ in the database for dashboards and alerting.
 import logging
 import time
 
+import httpx
+
 from cogniflow_home.db.supabase import db
 
 logger = logging.getLogger("cogniflow_home.latency")
@@ -61,7 +63,7 @@ class LatencyTracer:
             if t["duration_ms"] is not None and t["turn"] == target_turn
         )
 
-    def check_alert(self) -> str | None:
+    async def check_alert(self) -> str | None:
         total = self.get_total_latency()
         if total > ALERT_THRESHOLD_MS:
             summary = self.get_turn_summary()
@@ -70,6 +72,19 @@ class LatencyTracer:
                 f"{total:.0f}ms — {summary}"
             )
             logger.warning(msg)
+            try:
+                from cogniflow_home.config import settings
+                if getattr(settings, "alert_webhook", ""):
+                    async with httpx.AsyncClient(timeout=5.0) as client:
+                        await client.post(settings.alert_webhook, json={
+                            "text": f"High latency: {total:.0f}ms on call {self.call_id}",
+                            "call_id": self.call_id,
+                            "turn": self._turn_count,
+                            "total_ms": round(total),
+                            "breakdown": summary,
+                        })
+            except Exception:
+                logger.debug("Alert webhook failed", exc_info=True)
             return msg
         return None
 

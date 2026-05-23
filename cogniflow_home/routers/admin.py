@@ -1,6 +1,9 @@
 """Admin-only tenant management and billing overview."""
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 
 from cogniflow_home.db.supabase import db
 from cogniflow_home.tenants.auth import AuthContext, get_auth_context
@@ -8,24 +11,44 @@ from cogniflow_home.tenants.auth import AuthContext, get_auth_context
 router = APIRouter(tags=["admin"])
 
 
+class CreateTenantRequest(BaseModel):
+    name: str
+    email: str
+    plan: str = "starter"
+    phone: str = ""
+
+
+class UpdateTenantRequest(BaseModel):
+    plan: Optional[str] = None
+    status: Optional[str] = None
+    monthly_minutes_limit: Optional[int] = None
+    max_agents: Optional[int] = None
+    max_concurrent_calls: Optional[int] = None
+    name: Optional[str] = None
+    email: Optional[str] = None
+
+
+class AssignAgentRequest(BaseModel):
+    tenant_id: str
+
+
 @router.post("/admin/tenants")
-async def admin_create_tenant(request: Request, auth: AuthContext = Depends(get_auth_context)):
-    if not auth.is_admin and auth.tenant_id:
+async def admin_create_tenant(body: CreateTenantRequest, auth: AuthContext = Depends(get_auth_context)):
+    if not auth.is_admin:
         raise HTTPException(403, "Admin only")
-    body = await request.json()
     from cogniflow_home.tenants.manager import create_tenant
     result = await create_tenant(
-        name=body["name"],
-        email=body["email"],
-        plan=body.get("plan", "starter"),
-        phone=body.get("phone", ""),
+        name=body.name,
+        email=body.email,
+        plan=body.plan,
+        phone=body.phone,
     )
     return result
 
 
 @router.get("/admin/tenants")
 async def admin_list_tenants(auth: AuthContext = Depends(get_auth_context)):
-    if not auth.is_admin and auth.tenant_id:
+    if not auth.is_admin:
         raise HTTPException(403, "Admin only")
     tenants = await db.select("tenants", order="created_at.desc", limit=200)
     return {"tenants": tenants}
@@ -33,7 +56,7 @@ async def admin_list_tenants(auth: AuthContext = Depends(get_auth_context)):
 
 @router.get("/admin/tenants/{tenant_id}")
 async def admin_get_tenant(tenant_id: str, auth: AuthContext = Depends(get_auth_context)):
-    if not auth.is_admin and auth.tenant_id:
+    if not auth.is_admin:
         raise HTTPException(403, "Admin only")
     rows = await db.select("tenants", {"id": tenant_id})
     if not rows:
@@ -42,20 +65,19 @@ async def admin_get_tenant(tenant_id: str, auth: AuthContext = Depends(get_auth_
 
 
 @router.patch("/admin/tenants/{tenant_id}")
-async def admin_update_tenant(tenant_id: str, request: Request, auth: AuthContext = Depends(get_auth_context)):
-    if not auth.is_admin and auth.tenant_id:
+async def admin_update_tenant(tenant_id: str, body: UpdateTenantRequest, auth: AuthContext = Depends(get_auth_context)):
+    if not auth.is_admin:
         raise HTTPException(403, "Admin only")
-    body = await request.json()
-    allowed = {"plan", "status", "monthly_minutes_limit", "max_agents",
-               "max_concurrent_calls", "name", "email"}
-    updates = {k: v for k, v in body.items() if k in allowed}
+    updates = body.model_dump(exclude_none=True)
+    if not updates:
+        raise HTTPException(400, "No fields to update")
     await db.update("tenants", {"id": tenant_id}, updates)
     return {"ok": True}
 
 
 @router.post("/admin/tenants/{tenant_id}/suspend")
 async def admin_suspend_tenant(tenant_id: str, auth: AuthContext = Depends(get_auth_context)):
-    if not auth.is_admin and auth.tenant_id:
+    if not auth.is_admin:
         raise HTTPException(403, "Admin only")
     await db.update("tenants", {"id": tenant_id}, {"status": "suspended"})
     return {"ok": True}
@@ -63,7 +85,7 @@ async def admin_suspend_tenant(tenant_id: str, auth: AuthContext = Depends(get_a
 
 @router.get("/admin/billing")
 async def admin_billing_overview(auth: AuthContext = Depends(get_auth_context)):
-    if not auth.is_admin and auth.tenant_id:
+    if not auth.is_admin:
         raise HTTPException(403, "Admin only")
     from cogniflow_home.tenants.billing import get_all_tenants_summary
     summaries = await get_all_tenants_summary()
@@ -80,11 +102,10 @@ async def admin_billing_overview(auth: AuthContext = Depends(get_auth_context)):
 
 
 @router.post("/admin/agents/{agent_id}/assign")
-async def admin_assign_agent(agent_id: str, request: Request, auth: AuthContext = Depends(get_auth_context)):
-    if not auth.is_admin and auth.tenant_id:
+async def admin_assign_agent(agent_id: str, body: AssignAgentRequest, auth: AuthContext = Depends(get_auth_context)):
+    if not auth.is_admin:
         raise HTTPException(status_code=403, detail="Admin only")
-    body = await request.json()
-    target_tenant_id = body.get("tenant_id")
+    target_tenant_id = body.tenant_id
     from cogniflow_home.state import valid_uuid
     if not target_tenant_id or not valid_uuid(target_tenant_id):
         raise HTTPException(status_code=400, detail="Valid tenant_id is required")

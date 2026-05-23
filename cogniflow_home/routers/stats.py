@@ -122,7 +122,10 @@ async def api_analytics_agents(days: int = 30, auth: AuthContext = Depends(get_a
 
     from datetime import date, timedelta
     cutoff = (date.today() - timedelta(days=days)).isoformat()
-    all_calls = await db.select("calls", {"created_at": f"gte.{cutoff}T00:00:00"}, limit=5000)
+    calls_match = {"created_at": f"gte.{cutoff}T00:00:00"}
+    if auth.tenant_id:
+        calls_match["tenant_id"] = auth.tenant_id
+    all_calls = await db.select("calls", calls_match, limit=5000)
 
     agent_calls: dict[str, list] = {}
     for c in all_calls:

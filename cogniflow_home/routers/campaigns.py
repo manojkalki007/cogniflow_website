@@ -35,9 +35,11 @@ def _validate_twilio_request(request: Request, form: dict) -> bool:
 
 @router.get("/api/campaigns")
 async def api_list_campaigns(auth: AuthContext = Depends(get_auth_context)):
-    campaigns = await list_campaigns()
+    # DB-level tenant filtering — never load other tenants' campaigns into memory
     if auth.tenant_id:
-        campaigns = [c for c in campaigns if c.get("tenant_id") == auth.tenant_id]
+        campaigns = await db.select("campaigns", {"tenant_id": auth.tenant_id}, order="created_at.desc", limit=500)
+    else:
+        campaigns = await list_campaigns()
     return {"campaigns": campaigns}
 
 
@@ -177,7 +179,10 @@ async def api_campaign_analytics(campaign_id: str, auth: AuthContext = Depends(g
         campaign = await get_campaign(campaign_id)
         if not campaign or campaign.get("tenant_id") != auth.tenant_id:
             return {"error": "Campaign not found"}
-    calls = await db.select("calls", {"campaign_id": campaign_id}, limit=2000)
+    calls_match = {"campaign_id": campaign_id}
+    if auth.tenant_id:
+        calls_match["tenant_id"] = auth.tenant_id
+    calls = await db.select("calls", calls_match, limit=2000)
     total = len(calls)
     if total == 0:
         return {"total_calls": 0, "dispositions": {}, "conversion_rate": 0, "avg_duration": 0}

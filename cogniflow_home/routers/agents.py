@@ -126,11 +126,14 @@ async def api_update_agent(agent_id: str, request: Request, auth: AuthContext = 
     db_updates = {k: v for k, v in filtered.items() if k in _AGENT_DB_COLUMNS}
     extras = {k: v for k, v in filtered.items() if k in _AGENT_EXTRA_FIELDS}
     if extras:
-        existing = await db.select("agents", {"id": agent_id})
+        match = {"id": agent_id}
+        if auth.tenant_id:
+            match["tenant_id"] = auth.tenant_id
+        existing = await db.select("agents", match)
         old_meta = (existing[0].get("metadata") or {}) if existing else {}
         old_meta.update(extras)
         db_updates["metadata"] = old_meta
-    result = await update_agent(agent_id, db_updates)
+    result = await update_agent(agent_id, db_updates, tenant_id=auth.tenant_id)
     return _unpack_agent(result) if result else {"error": "Agent not found"}
 
 
@@ -166,7 +169,10 @@ async def api_agent_performance(agent_id: str, auth: AuthContext = Depends(get_a
         agent_rows = await db.select("agents", {"id": agent_id, "tenant_id": auth.tenant_id})
         if not agent_rows:
             return {"error": "Agent not found"}
-    calls = await db.select("calls", {"agent_id": agent_id}, order="created_at.desc", limit=200)
+    calls_match = {"agent_id": agent_id}
+    if auth.tenant_id:
+        calls_match["tenant_id"] = auth.tenant_id
+    calls = await db.select("calls", calls_match, order="created_at.desc", limit=200)
     total = len(calls)
     if total == 0:
         return {"total_calls": 0, "avg_duration": 0, "avg_sentiment": 0, "conversion_rate": 0, "dispositions": {}}

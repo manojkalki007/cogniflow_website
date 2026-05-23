@@ -437,3 +437,46 @@ section {
   opacity: 1;
   transform: translateX(-50%) scale(1);
 }
+
+/* Card hover effect */
+.card-hover {
+  transition: all 200ms ease-out;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  border-color: rgba(0, 188, 212, 0.3);
+  box-shadow: 0 8px 30px rgba(0, 188, 212, 0.08);
+}
+
+/* Accessibility: visible focus indicators for keyboard users */
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+  outline: 2px solid #00BCD4;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Dashboard scope uses the mission-control accent */
+.dash button:focus-visible,
+.dash a:focus-visible,
+.dash [role="button"]:focus-visible,
+.dash input:focus-visible,
+.dash select:focus-visible,
+.dash textarea:focus-visible {
+  outline-color: var(--d-primary);
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

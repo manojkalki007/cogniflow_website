@@ -9,8 +9,9 @@ import struct
 from typing import Optional
 
 import httpx
-from fastapi import APIRouter, Depends, Request, WebSocket
+from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket
 from fastapi.responses import Response
+from pydantic import BaseModel, Field
 
 from cogniflow_home.agents import get_agent_by_id, get_agent_for_number
 from cogniflow_home.config import settings
@@ -60,14 +61,21 @@ def _pcm_to_wav(pcm_data: bytes, sample_rate: int = 16000, bits_per_sample: int 
     return buf.getvalue()
 
 
+class VoicePreviewRequest(BaseModel):
+    text: str = Field("Hello! This is a voice preview.", max_length=500)
+    provider: str = "smallest"
+    voice_id: str = ""
+    language: str = "en"
+    sample_rate: int = Field(16000, ge=8000, le=48000)
+
+
 @router.post("/api/voice/preview")
-async def voice_preview(request: Request):
-    body = await request.json()
-    text = body.get("text", "Hello! This is a voice preview.")
-    provider = body.get("provider", "smallest")
-    voice_id = body.get("voice_id", "")
-    language = body.get("language", "en")
-    sample_rate = body.get("sample_rate", 16000)
+async def voice_preview(body: VoicePreviewRequest, auth: AuthContext = Depends(get_auth_context)):
+    text = body.text
+    provider = body.provider
+    voice_id = body.voice_id
+    language = body.language
+    sample_rate = body.sample_rate
 
     cache_key = f"{provider}:{voice_id}:{language}:{text[:50]}"
     if cache_key in _voice_preview_cache:
@@ -86,7 +94,7 @@ async def voice_preview(request: Request):
             from cogniflow_home.providers.elevenlabs_tts import ElevenLabsTTS
             tts = ElevenLabsTTS(voice_id=voice_id or "pNInz6obpgDQGcFmaJgB", raw_pcm=True)
         else:
-            return {"error": f"Unknown TTS provider: {provider}"}
+            raise HTTPException(400, f"Unknown TTS provider: {provider}")
 
         await tts.connect()
         pcm_chunks = []
@@ -100,9 +108,11 @@ async def voice_preview(request: Request):
         _voice_preview_cache[cache_key] = wav
         encoded = base64.b64encode(wav).decode("ascii")
         return {"audio": encoded, "format": "wav", "size_bytes": len(wav)}
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception:
         logger.exception("Voice preview failed")
-        return {"error": str(e)}
+        raise HTTPException(500, "Voice preview failed. Try again later.")
 
 
 # ─── Twilio Webhooks ───

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 import Sidebar from "@/components/dashboard/Sidebar";
+import MobileNav from "@/components/dashboard/MobileNav";
 import type { Session } from "@supabase/supabase-js";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -65,16 +66,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="dash dash-grid">
       <Sidebar onSignOut={handleSignOut} />
-      <main className="ml-[240px] min-h-screen transition-all duration-300">
+      <main className="ml-0 md:ml-[240px] min-h-screen transition-all duration-300">
         {/* Top bar */}
         <header
-          className="sticky top-0 z-30 h-14 flex items-center justify-between px-8 border-b backdrop-blur-xl"
+          className="sticky top-0 z-30 h-14 flex items-center justify-between px-4 md:px-8 border-b backdrop-blur-xl"
           style={{
             background: "rgba(6, 7, 11, 0.8)",
             borderColor: "var(--d-border)",
           }}
         >
-          <div />
+          <MobileNav onSignOut={handleSignOut} />
           <div className="flex items-center gap-4">
             <div
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg"

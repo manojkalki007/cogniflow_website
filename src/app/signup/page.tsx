@@ -253,7 +253,7 @@ export default function SignupPage() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-4 py-3 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-white/25 focus:outline-none focus:border-[#0052CC]/50 focus:ring-1 focus:ring-[#0052CC]/25 transition-all"
+                    className="w-full px-4 py-3 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-white/25 focus:outline-none focus:border-[#00BCD4]/50 focus:ring-1 focus:ring-[#00BCD4]/25 transition-all"
                     placeholder="you@company.com"
                   />
                 </div>
@@ -267,7 +267,7 @@ export default function SignupPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3.5 rounded-full bg-[#0052CC] text-white font-semibold text-sm hover:bg-[#003d99] transition-colors disabled:opacity-60"
+                  className="w-full py-3.5 rounded-full bg-[#00BCD4] text-white font-semibold text-sm hover:bg-[#0097A7] transition-colors disabled:opacity-60"
                 >
                   {loading ? "Sending code..." : "Continue with Email"}
                 </button>
@@ -277,7 +277,7 @@ export default function SignupPage() {
                 Already have an account?{" "}
                 <a
                   href="/login"
-                  className="text-[#0052CC] hover:text-[#2684FF] transition-colors font-medium"
+                  className="text-[#00BCD4] hover:text-[#4DD0E1] transition-colors font-medium"
                 >
                   Sign in
                 </a>
@@ -285,8 +285,8 @@ export default function SignupPage() {
             </>
           ) : (
             <div className="text-center">
-              <div className="w-14 h-14 mx-auto mb-5 rounded-full bg-[#0052CC]/10 border border-[#0052CC]/20 flex items-center justify-center">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0052CC" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <div className="w-14 h-14 mx-auto mb-5 rounded-full bg-[#00BCD4]/10 border border-[#00BCD4]/20 flex items-center justify-center">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00BCD4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect width="20" height="16" x="2" y="4" rx="2" />
                   <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
                 </svg>
@@ -313,7 +313,7 @@ export default function SignupPage() {
                     value={digit}
                     onChange={(e) => handleOtpChange(i, e.target.value)}
                     onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                    className="w-10 h-12 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-center text-lg font-semibold focus:outline-none focus:border-[#0052CC]/50 focus:ring-1 focus:ring-[#0052CC]/25 transition-all"
+                    className="w-12 h-12 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-center text-lg font-semibold focus:outline-none focus:border-[#00BCD4]/50 focus:ring-1 focus:ring-[#00BCD4]/25 transition-all"
                   />
                 ))}
               </div>
@@ -327,7 +327,7 @@ export default function SignupPage() {
               <button
                 onClick={handleVerifyOtp}
                 disabled={loading || otp.join("").length !== 8}
-                className="mt-6 w-full py-3.5 rounded-full bg-[#0052CC] text-white font-semibold text-sm hover:bg-[#003d99] transition-colors disabled:opacity-60"
+                className="mt-6 w-full py-3.5 rounded-full bg-[#00BCD4] text-white font-semibold text-sm hover:bg-[#0097A7] transition-colors disabled:opacity-60"
               >
                 {loading ? "Verifying..." : "Verify & Create Account"}
               </button>
@@ -339,7 +339,7 @@ export default function SignupPage() {
                 ) : (
                   <button
                     onClick={handleResend}
-                    className="text-[#0052CC] hover:text-[#2684FF] transition-colors font-medium"
+                    className="text-[#00BCD4] hover:text-[#4DD0E1] transition-colors font-medium"
                   >
                     Resend
                   </button>

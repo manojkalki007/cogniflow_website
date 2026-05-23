@@ -21,7 +21,7 @@ function DashboardMockup() {
       <div className="flex">
         <div className="hidden sm:flex w-48 flex-col border-r border-gray-100 bg-[#0B1120] p-4 gap-1">
           <div className="flex items-center gap-2 mb-6">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-500" />
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#00BCD4] to-[#0097A7]" />
             <span className="text-white text-sm font-semibold">Cogniflow</span>
           </div>
           {["Dashboard", "Agents", "Calls", "Campaigns", "Analytics", "Settings"].map((item, i) => (

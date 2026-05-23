@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { FadeUp, FadeIn } from "./animations";
 
 const FAQS = [
@@ -50,7 +51,7 @@ export default function FAQ() {
             {FAQS.map(({ q, a }, i) => (
               <div
                 key={i}
-                className="border border-[var(--color-border)] rounded-xl overflow-hidden transition-all hover:border-[var(--color-brand)]/40 hover:shadow-sm"
+                className="border border-[var(--color-border)] rounded-xl overflow-hidden card-hover"
               >
                 <button
                   onClick={() => setOpenIndex(openIndex === i ? null : i)}
@@ -64,11 +65,21 @@ export default function FAQ() {
                     }`}
                   />
                 </button>
-                {openIndex === i && (
-                  <div className="px-6 pb-4">
-                    <p className="text-sm text-[var(--color-text-muted)] leading-relaxed">{a}</p>
-                  </div>
-                )}
+                <AnimatePresence initial={false}>
+                  {openIndex === i && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.25, ease: "easeOut" }}
+                      style={{ overflow: "hidden" }}
+                    >
+                      <div className="px-6 pb-4">
+                        <p className="text-sm text-[var(--color-text-muted)] leading-relaxed">{a}</p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             ))}
           </div>

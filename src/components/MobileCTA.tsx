@@ -44,7 +44,7 @@ export default function MobileCTA() {
         </a>
         <button
           onClick={() => setDismissed(true)}
-          className="p-1.5 text-white/40"
+          className="p-3 min-w-[44px] min-h-[44px] flex items-center justify-center text-white/40"
           aria-label="Dismiss"
         >
           <X size={16} />

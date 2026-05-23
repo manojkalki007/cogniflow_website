@@ -2,13 +2,33 @@
 
 import logging
 from datetime import datetime, timezone
+from typing import Optional
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 
 from cogniflow_home.config import settings
 from cogniflow_home.db.supabase import db
 from cogniflow_home.state import valid_uuid
 from cogniflow_home.tenants.auth import AuthContext, get_auth_context
+
+
+class UpdateIntegrationRequest(BaseModel):
+    name: Optional[str] = None
+    status: Optional[str] = None
+    config: Optional[dict] = None
+    is_active: Optional[bool] = None
+
+
+class AddDncRequest(BaseModel):
+    phone_number: str
+    reason: str = "manual"
+
+
+class DealClosedRequest(BaseModel):
+    deal_id: str
+    amount: float = 0
+    contact_phone: str
 
 logger = logging.getLogger("cogniflow_home")
 
@@ -124,7 +144,8 @@ async def api_provider_status(auth: AuthContext = Depends(get_auth_context)):
 
 @router.get("/api/integrations")
 async def api_list_integrations(auth: AuthContext = Depends(get_auth_context)):
-    integrations = await db.select("integrations", order="created_at.desc")
+    match = {"tenant_id": auth.tenant_id} if auth.tenant_id else {}
+    integrations = await db.select("integrations", match, order="created_at.desc")
     if not integrations:
         defaults = [
             {"type": "salesforce", "name": "Salesforce", "status": "disconnected"},
@@ -139,18 +160,30 @@ async def api_list_integrations(auth: AuthContext = Depends(get_auth_context)):
 
 
 @router.patch("/api/integrations/{integration_id}")
-async def api_update_integration(integration_id: str, request: Request, auth: AuthContext = Depends(get_auth_context)):
-    body = await request.json()
+async def api_update_integration(integration_id: str, body: UpdateIntegrationRequest, auth: AuthContext = Depends(get_auth_context)):
+    updates = body.model_dump(exclude_none=True)
+    if not updates:
+        raise HTTPException(400, "No fields to update")
     if valid_uuid(integration_id):
-        result = await db.update("integrations", {"id": integration_id}, body)
-        return result or {"error": "Integration not found"}
-    result = await db.upsert("integrations", {
+        match = {"id": integration_id}
+        if auth.tenant_id:
+            match["tenant_id"] = auth.tenant_id
+        result = await db.update("integrations", match, updates)
+        if not result:
+            raise HTTPException(404, "Integration not found")
+        return result
+    upsert_data = {
         "type": integration_id,
-        "name": body.get("name", integration_id),
-        "status": body.get("status", "connected"),
-        "config": body.get("config", {}),
-    })
-    return result or {"error": "Failed to update integration"}
+        "name": updates.get("name", integration_id),
+        "status": updates.get("status", "connected"),
+        "config": updates.get("config", {}),
+    }
+    if auth.tenant_id:
+        upsert_data["tenant_id"] = auth.tenant_id
+    result = await db.upsert("integrations", upsert_data)
+    if not result:
+        raise HTTPException(500, "Failed to update integration")
+    return result
 
 
 @router.post("/api/integrations/{integration_id}/test")
@@ -176,26 +209,31 @@ async def api_test_integration(integration_id: str, auth: AuthContext = Depends(
 
 @router.get("/api/dnc")
 async def list_dnc(auth: AuthContext = Depends(get_auth_context)):
-    from cogniflow_home.campaigns.dnc import get_list
-    numbers = await get_list()
+    match = {"tenant_id": auth.tenant_id} if auth.tenant_id else {}
+    numbers = await db.select("dnc_list", match, limit=10000)
     return {"dnc_list": numbers, "count": len(numbers)}
 
 
 @router.post("/api/dnc")
-async def add_dnc(request: Request, auth: AuthContext = Depends(get_auth_context)):
-    from cogniflow_home.campaigns.dnc import add_number
-    body = await request.json()
-    phone = body.get("phone_number")
-    if not phone:
-        return {"error": "phone_number is required"}
-    result = await add_number(phone, reason=body.get("reason", "manual"))
-    return result or {"error": "Failed to add to DNC list"}
+async def add_dnc(body: AddDncRequest, auth: AuthContext = Depends(get_auth_context)):
+    if not auth.tenant_id:
+        raise HTTPException(403, "Tenant context required")
+    result = await db.insert("dnc_list", {
+        "tenant_id": auth.tenant_id,
+        "phone_number": body.phone_number,
+        "reason": body.reason,
+    })
+    if not result:
+        raise HTTPException(500, "Failed to add to DNC list")
+    return result
 
 
 @router.delete("/api/dnc/{phone_number}")
 async def remove_dnc(phone_number: str, auth: AuthContext = Depends(get_auth_context)):
-    from cogniflow_home.campaigns.dnc import remove_number
-    await remove_number(phone_number)
+    match = {"phone_number": phone_number}
+    if auth.tenant_id:
+        match["tenant_id"] = auth.tenant_id
+    await db.delete("dnc_list", match)
     return {"status": "removed"}
 
 
@@ -203,18 +241,23 @@ async def remove_dnc(phone_number: str, auth: AuthContext = Depends(get_auth_con
 
 @router.get("/api/revenue")
 async def api_revenue_summary(period_days: int = 30, auth: AuthContext = Depends(get_auth_context)):
+    if not auth.tenant_id:
+        raise HTTPException(403, "Tenant context required")
     from cogniflow_home.revenue.tracker import get_revenue_summary
-    return await get_revenue_summary(period_days)
+    try:
+        return await get_revenue_summary(period_days, tenant_id=auth.tenant_id)
+    except TypeError:
+        # Fallback if tracker signature hasn't been updated yet
+        return await get_revenue_summary(period_days)
 
 
 @router.post("/api/revenue/deal-closed")
-async def api_deal_closed(request: Request, auth: AuthContext = Depends(get_auth_context)):
+async def api_deal_closed(body: DealClosedRequest, auth: AuthContext = Depends(get_auth_context)):
+    if not auth.tenant_id:
+        raise HTTPException(403, "Tenant context required")
     from cogniflow_home.revenue.tracker import handle_deal_closed
-    body = await request.json()
-    deal_id = body.get("deal_id")
-    amount = body.get("amount", 0)
-    contact_phone = body.get("contact_phone")
-    if not deal_id or not contact_phone:
-        return {"error": "deal_id and contact_phone are required"}
-    await handle_deal_closed(deal_id, amount, contact_phone)
-    return {"status": "attributed", "deal_id": deal_id}
+    try:
+        await handle_deal_closed(body.deal_id, body.amount, body.contact_phone, tenant_id=auth.tenant_id)
+    except TypeError:
+        await handle_deal_closed(body.deal_id, body.amount, body.contact_phone)
+    return {"status": "attributed", "deal_id": body.deal_id}

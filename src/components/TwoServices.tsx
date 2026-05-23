@@ -26,8 +26,8 @@ const SERVICES = [
       { icon: MessageSquare, label: "WhatsApp Follow-up" },
       { icon: BarChart3, label: "Revenue Attribution" },
     ],
-    color: "#7C3AED",
-    lightBg: "#F3E8FF",
+    color: "#0097A7",
+    lightBg: "#E0F7FA",
     href: "#features",
   },
 ];
