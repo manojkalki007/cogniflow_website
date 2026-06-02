@@ -121,6 +121,8 @@ class ExotelProvider(TelephonyProvider):
             CHUNK_SIZE = 320
             for i in range(0, len(pcm_bytes), CHUNK_SIZE):
                 chunk = pcm_bytes[i : i + CHUNK_SIZE]
+                if len(chunk) < CHUNK_SIZE:
+                    chunk = chunk.ljust(CHUNK_SIZE, b'\x00')
                 pcm_payload = base64.b64encode(chunk).decode("ascii")
                 msg = {
                     "event": "media",
@@ -152,8 +154,8 @@ class ExotelProvider(TelephonyProvider):
             }
             await self._websocket.send_text(json.dumps(msg))
 
-    def get_twiml_or_response(self, ws_url: str, caller: str) -> str:
-        return json.dumps({"websocket_url": ws_url, "caller": caller})
+    def get_twiml_or_response(self, ws_url: str, caller: str, called: str = "") -> str:
+        return json.dumps({"websocket_url": ws_url, "caller": caller, "called": called})
 
     async def initiate_outbound_call(
         self, to_number: str, webhook_url: str, status_callback_url: str | None = None

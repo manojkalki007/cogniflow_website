@@ -98,5 +98,5 @@ class GenericProvider(TelephonyProvider):
             msg = self.build_audio_response(payload)
             await self._websocket.send_text(msg)
 
-    def get_twiml_or_response(self, ws_url: str, caller: str) -> str:
-        return json.dumps({"websocket_url": ws_url, "caller": caller})
+    def get_twiml_or_response(self, ws_url: str, caller: str, called: str = "") -> str:
+        return json.dumps({"websocket_url": ws_url, "caller": caller, "called": called})

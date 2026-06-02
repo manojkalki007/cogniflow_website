@@ -123,10 +123,11 @@ async def twilio_inbound(request: Request):
     if not _validate_twilio_request(request, form):
         return Response(status_code=403, content="Invalid signature")
     caller = form.get("From", "unknown")
+    called = form.get("To", "unknown")
     ws_url = settings.public_url.replace("https://", "wss://").replace("http://", "ws://")
     ws_url = f"{ws_url}/voice/twilio/ws"
     provider = get_provider("twilio")
-    twiml = provider.get_twiml_or_response(ws_url, caller)
+    twiml = provider.get_twiml_or_response(ws_url, caller, called)
     return Response(content=twiml, media_type="application/xml")
 
 
@@ -136,10 +137,11 @@ async def twilio_outbound(request: Request):
     if not _validate_twilio_request(request, form):
         return Response(status_code=403, content="Invalid signature")
     called = form.get("To", "unknown")
+    caller = form.get("From", "unknown")
     ws_url = settings.public_url.replace("https://", "wss://").replace("http://", "ws://")
     ws_url = f"{ws_url}/voice/twilio/ws"
     provider = get_provider("twilio")
-    twiml = provider.get_twiml_or_response(ws_url, called)
+    twiml = provider.get_twiml_or_response(ws_url, caller, called)
     return Response(content=twiml, media_type="application/xml")
 
 
@@ -147,16 +149,24 @@ async def twilio_outbound(request: Request):
 
 @router.post("/voice/exotel/inbound")
 async def exotel_inbound(request: Request):
+    form = await request.form()
+    caller = form.get("From", "unknown")
+    called = form.get("To", "unknown")
     ws_url = settings.public_url.replace("https://", "wss://").replace("http://", "ws://")
     ws_url = f"{ws_url}/voice/exotel/ws"
-    return {"websocket_url": ws_url}
+    provider = get_provider("exotel")
+    return json.loads(provider.get_twiml_or_response(ws_url, caller, called))
 
 
 @router.post("/voice/exotel/outbound")
 async def exotel_outbound(request: Request):
+    form = await request.form()
+    caller = form.get("From", "unknown")
+    called = form.get("To", "unknown")
     ws_url = settings.public_url.replace("https://", "wss://").replace("http://", "ws://")
     ws_url = f"{ws_url}/voice/exotel/ws"
-    return {"websocket_url": ws_url}
+    provider = get_provider("exotel")
+    return json.loads(provider.get_twiml_or_response(ws_url, caller, called))
 
 
 # ─── Vobiz XML Webhooks ───
@@ -165,10 +175,11 @@ async def exotel_outbound(request: Request):
 async def vobiz_inbound(request: Request):
     form = await request.form()
     caller = form.get("From", "unknown")
+    called = form.get("To", "unknown")
     ws_url = settings.public_url.replace("https://", "wss://").replace("http://", "ws://")
     ws_url = f"{ws_url}/voice/vobiz/ws"
     provider = get_provider("vobiz")
-    xml = provider.get_twiml_or_response(ws_url, caller)
+    xml = provider.get_twiml_or_response(ws_url, caller, called)
     return Response(content=xml, media_type="application/xml")
 
 
@@ -176,10 +187,11 @@ async def vobiz_inbound(request: Request):
 async def vobiz_outbound(request: Request):
     form = await request.form()
     called = form.get("To", "unknown")
+    caller = form.get("From", "unknown")
     ws_url = settings.public_url.replace("https://", "wss://").replace("http://", "ws://")
     ws_url = f"{ws_url}/voice/vobiz/ws"
     provider = get_provider("vobiz")
-    xml = provider.get_twiml_or_response(ws_url, called)
+    xml = provider.get_twiml_or_response(ws_url, caller, called)
     return Response(content=xml, media_type="application/xml")
 
 
@@ -283,7 +295,8 @@ async def sip_inbound(request: Request):
     except Exception:
         pass
     caller = body.get("from", body.get("caller_id", "unknown"))
-    return json.loads(provider.get_twiml_or_response(ws_url, caller))
+    called = body.get("to", body.get("did", "unknown"))
+    return json.loads(provider.get_twiml_or_response(ws_url, caller, called))
 
 
 @router.post("/voice/sip/outbound")
@@ -298,7 +311,8 @@ async def sip_outbound(request: Request):
     except Exception:
         pass
     called = body.get("to", body.get("did", "unknown"))
-    return json.loads(provider.get_twiml_or_response(ws_url, called))
+    caller = body.get("from", body.get("caller_id", "unknown"))
+    return json.loads(provider.get_twiml_or_response(ws_url, caller, called))
 
 
 # ─── Generic Inbound Fallback ───

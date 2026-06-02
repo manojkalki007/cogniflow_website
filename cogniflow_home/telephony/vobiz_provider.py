@@ -157,7 +157,7 @@ class VobizProvider(TelephonyProvider):
             except Exception:
                 pass
 
-    def get_twiml_or_response(self, ws_url: str, caller: str) -> str:
+    def get_twiml_or_response(self, ws_url: str, caller: str, called: str = "") -> str:
         return f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Stream

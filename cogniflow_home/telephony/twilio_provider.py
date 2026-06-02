@@ -100,7 +100,7 @@ class TwilioProvider(TelephonyProvider):
             except Exception:
                 logger.warning("WebSocket clear failed (connection closed)")
 
-    def get_twiml_or_response(self, ws_url: str, caller: str, record: bool = True) -> str:
+    def get_twiml_or_response(self, ws_url: str, caller: str, called: str = "", record: bool = True) -> str:
         response = Element("Response")
 
         if record:
@@ -114,6 +114,8 @@ class TwilioProvider(TelephonyProvider):
         connect = SubElement(response, "Connect")
         stream = SubElement(connect, "Stream", url=ws_url)
         SubElement(stream, "Parameter", name="caller", value=caller)
+        if called:
+            SubElement(stream, "Parameter", name="called", value=called)
 
         return tostring(response, encoding="unicode")
 

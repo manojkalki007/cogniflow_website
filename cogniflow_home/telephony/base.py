@@ -59,7 +59,7 @@ class TelephonyProvider:
         """Tell the provider to stop playing any queued audio (for barge-in)."""
         pass
 
-    def get_twiml_or_response(self, ws_url: str, caller: str) -> str:
+    def get_twiml_or_response(self, ws_url: str, caller: str, called: str = "") -> str:
         """Return the provider-specific webhook response (TwiML, XML, JSON, etc.)."""
         raise NotImplementedError
 

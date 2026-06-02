@@ -141,10 +141,11 @@ class SIPProvider(TelephonyProvider):
             except Exception:
                 logger.warning("SIP WebSocket clear failed (connection closed)")
 
-    def get_twiml_or_response(self, ws_url: str, caller: str) -> str:
+    def get_twiml_or_response(self, ws_url: str, caller: str, called: str = "") -> str:
         return json.dumps({
             "websocket_url": ws_url,
             "caller": caller,
+            "called": called,
             "provider": "sip",
         })
 
