@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Phone,
@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
-/*  Mock data                                                          */
+/*  Providers Data (Static)                                            */
 /* ------------------------------------------------------------------ */
 
 interface Provider {
@@ -37,120 +37,19 @@ interface Provider {
   latencyMs: number;
 }
 
-const PROVIDERS: Provider[] = [
-  { id: "twilio", name: "Twilio", abbr: "Tw", color: "#F22F46", category: "Cloud CPaaS", status: "configured", streaming: true, latencyMs: 45 },
-  { id: "exotel", name: "Exotel", abbr: "Ex", color: "#2962FF", category: "India CPaaS", status: "configured", streaming: true, latencyMs: 62 },
-  { id: "vobiz", name: "Vobiz", abbr: "Vb", color: "#7C3AED", category: "India Telecom", status: "configured", streaming: true, latencyMs: 58 },
-  { id: "mcube", name: "MCube", abbr: "Mc", color: "#FF8B3E", category: "Click-to-Call", status: "click-to-call", streaming: false, latencyMs: 110 },
-  { id: "sip", name: "SIP", abbr: "SI", color: "#8B92A5", category: "Self-hosted PBX", status: "configured", streaming: true, latencyMs: 12 },
+const PROVIDERS_BASE: Omit<Provider, "status">[] = [
+  { id: "twilio", name: "Twilio", abbr: "Tw", color: "#F22F46", category: "Cloud CPaaS", streaming: true, latencyMs: 45 },
+  { id: "exotel", name: "Exotel", abbr: "Ex", color: "#2962FF", category: "India CPaaS", streaming: true, latencyMs: 62 },
+  { id: "vobiz", name: "Vobiz", abbr: "Vb", color: "#7C3AED", category: "India Telecom", streaming: true, latencyMs: 58 },
+  { id: "mcube", name: "MCube", abbr: "Mc", color: "#FF8B3E", category: "Click-to-Call", streaming: false, latencyMs: 110 },
+  { id: "sip", name: "SIP", abbr: "SI", color: "#8B92A5", category: "Self-hosted PBX", streaming: true, latencyMs: 12 },
 ];
 
-interface PhoneNumber {
-  id: string;
-  number: string;
-  providerId: string;
-  country: string;
-  countryCode: string;
-  status: "active" | "inactive";
-  connected: "connected" | "disconnected" | "na" | "configured";
-  connectedNote?: string;
-  actions: ("verify" | "release" | "connect")[];
-}
-
-const PHONE_NUMBERS: PhoneNumber[] = [
-  { id: "pn1", number: "+1 (415) 555-0123", providerId: "twilio", country: "United States", countryCode: "US", status: "active", connected: "connected", actions: ["verify", "release"] },
-  { id: "pn2", number: "+91 98765 43210", providerId: "exotel", country: "India", countryCode: "IN", status: "active", connected: "connected", actions: ["verify"] },
-  { id: "pn3", number: "+91 87654 32109", providerId: "vobiz", country: "India", countryCode: "IN", status: "active", connected: "connected", actions: ["verify"] },
-  { id: "pn4", number: "+91 76543 21098", providerId: "mcube", country: "India", countryCode: "IN", status: "active", connected: "na", connectedNote: "No streaming", actions: [] },
-  { id: "pn5", number: "+1 (212) 555-0456", providerId: "twilio", country: "United States", countryCode: "US", status: "active", connected: "disconnected", actions: ["connect", "verify"] },
-  { id: "pn6", number: "sip:1000@pbx.local", providerId: "sip", country: "-", countryCode: "-", status: "active", connected: "configured", actions: ["verify"] },
-];
-
-const BASE_URL = "https://api.cogniflowautomations.com/v1/telephony";
-
-interface WebhookGroup {
-  providerId: string;
-  providerName: string;
-  note?: string;
-  urls: { label: string; url: string }[];
-}
-
-const WEBHOOKS: WebhookGroup[] = [
-  {
-    providerId: "twilio",
-    providerName: "Twilio",
-    urls: [
-      { label: "Inbound", url: `${BASE_URL}/twilio/inbound` },
-      { label: "Outbound", url: `${BASE_URL}/twilio/outbound` },
-      { label: "WebSocket", url: `wss://stream.cogniflowautomations.com/twilio/ws` },
-      { label: "Recording Status", url: `${BASE_URL}/twilio/recording_status` },
-    ],
-  },
-  {
-    providerId: "exotel",
-    providerName: "Exotel",
-    urls: [
-      { label: "Inbound", url: `${BASE_URL}/exotel/inbound` },
-      { label: "Outbound", url: `${BASE_URL}/exotel/outbound` },
-      { label: "WebSocket", url: `wss://stream.cogniflowautomations.com/exotel/ws` },
-    ],
-  },
-  {
-    providerId: "vobiz",
-    providerName: "Vobiz",
-    urls: [
-      { label: "Inbound", url: `${BASE_URL}/vobiz/inbound` },
-      { label: "Outbound", url: `${BASE_URL}/vobiz/outbound` },
-      { label: "Hangup", url: `${BASE_URL}/vobiz/hangup` },
-      { label: "Ring", url: `${BASE_URL}/vobiz/ring` },
-      { label: "Stream Status", url: `${BASE_URL}/vobiz/stream_status` },
-      { label: "WebSocket", url: `wss://stream.cogniflowautomations.com/vobiz/ws` },
-    ],
-  },
-  {
-    providerId: "mcube",
-    providerName: "MCube",
-    note: "No WebSocket - click-to-call only",
-    urls: [
-      { label: "Status Callback", url: `${BASE_URL}/mcube/status_callback` },
-    ],
-  },
-  {
-    providerId: "sip",
-    providerName: "SIP",
-    urls: [
-      { label: "WebSocket", url: `wss://stream.cogniflowautomations.com/sip/ws` },
-    ],
-  },
-];
-
-/* ------------------------------------------------------------------ */
-/*  Animation variants                                                 */
-/* ------------------------------------------------------------------ */
-
-const containerVariants = {
-  hidden: {},
-  show: {
-    transition: { staggerChildren: 0.06 },
-  },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 12 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] as const } },
-};
-
-const rowVariants = {
-  hidden: { opacity: 0, x: -8 },
-  show: { opacity: 1, x: 0, transition: { duration: 0.3, ease: [0.4, 0, 0.2, 1] as const } },
-};
-
-/* ------------------------------------------------------------------ */
-/*  Helper: Provider lookup                                            */
-/* ------------------------------------------------------------------ */
-
-function getProvider(id: string): Provider {
-  return PROVIDERS.find((p) => p.id === id)!;
+function getProviderInfo(id: string): Provider {
+  const base = PROVIDERS_BASE.find((p) => p.id === id) || {
+    id, name: id, abbr: id.slice(0,2), color: "#8B92A5", category: "Unknown", streaming: true, latencyMs: 0,
+  };
+  return { ...base, status: "configured" }; // Status overridden by API
 }
 
 /* ------------------------------------------------------------------ */
@@ -186,28 +85,6 @@ function StatusBadge({ status }: { status: Provider["status"] }) {
   return <span className="dash-badge dash-badge-err">Not Configured</span>;
 }
 
-function ConnectedDot({ connected, note }: { connected: PhoneNumber["connected"]; note?: string }) {
-  const map: Record<string, { color: string; label: string }> = {
-    connected: { color: "var(--d-success)", label: "Connected" },
-    disconnected: { color: "var(--d-error)", label: "Disconnected" },
-    na: { color: "var(--d-warning)", label: note || "N/A" },
-    configured: { color: "var(--d-primary)", label: "Configured" },
-  };
-  const info = map[connected];
-
-  return (
-    <div className="flex items-center gap-2">
-      <span
-        className="w-2 h-2 rounded-full shrink-0"
-        style={{ background: info.color, boxShadow: `0 0 6px ${info.color}60` }}
-      />
-      <span className="text-sm" style={{ color: info.color }}>
-        {info.label}
-      </span>
-    </div>
-  );
-}
-
 function GhostButton({
   children,
   onClick,
@@ -226,17 +103,9 @@ function GhostButton({
     <button
       onClick={onClick}
       className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-150"
-      style={{
-        color: colors.text,
-        background: "transparent",
-        border: `1px solid ${colors.border}`,
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = colors.bg;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = "transparent";
-      }}
+      style={{ color: colors.text, background: "transparent", border: `1px solid ${colors.border}` }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = colors.bg)}
+      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
       {children}
     </button>
@@ -245,17 +114,13 @@ function GhostButton({
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
-
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* fallback — ignored in mock */
-    }
+    } catch {}
   };
-
   return (
     <button
       onClick={handleCopy}
@@ -265,12 +130,6 @@ function CopyButton({ text }: { text: string }) {
         color: copied ? "var(--d-success)" : "var(--d-text-3)",
         background: copied ? "rgba(52,211,153,0.1)" : "transparent",
         border: `1px solid ${copied ? "rgba(52,211,153,0.3)" : "var(--d-border)"}`,
-      }}
-      onMouseEnter={(e) => {
-        if (!copied) e.currentTarget.style.background = "var(--d-surface-2)";
-      }}
-      onMouseLeave={(e) => {
-        if (!copied) e.currentTarget.style.background = "transparent";
       }}
     >
       {copied ? <Check size={13} /> : <Copy size={13} />}
@@ -284,16 +143,86 @@ function CopyButton({ text }: { text: string }) {
 
 export default function TelephonyPage() {
   const [webhooksOpen, setWebhooksOpen] = useState(false);
+  
+  const [numbers, setNumbers] = useState<any[]>([]);
+  const [configuredProviders, setConfiguredProviders] = useState<string[]>([]);
+  const [webhookData, setWebhookData] = useState<any>(null);
+  
+  const [agents, setAgents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [numRes, agentRes, webRes] = await Promise.all([
+        fetch("/api/proxy/api/numbers"),
+        fetch("/api/proxy/api/agents"),
+        fetch("/api/proxy/api/numbers/webhooks")
+      ]);
+      const numData = await numRes.json();
+      const agentData = await agentRes.json();
+      const webData = await webRes.json();
+      
+      setNumbers(numData.numbers || []);
+      setConfiguredProviders(numData.configured_providers || []);
+      setAgents(agentData.agents || []);
+      setWebhookData(webData);
+    } catch (e) {
+      console.error("Error fetching data", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getAssignedAgent = (numberString: string) => {
+    return agents.find(a => a.phone_numbers && a.phone_numbers.includes(numberString));
+  };
+
+  const handleAssignAgent = async (numberString: string, agentId: string) => {
+    try {
+      // Find the current assigned agent (if any) and remove it
+      const currentAgent = getAssignedAgent(numberString);
+      if (currentAgent && currentAgent.id !== agentId) {
+        await fetch(`/api/proxy/api/agents/${currentAgent.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            phone_numbers: currentAgent.phone_numbers.filter((n: string) => n !== numberString)
+          })
+        });
+      }
+
+      // Add to new agent
+      if (agentId) {
+        const newAgent = agents.find(a => a.id === agentId);
+        if (newAgent) {
+          const updatedNumbers = [...(newAgent.phone_numbers || []).filter((n: string) => n !== numberString), numberString];
+          await fetch(`/api/proxy/api/agents/${agentId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ phone_numbers: updatedNumbers })
+          });
+        }
+      }
+      fetchData();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const providersList = PROVIDERS_BASE.map(p => ({
+    ...p,
+    status: configuredProviders.includes(p.id) ? (p.id === 'mcube' ? 'click-to-call' : 'configured') : 'not_configured'
+  })) as Provider[];
 
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="show"
-      className="space-y-8"
-    >
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
       {/* ── Header ─────────────────────────────────────────────── */}
-      <motion.div variants={itemVariants} className="flex items-start justify-between gap-4 flex-wrap">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-3 mb-1">
             <Phone size={22} style={{ color: "var(--d-primary)" }} />
@@ -301,327 +230,139 @@ export default function TelephonyPage() {
               Telephony
             </h1>
           </div>
-          <p className="text-sm mt-1" style={{ color: "var(--d-text-2)" }}>
-            Manage providers and phone numbers
-          </p>
+          <p className="text-sm mt-1" style={{ color: "var(--d-text-2)" }}>Manage providers and phone numbers</p>
         </div>
-        <button
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200"
-          style={{
-            background: "var(--d-primary)",
-            color: "var(--d-bg)",
-            boxShadow: "0 0 20px var(--d-primary-glow)",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.boxShadow = "0 0 32px var(--d-primary-glow), 0 4px 16px rgba(0,221,179,0.3)";
-            e.currentTarget.style.transform = "translateY(-1px)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.boxShadow = "0 0 20px var(--d-primary-glow)";
-            e.currentTarget.style.transform = "translateY(0)";
-          }}
-        >
-          <Plus size={16} />
-          Add Provider
-        </button>
-      </motion.div>
+      </div>
 
       {/* ── Provider Cards ─────────────────────────────────────── */}
-      <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {PROVIDERS.map((provider, i) => (
-          <motion.div
-            key={provider.id}
-            variants={itemVariants}
-            className="dash-card-glow p-5 flex flex-col gap-4 cursor-pointer"
-          >
-            {/* Top row: icon + status */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {providersList.map((provider) => (
+          <div key={provider.id} className="dash-card-glow p-5 flex flex-col gap-4 cursor-pointer">
             <div className="flex items-start justify-between">
               <ProviderIcon provider={provider} />
               <StatusBadge status={provider.status} />
             </div>
-
-            {/* Name + category */}
             <div>
-              <h3 className="text-sm font-semibold" style={{ color: "var(--d-text)" }}>
-                {provider.name}
-              </h3>
-              <span className="text-xs" style={{ color: "var(--d-text-3)" }}>
-                {provider.category}
-              </span>
+              <h3 className="text-sm font-semibold" style={{ color: "var(--d-text)" }}>{provider.name}</h3>
+              <span className="text-xs" style={{ color: "var(--d-text-3)" }}>{provider.category}</span>
             </div>
-
-            {/* Footer: streaming + latency */}
             <div className="flex items-center justify-between mt-auto pt-3" style={{ borderTop: "1px solid var(--d-border)" }}>
               <div className="flex items-center gap-1.5">
                 {provider.streaming ? (
-                  <>
-                    <Wifi size={13} style={{ color: "var(--d-success)" }} />
-                    <span className="text-xs font-medium" style={{ color: "var(--d-success)" }}>
-                      Streaming
-                    </span>
-                  </>
+                  <><Wifi size={13} style={{ color: "var(--d-success)" }} /><span className="text-xs font-medium" style={{ color: "var(--d-success)" }}>Streaming</span></>
                 ) : (
-                  <>
-                    <WifiOff size={13} style={{ color: "var(--d-text-3)" }} />
-                    <span className="text-xs font-medium" style={{ color: "var(--d-text-3)" }}>
-                      No Streaming
-                    </span>
-                  </>
+                  <><WifiOff size={13} style={{ color: "var(--d-text-3)" }} /><span className="text-xs font-medium" style={{ color: "var(--d-text-3)" }}>No Streaming</span></>
                 )}
               </div>
-              <span
-                className="dash-stat text-xs"
-                style={{ color: "var(--d-text-2)", fontFamily: "var(--d-mono)" }}
-              >
-                {provider.latencyMs}ms
-              </span>
             </div>
-          </motion.div>
+          </div>
         ))}
-      </motion.div>
+      </div>
 
       {/* ── Phone Numbers ──────────────────────────────────────── */}
-      <motion.div variants={itemVariants} className="dash-card overflow-hidden">
-        {/* Section header */}
-        <div
-          className="flex items-center justify-between gap-4 flex-wrap px-6 py-5"
-          style={{ borderBottom: "1px solid var(--d-border)" }}
-        >
+      <div className="dash-card overflow-hidden">
+        <div className="flex items-center justify-between gap-4 flex-wrap px-6 py-5" style={{ borderBottom: "1px solid var(--d-border)" }}>
           <div className="flex items-center gap-3">
-            <h2 className="text-lg font-semibold" style={{ color: "var(--d-text)" }}>
-              Phone Numbers
-            </h2>
-            <span className="dash-badge dash-badge-info">{PHONE_NUMBERS.length}</span>
+            <h2 className="text-lg font-semibold" style={{ color: "var(--d-text)" }}>Phone Numbers</h2>
+            <span className="dash-badge dash-badge-info">{numbers.length}</span>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200"
-              style={{
-                background: "var(--d-primary)",
-                color: "var(--d-bg)",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = "0 0 20px var(--d-primary-glow)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = "none";
-              }}
-            >
-              <ShoppingCart size={14} />
-              Buy Number
+            <button className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200" style={{ background: "var(--d-primary)", color: "var(--d-bg)" }}>
+              <ShoppingCart size={14} /> Buy Number
             </button>
-            <button
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200"
-              style={{
-                color: "var(--d-text-2)",
-                background: "var(--d-surface-2)",
-                border: "1px solid var(--d-border)",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = "var(--d-border-bright)";
-                e.currentTarget.style.color = "var(--d-text)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = "var(--d-border)";
-                e.currentTarget.style.color = "var(--d-text-2)";
-              }}
-            >
-              <ShieldCheck size={14} />
-              Verify All
+            <button className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold" style={{ color: "var(--d-text-2)", background: "var(--d-surface-2)", border: "1px solid var(--d-border)" }}>
+              <Link2 size={14} /> Connect Existing
             </button>
           </div>
         </div>
 
-        {/* Table */}
         <div className="overflow-x-auto">
           <table className="dash-table">
             <thead>
               <tr>
                 <th>Number</th>
                 <th>Provider</th>
-                <th>Country</th>
-                <th>Status</th>
-                <th>Connected</th>
+                <th>Assigned Agent</th>
                 <th>Actions</th>
               </tr>
             </thead>
-            <motion.tbody variants={containerVariants} initial="hidden" animate="show">
-              {PHONE_NUMBERS.map((pn) => {
-                const provider = getProvider(pn.providerId);
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={4} className="text-center py-8 text-sm" style={{ color: "var(--d-text-3)" }}>Loading...</td></tr>
+              ) : numbers.length === 0 ? (
+                <tr><td colSpan={4} className="text-center py-8 text-sm" style={{ color: "var(--d-text-3)" }}>No phone numbers found. Connect one to get started.</td></tr>
+              ) : numbers.map((pn) => {
+                const provider = getProviderInfo(pn.provider || "twilio");
+                const assignedAgent = getAssignedAgent(pn.number);
                 return (
-                  <motion.tr key={pn.id} variants={rowVariants}>
+                  <tr key={pn.number || pn.id}>
                     <td>
-                      <span
-                        className="text-sm font-medium"
-                        style={{ fontFamily: "var(--d-mono)", color: "var(--d-text)", letterSpacing: "0.02em" }}
-                      >
-                        {pn.number}
-                      </span>
+                      <span className="text-sm font-medium" style={{ fontFamily: "var(--d-mono)", color: "var(--d-text)" }}>{pn.number}</span>
                     </td>
                     <td>
                       <div className="flex items-center gap-2.5">
                         <ProviderIcon provider={provider} size={26} />
-                        <span className="text-sm" style={{ color: "var(--d-text-2)" }}>
-                          {provider.name}
-                        </span>
+                        <span className="text-sm" style={{ color: "var(--d-text-2)" }}>{provider.name}</span>
                       </div>
+                    </td>
+                    <td>
+                      <select
+                        className="text-xs py-1.5 px-2 rounded border focus:outline-none"
+                        style={{ background: "var(--d-surface-2)", color: "var(--d-text)", borderColor: "var(--d-border)" }}
+                        value={assignedAgent ? assignedAgent.id : ""}
+                        onChange={(e) => handleAssignAgent(pn.number, e.target.value)}
+                      >
+                        <option value="">-- Unassigned --</option>
+                        {agents.map(a => (
+                          <option key={a.id} value={a.id}>{a.name}</option>
+                        ))}
+                      </select>
                     </td>
                     <td>
                       <div className="flex items-center gap-2">
-                        {pn.countryCode !== "-" && <Globe size={14} style={{ color: "var(--d-text-3)" }} />}
-                        <span className="text-sm" style={{ color: "var(--d-text-2)" }}>
-                          {pn.countryCode}
-                        </span>
+                        <GhostButton variant="danger"><Trash2 size={12} /> Release</GhostButton>
                       </div>
                     </td>
-                    <td>
-                      <span className="dash-badge dash-badge-ok">Active</span>
-                    </td>
-                    <td>
-                      <ConnectedDot connected={pn.connected} note={pn.connectedNote} />
-                    </td>
-                    <td>
-                      <div className="flex items-center gap-2">
-                        {pn.actions.includes("connect") && (
-                          <GhostButton>
-                            <Link2 size={12} />
-                            Connect
-                          </GhostButton>
-                        )}
-                        {pn.actions.includes("verify") && (
-                          <GhostButton>
-                            <ShieldCheck size={12} />
-                            Verify
-                          </GhostButton>
-                        )}
-                        {pn.actions.includes("release") && (
-                          <GhostButton variant="danger">
-                            <Trash2 size={12} />
-                            Release
-                          </GhostButton>
-                        )}
-                        {pn.actions.length === 0 && (
-                          <span className="text-xs" style={{ color: "var(--d-text-3)" }}>
-                            --
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                  </motion.tr>
+                  </tr>
                 );
               })}
-            </motion.tbody>
+            </tbody>
           </table>
         </div>
-      </motion.div>
+      </div>
 
       {/* ── Webhook Configuration ──────────────────────────────── */}
-      <motion.div variants={itemVariants} className="dash-card overflow-hidden">
-        {/* Collapsible header */}
+      <div className="dash-card overflow-hidden">
         <button
           onClick={() => setWebhooksOpen(!webhooksOpen)}
-          className="w-full flex items-center justify-between px-6 py-5 text-left transition-colors duration-150"
-          style={{
-            borderBottom: webhooksOpen ? "1px solid var(--d-border)" : "none",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "var(--d-surface-2)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "transparent";
-          }}
+          className="w-full flex items-center justify-between px-6 py-5 text-left transition-colors duration-150 hover:bg-white/5"
+          style={{ borderBottom: webhooksOpen ? "1px solid var(--d-border)" : "none" }}
         >
           <div className="flex items-center gap-3">
             <Webhook size={18} style={{ color: "var(--d-accent)" }} />
-            <h2 className="text-lg font-semibold" style={{ color: "var(--d-text)" }}>
-              Webhook Configuration
-            </h2>
-            <span className="dash-badge dash-badge-info">{WEBHOOKS.length} providers</span>
+            <h2 className="text-lg font-semibold" style={{ color: "var(--d-text)" }}>Webhook Configuration</h2>
           </div>
-          <motion.div
-            animate={{ rotate: webhooksOpen ? 90 : 0 }}
-            transition={{ duration: 0.2 }}
-          >
+          <motion.div animate={{ rotate: webhooksOpen ? 90 : 0 }} transition={{ duration: 0.2 }}>
             <ChevronRight size={18} style={{ color: "var(--d-text-3)" }} />
           </motion.div>
         </button>
 
-        {/* Collapsible body */}
         <motion.div
           initial={false}
-          animate={{
-            height: webhooksOpen ? "auto" : 0,
-            opacity: webhooksOpen ? 1 : 0,
-          }}
-          transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+          animate={{ height: webhooksOpen ? "auto" : 0, opacity: webhooksOpen ? 1 : 0 }}
           style={{ overflow: "hidden" }}
         >
-          <div className="divide-y" style={{ borderColor: "var(--d-border)" }}>
-            {WEBHOOKS.map((group) => {
-              const provider = getProvider(group.providerId);
-              return (
-                <div
-                  key={group.providerId}
-                  className="px-6 py-5"
-                  style={{ borderColor: "var(--d-border)" }}
-                >
-                  {/* Provider label */}
-                  <div className="flex items-center gap-3 mb-4">
-                    <ProviderIcon provider={provider} size={28} />
-                    <span className="text-sm font-semibold" style={{ color: "var(--d-text)" }}>
-                      {group.providerName}
-                    </span>
-                    {group.note && (
-                      <span
-                        className="text-xs px-2 py-1 rounded-md"
-                        style={{
-                          background: "var(--d-accent-muted)",
-                          color: "var(--d-accent)",
-                          border: "1px solid rgba(255,139,62,0.2)",
-                        }}
-                      >
-                        {group.note}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* URL rows */}
-                  <div className="space-y-2">
-                    {group.urls.map((entry) => (
-                      <div
-                        key={entry.label}
-                        className="flex items-center gap-3 rounded-lg px-4 py-2.5"
-                        style={{
-                          background: "var(--d-surface-2)",
-                          border: "1px solid var(--d-border)",
-                        }}
-                      >
-                        <span
-                          className="text-xs font-semibold uppercase shrink-0 w-28"
-                          style={{ color: "var(--d-text-3)", letterSpacing: "0.04em" }}
-                        >
-                          {entry.label}
-                        </span>
-                        <span
-                          className="flex-1 text-xs truncate"
-                          style={{
-                            fontFamily: "var(--d-mono)",
-                            color: "var(--d-text-2)",
-                            letterSpacing: "0.01em",
-                          }}
-                        >
-                          {entry.url}
-                        </span>
-                        <CopyButton text={entry.url} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+          <div className="divide-y p-6 text-sm" style={{ borderColor: "var(--d-border)", color: "var(--d-text-2)" }}>
+            {webhookData ? (
+              <pre style={{ fontFamily: "var(--d-mono)", fontSize: "11px", whiteSpace: "pre-wrap" }}>
+                {JSON.stringify(webhookData, null, 2)}
+              </pre>
+            ) : (
+              <div>Loading webhooks...</div>
+            )}
           </div>
         </motion.div>
-      </motion.div>
+      </div>
     </motion.div>
   );
 }
