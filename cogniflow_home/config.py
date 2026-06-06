@@ -69,7 +69,7 @@ class Settings(BaseSettings):
     # Smallest AI
     smallest_ai_api_key: str = ""
 
-    # ElevenLabs (premium TTS)
+    # ElevenLabs
     elevenlabs_api_key: str = ""
     elevenlabs_model: str = "eleven_turbo_v2_5"
 

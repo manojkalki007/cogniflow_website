@@ -59,6 +59,9 @@ def _create_tts(language: str, voice_id: str, sample_rate: int = 8000, raw_pcm: 
     if tts_provider == "elevenlabs" and settings.elevenlabs_api_key:
         from cogniflow_home.providers.elevenlabs_tts import ElevenLabsTTS
         return ElevenLabsTTS(voice_id=voice_id, language=language, sample_rate=sample_rate, raw_pcm=raw_pcm)
+    if tts_provider == "smallest" and settings.smallest_ai_api_key:
+        from cogniflow_home.providers.smallest_tts import SmallestTTS
+        return SmallestTTS(voice_id=voice_id, language=language, sample_rate=sample_rate, raw_pcm=raw_pcm)
     if settings.smallest_ai_api_key:
         from cogniflow_home.providers.smallest_tts import SmallestTTS
         return SmallestTTS(voice_id=voice_id, language=language, sample_rate=sample_rate, raw_pcm=raw_pcm)
@@ -219,9 +222,11 @@ class VoicePipeline:
                  enable_memory: bool = True, enable_prediction: bool = True,
                  enable_emotion: bool = True, enable_language_switch: bool = True,
                  enable_rag: bool = False, enable_barge_in: bool = True,
-                 enable_speculative: bool = True, enable_filler: bool = True):
+                 enable_speculative: bool = True, enable_filler: bool = True,
+                 tts_provider: str = ""):
         call_id = call_info.call_sid or str(uuid.uuid4())
         self._sample_rate = sample_rate
+        self._tts_provider = tts_provider
         self.state = CallState(
             call_sid=call_id,
             caller_number=call_info.caller_number,
@@ -255,7 +260,8 @@ class VoicePipeline:
             "direction": call_info.direction,
             "tenant_id": tenant_id,
         }
-        self.tts = _create_tts(language, voice_id or VOICE_ID, sample_rate=sample_rate, raw_pcm=self._raw_pcm)
+        self.tts = _create_tts(language, voice_id or VOICE_ID, sample_rate=sample_rate,
+                              raw_pcm=self._raw_pcm, tts_provider=tts_provider)
 
         # TTS failover chain (Smallest <-> Sarvam)
         self._tts_chain = _create_tts_chain(
@@ -783,7 +789,8 @@ class VoicePipeline:
             await self.stt.connect()
 
             await self.tts.close()
-            self.tts = _create_tts(language, "", sample_rate=self._sample_rate, raw_pcm=self._raw_pcm)
+            self.tts = _create_tts(language, "", sample_rate=self._sample_rate, raw_pcm=self._raw_pcm,
+                                  tts_provider=self._tts_provider)
             await self.tts.connect()
 
             self.state.language = language
