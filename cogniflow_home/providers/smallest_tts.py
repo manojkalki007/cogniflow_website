@@ -22,10 +22,17 @@ LANGUAGE_CODES = {
 }
 
 
+VALID_VOICES = {
+    "jessica", "sophia", "olivia", "isabella", "mia", "harper", "ella",
+    "rachel", "natasha", "maya", "liam", "noah", "william", "lucas",
+    "ethan", "daniel", "david", "arjun", "vikram",
+}
+
+
 class SmallestTTS:
 
-    def __init__(self, voice_id: str = "emily", language: str = "en", sample_rate: int = 8000, raw_pcm: bool = False):
-        self.voice_id = voice_id or "emily"
+    def __init__(self, voice_id: str = "jessica", language: str = "en", sample_rate: int = 8000, raw_pcm: bool = False):
+        self.voice_id = voice_id if voice_id in VALID_VOICES else "jessica"
         self.language = language if language in LANGUAGE_CODES else "en"
         self.sample_rate = sample_rate
         self.raw_pcm = raw_pcm
