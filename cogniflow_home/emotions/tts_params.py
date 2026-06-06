@@ -52,12 +52,12 @@ PROFILE_BASELINES = {
 }
 
 VOICE_MAP = {
-    "empathetic":        {"female": "kavya",  "male": "manan"},
-    "energetic":         {"female": "ishita", "male": "amit"},
-    "professional":      {"female": "shreya", "male": "ratan"},
-    "friendly":          {"female": "priya",  "male": "aditya"},
-    "hinglish":          {"female": "kavya",  "male": "manan"},
-    "hinglish_friendly": {"female": "kavya",  "male": "manan"},
+    "empathetic":        {"female": "maya",    "male": "arjun"},
+    "energetic":         {"female": "jessica", "male": "vikram"},
+    "professional":      {"female": "sophia",  "male": "liam"},
+    "friendly":          {"female": "mia",     "male": "arjun"},
+    "hinglish":          {"female": "maya",    "male": "vikram"},
+    "hinglish_friendly": {"female": "maya",    "male": "vikram"},
 }
 
 

@@ -11,8 +11,9 @@ EMOTION_PROFILES = {
     "empathetic": {
         "description": "Warm, caring, patient. For healthcare, support, counseling.",
         "tts": {
-            "voice": "kavya",
-            "voice_male": "manan",
+            "voice": "maya",
+            "voice_female": "maya",
+            "voice_male": "arjun",
             "temperature": 0.65,
             "pace": 0.95,
         },
@@ -37,8 +38,9 @@ EMOTIONAL BASELINE: Warm and empathetic.
     "energetic": {
         "description": "Upbeat, confident, persuasive. For sales, lead gen, EdTech.",
         "tts": {
-            "voice": "amit",
-            "voice_female": "ishita",
+            "voice": "jessica",
+            "voice_female": "jessica",
+            "voice_male": "vikram",
             "temperature": 0.75,
             "pace": 1.10,
         },
@@ -65,8 +67,9 @@ EMOTIONAL BASELINE: Energetic and enthusiastic.
     "professional": {
         "description": "Calm, authoritative, trustworthy. For finance, legal, enterprise.",
         "tts": {
-            "voice": "shreya",
-            "voice_male": "ratan",
+            "voice": "sophia",
+            "voice_female": "sophia",
+            "voice_male": "liam",
             "temperature": 0.50,
             "pace": 0.95,
         },
@@ -92,8 +95,9 @@ EMOTIONAL BASELINE: Calm and professional.
     "friendly": {
         "description": "Casual, approachable, efficient. Default for most use cases.",
         "tts": {
-            "voice": "priya",
-            "voice_male": "aditya",
+            "voice": "mia",
+            "voice_female": "mia",
+            "voice_male": "arjun",
             "temperature": 0.60,
             "pace": 1.0,
         },
@@ -115,8 +119,9 @@ EMOTIONAL BASELINE: Friendly and efficient.
     "hinglish_friendly": {
         "description": "Natural Hinglish mix. Casual, relatable, desi.",
         "tts": {
-            "voice": "kavya",
-            "voice_male": "manan",
+            "voice": "maya",
+            "voice_female": "maya",
+            "voice_male": "vikram",
             "temperature": 0.70,
             "pace": 1.05,
         },
