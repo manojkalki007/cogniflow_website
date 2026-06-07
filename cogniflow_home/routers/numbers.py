@@ -1,8 +1,13 @@
 """Phone number management — connect, setup, verify, assign, test, remove.
 
-Persists to phone_numbers table. Each number is tenant-scoped and stores
-encrypted provider credentials so multiple tenants can use different
-Twilio/Vobiz/Exotel accounts independently.
+Persists to phone_numbers table using ONLY the original schema columns
+that PostgREST has cached:
+  id, user_id, number, provider, provider_number_id, country_code,
+  country_name, number_type, assigned_agent_id, status, monthly_cost_usd,
+  sip_config (jsonb), created_at, updated_at
+
+All extra data (encrypted credentials, metadata, concurrency) is stored
+inside the sip_config jsonb column.
 """
 
 import json
@@ -44,17 +49,44 @@ def _webhook_urls(provider: str) -> dict:
     return {}
 
 
+def _get_sip_config(row: dict) -> dict:
+    raw = row.get("sip_config")
+    if not raw:
+        return {}
+    if isinstance(raw, str):
+        try:
+            return json.loads(raw)
+        except Exception:
+            return {}
+    return raw
+
+
 def _safe_row(row: dict) -> dict:
-    """Strip encrypted credentials before returning to frontend."""
+    """Return row suitable for frontend — decrypt sip_config, strip credentials."""
     r = {**row}
+    cfg = _get_sip_config(r)
+    r["concurrency"] = cfg.get("concurrency", DEFAULT_CONCURRENCY)
+    r["metadata"] = cfg.get("metadata", {})
+    r["agent_id"] = r.get("assigned_agent_id")
+    r.pop("sip_config", None)
     r.pop("credentials", None)
     return r
+
+
+def _decrypt_creds(row: dict) -> dict:
+    cfg = _get_sip_config(row)
+    encrypted = cfg.get("encrypted_credentials", {})
+    if not encrypted:
+        return {}
+    try:
+        return credentials._decrypt_config(encrypted)
+    except Exception:
+        return {}
 
 
 # ─── Provider verification helpers ───
 
 async def _verify_vobiz(creds: dict) -> dict:
-    """Verify Vobiz credentials by listing numbers."""
     auth_id = creds.get("auth_id", "")
     auth_token = creds.get("auth_token", "")
     if not auth_id or not auth_token:
@@ -73,7 +105,6 @@ async def _verify_vobiz(creds: dict) -> dict:
 
 
 async def _verify_twilio(creds: dict) -> dict:
-    """Verify Twilio credentials by listing numbers."""
     sid = creds.get("account_sid", "")
     token = creds.get("auth_token", "")
     if not sid or not token:
@@ -91,7 +122,6 @@ async def _verify_twilio(creds: dict) -> dict:
 
 
 async def _verify_exotel(creds: dict) -> dict:
-    """Verify Exotel credentials by listing ExoPhones."""
     api_key = creds.get("api_key", "")
     api_token = creds.get("api_token", "")
     account_sid = creds.get("account_sid", "")
@@ -115,7 +145,6 @@ async def _verify_exotel(creds: dict) -> dict:
 # ─── Provider auto-configure helpers ───
 
 async def _connect_vobiz(creds: dict, phone_number: str) -> dict:
-    """Create Vobiz XML Application and attach number."""
     auth_id = creds.get("auth_id", "")
     auth_token = creds.get("auth_token", "")
     headers = {"X-Auth-ID": auth_id, "X-Auth-Token": auth_token, "Content-Type": "application/json"}
@@ -142,7 +171,6 @@ async def _connect_vobiz(creds: dict, phone_number: str) -> dict:
     if not app_id:
         return {"ok": False, "error": "Application created but no app_id returned"}
 
-    # Try multiple approaches to assign number to app
     from urllib.parse import quote as url_quote
     encoded_number = url_quote(phone_number, safe="")
     number_no_plus = phone_number.lstrip("+")
@@ -151,7 +179,7 @@ async def _connect_vobiz(creds: dict, phone_number: str) -> dict:
     attempts = [
         ("POST", f"{base}/Account/{auth_id}/Number/{number_no_plus}/", headers, assign_body),
         ("POST", f"{base}/Account/{auth_id}/Number/{encoded_number}/", headers, assign_body),
-        ("POST", f"{base}/Account/{auth_id}/Number/{number_no_plus}/", None, assign_body),  # Basic Auth
+        ("POST", f"{base}/Account/{auth_id}/Number/{number_no_plus}/", None, assign_body),
     ]
 
     last_error = ""
@@ -169,8 +197,6 @@ async def _connect_vobiz(creds: dict, phone_number: str) -> dict:
             last_error = f"{resp2.status_code}: {resp2.text[:200]}"
             logger.warning(f"Vobiz number assign attempt failed: {method} {url} -> {last_error}")
 
-    # All attempts failed — save the number anyway with the app created,
-    # user can link manually in Vobiz dashboard
     logger.error(f"All Vobiz number assignment attempts failed. App {app_id} created. Last error: {last_error}")
     return {
         "ok": True,
@@ -181,7 +207,6 @@ async def _connect_vobiz(creds: dict, phone_number: str) -> dict:
 
 
 async def _connect_twilio(creds: dict, phone_number: str) -> dict:
-    """Update Twilio number webhooks to point to Cogniflow."""
     sid = creds.get("account_sid", "")
     token = creds.get("auth_token", "")
     number_sid = creds.get("number_sid", "")
@@ -217,7 +242,6 @@ async def _connect_twilio(creds: dict, phone_number: str) -> dict:
 
 
 async def _connect_exotel(creds: dict, phone_number: str) -> dict:
-    """For Exotel we verify credentials; flow assignment is manual."""
     result = await _verify_exotel(creds)
     if not result["ok"]:
         return result
@@ -230,12 +254,13 @@ async def _connect_exotel(creds: dict, phone_number: str) -> dict:
 @router.get("/api/phone-numbers")
 async def list_phone_numbers(auth: AuthContext = Depends(get_auth_context)):
     """List all phone numbers for this tenant."""
-    rows = await db.select("phone_numbers", {"tenant_id": auth.tenant_id, "status": "neq.removed"}, order="created_at.desc")
+    rows = await db.select("phone_numbers", {"user_id": auth.tenant_id, "status": "neq.removed"}, order="created_at.desc")
     enriched = []
     for r in rows:
         row = _safe_row(r)
-        if r.get("agent_id"):
-            agents = await db.select("agents", {"id": r["agent_id"]}, select="id,name", limit=1)
+        aid = row.get("agent_id") or row.get("assigned_agent_id")
+        if aid:
+            agents = await db.select("agents", {"id": aid}, select="id,name", limit=1)
             row["agent_name"] = agents[0]["name"] if agents else None
         else:
             row["agent_name"] = None
@@ -245,10 +270,7 @@ async def list_phone_numbers(auth: AuthContext = Depends(get_auth_context)):
 
 @router.post("/api/phone-numbers/setup")
 async def setup_phone_number(request: Request, auth: AuthContext = Depends(get_auth_context)):
-    """Full setup flow: verify creds → auto-configure → save to DB.
-
-    Body: {provider, credentials: {...}, phone_number, agent_id?}
-    """
+    """Full setup flow: verify creds → auto-configure → save to DB."""
     body = await request.json()
     provider = body.get("provider", "")
     creds = body.get("credentials", {})
@@ -262,7 +284,7 @@ async def setup_phone_number(request: Request, auth: AuthContext = Depends(get_a
         return JSONResponse({"error": "phone_number is required"}, status_code=400)
 
     # Check for duplicate
-    existing = await db.select("phone_numbers", {"tenant_id": auth.tenant_id, "number": phone_number}, limit=1)
+    existing = await db.select("phone_numbers", {"user_id": auth.tenant_id, "number": phone_number}, limit=1)
     if existing and existing[0].get("status") != "removed":
         return JSONResponse({"error": f"Number {phone_number} is already connected"}, status_code=409)
 
@@ -295,27 +317,31 @@ async def setup_phone_number(request: Request, auth: AuthContext = Depends(get_a
 
     metadata["webhooks"] = setup_result.get("webhooks", _webhook_urls(provider))
 
-    encrypted_creds = json.dumps(credentials.encrypt_config(creds)) if creds else None
+    encrypted_creds = credentials.encrypt_config(creds) if creds else {}
+
+    sip_config = {
+        "encrypted_credentials": encrypted_creds,
+        "metadata": metadata,
+        "concurrency": concurrency,
+    }
 
     row = {
         "id": str(uuid.uuid4()),
-        "tenant_id": auth.tenant_id,
-        "provider": provider,
+        "user_id": auth.tenant_id,
         "number": phone_number,
+        "provider": provider,
         "status": status,
-        "credentials": encrypted_creds,
+        "sip_config": json.dumps(sip_config),
+        "provider_number_id": setup_result.get("app_id") or setup_result.get("number_sid") or "",
     }
     if agent_id:
-        row["agent_id"] = agent_id
+        row["assigned_agent_id"] = agent_id
 
     if existing:
         result = await db.update("phone_numbers", {"id": existing[0]["id"]}, {**row, "id": existing[0]["id"]})
         row["id"] = existing[0]["id"]
     else:
-        # Direct insert with error capture
-        import httpx as _httpx
-        _url = f"/rest/v1/phone_numbers"
-        _resp = await db._client.post(_url, json=row)
+        _resp = await db._client.post("/rest/v1/phone_numbers", json=row)
         if _resp.status_code in (200, 201):
             _rows = _resp.json()
             result = _rows[0] if _rows else row
@@ -326,8 +352,7 @@ async def setup_phone_number(request: Request, auth: AuthContext = Depends(get_a
             }, status_code=500)
 
     if not result:
-        logger.error(f"Failed to save phone number {phone_number} to DB. tenant_id={auth.tenant_id}")
-        return JSONResponse({"error": "Phone number configured but failed to save to database. Please try again."}, status_code=500)
+        return JSONResponse({"error": "Phone number configured but failed to save to database."}, status_code=500)
 
     if agent_id:
         await _sync_agent_numbers(auth.tenant_id, agent_id)
@@ -347,11 +372,7 @@ async def setup_phone_number(request: Request, auth: AuthContext = Depends(get_a
 
 @router.post("/api/phone-numbers/verify-credentials")
 async def verify_provider_credentials(request: Request, auth: AuthContext = Depends(get_auth_context)):
-    """Step 1: Verify provider credentials and list available numbers.
-
-    Body: {provider, credentials: {...}}
-    Returns: {ok, numbers: [...], account}
-    """
+    """Verify provider credentials and list available numbers."""
     body = await request.json()
     provider = body.get("provider", "")
     creds = body.get("credentials", {})
@@ -370,22 +391,30 @@ async def verify_provider_credentials(request: Request, auth: AuthContext = Depe
 @router.patch("/api/phone-numbers/{number_id}")
 async def update_phone_number(number_id: str, request: Request, auth: AuthContext = Depends(get_auth_context)):
     """Update a phone number — assign agent, change concurrency, update display name."""
-    rows = await db.select("phone_numbers", {"id": number_id, "tenant_id": auth.tenant_id}, limit=1)
+    rows = await db.select("phone_numbers", {"id": number_id, "user_id": auth.tenant_id}, limit=1)
     if not rows:
         return JSONResponse({"error": "Number not found"}, status_code=404)
 
     body = await request.json()
     updates = {}
-    old_agent_id = rows[0].get("agent_id")
+    old_agent_id = rows[0].get("assigned_agent_id")
 
     if "agent_id" in body:
-        updates["agent_id"] = body["agent_id"]
-    if "concurrency" in body:
-        updates["concurrency"] = max(1, min(50, int(body["concurrency"])))
-    if "display_name" in body:
-        updates["display_name"] = body["display_name"]
+        updates["assigned_agent_id"] = body["agent_id"]
     if "status" in body and body["status"] in ("active", "pending_manual", "error"):
         updates["status"] = body["status"]
+
+    # Update concurrency/display_name inside sip_config
+    cfg = _get_sip_config(rows[0])
+    cfg_changed = False
+    if "concurrency" in body:
+        cfg["concurrency"] = max(1, min(50, int(body["concurrency"])))
+        cfg_changed = True
+    if "display_name" in body:
+        cfg["display_name"] = body["display_name"]
+        cfg_changed = True
+    if cfg_changed:
+        updates["sip_config"] = json.dumps(cfg)
 
     if not updates:
         return JSONResponse({"error": "No valid fields to update"}, status_code=400)
@@ -405,12 +434,12 @@ async def update_phone_number(number_id: str, request: Request, auth: AuthContex
 @router.delete("/api/phone-numbers/{number_id}")
 async def remove_phone_number(number_id: str, auth: AuthContext = Depends(get_auth_context)):
     """Remove a phone number (soft delete)."""
-    rows = await db.select("phone_numbers", {"id": number_id, "tenant_id": auth.tenant_id}, limit=1)
+    rows = await db.select("phone_numbers", {"id": number_id, "user_id": auth.tenant_id}, limit=1)
     if not rows:
         return JSONResponse({"error": "Number not found"}, status_code=404)
 
-    old_agent_id = rows[0].get("agent_id")
-    await db.update("phone_numbers", {"id": number_id}, {"status": "removed", "agent_id": None})
+    old_agent_id = rows[0].get("assigned_agent_id")
+    await db.update("phone_numbers", {"id": number_id}, {"status": "removed", "assigned_agent_id": None})
 
     if old_agent_id:
         await _sync_agent_numbers(auth.tenant_id, old_agent_id)
@@ -421,7 +450,7 @@ async def remove_phone_number(number_id: str, auth: AuthContext = Depends(get_au
 @router.post("/api/phone-numbers/{number_id}/verify")
 async def verify_phone_number(number_id: str, auth: AuthContext = Depends(get_auth_context)):
     """Verify a phone number is correctly connected to Cogniflow."""
-    rows = await db.select("phone_numbers", {"id": number_id, "tenant_id": auth.tenant_id}, limit=1)
+    rows = await db.select("phone_numbers", {"id": number_id, "user_id": auth.tenant_id}, limit=1)
     if not rows:
         return JSONResponse({"error": "Number not found"}, status_code=404)
 
@@ -452,7 +481,7 @@ async def verify_phone_number(number_id: str, auth: AuthContext = Depends(get_au
 @router.post("/api/phone-numbers/{number_id}/test-call")
 async def test_call_number(number_id: str, request: Request, auth: AuthContext = Depends(get_auth_context)):
     """Make a quick test call to verify the number works end-to-end."""
-    rows = await db.select("phone_numbers", {"id": number_id, "tenant_id": auth.tenant_id}, limit=1)
+    rows = await db.select("phone_numbers", {"id": number_id, "user_id": auth.tenant_id}, limit=1)
     if not rows:
         return JSONResponse({"error": "Number not found"}, status_code=404)
 
@@ -468,15 +497,12 @@ async def test_call_number(number_id: str, request: Request, auth: AuthContext =
     try:
         if provider == "twilio":
             call_sid = await _test_call_twilio(creds, row["number"], to_number)
-            await db.update("phone_numbers", {"id": number_id}, {"last_tested_at": "now()"})
             return {"ok": True, "call_sid": call_sid, "message": f"Test call initiated to {to_number}"}
         elif provider == "vobiz":
             call_id = await _test_call_vobiz(creds, row["number"], to_number)
-            await db.update("phone_numbers", {"id": number_id}, {"last_tested_at": "now()"})
             return {"ok": True, "call_id": call_id, "message": f"Test call initiated to {to_number}"}
         elif provider == "exotel":
             call_sid = await _test_call_exotel(creds, row["number"], to_number)
-            await db.update("phone_numbers", {"id": number_id}, {"last_tested_at": "now()"})
             return {"ok": True, "call_sid": call_sid, "message": f"Test call initiated to {to_number}"}
         else:
             return JSONResponse({"error": f"Test calls not supported for {provider}"}, status_code=400)
@@ -488,7 +514,7 @@ async def test_call_number(number_id: str, request: Request, auth: AuthContext =
 @router.post("/api/phone-numbers/{number_id}/call")
 async def make_outbound_call(number_id: str, request: Request, auth: AuthContext = Depends(get_auth_context)):
     """Make an outbound call FROM this phone number using its stored credentials."""
-    rows = await db.select("phone_numbers", {"id": number_id, "tenant_id": auth.tenant_id}, limit=1)
+    rows = await db.select("phone_numbers", {"id": number_id, "user_id": auth.tenant_id}, limit=1)
     if not rows:
         return JSONResponse({"error": "Number not found"}, status_code=404)
 
@@ -498,7 +524,7 @@ async def make_outbound_call(number_id: str, request: Request, auth: AuthContext
 
     body = await request.json()
     to_number = body.get("to_number", "")
-    agent_id = body.get("agent_id", row.get("agent_id"))
+    agent_id = body.get("agent_id", row.get("assigned_agent_id"))
     if not to_number:
         return JSONResponse({"error": "to_number is required"}, status_code=400)
 
@@ -519,19 +545,17 @@ async def make_outbound_call(number_id: str, request: Request, auth: AuthContext
             from cogniflow_home.state import _pending_agent_overrides
             _pending_agent_overrides[call_sid] = agent_id
 
-        await db.update("phone_numbers", {"id": number_id}, {"last_call_at": "now()"})
         return {"ok": True, "call_sid": call_sid, "from": row["number"], "to": to_number, "provider": provider}
     except Exception as e:
         logger.exception(f"Outbound call failed from {row['number']}")
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-# ─── Legacy endpoints (kept for backward compat) ───
+# ─── Legacy endpoints ───
 
 @router.get("/api/numbers")
 async def api_list_numbers_legacy(auth: AuthContext = Depends(get_auth_context)):
-    """Legacy: list numbers from provider APIs directly."""
-    rows = await db.select("phone_numbers", {"tenant_id": auth.tenant_id, "status": "neq.removed"})
+    rows = await db.select("phone_numbers", {"user_id": auth.tenant_id, "status": "neq.removed"})
     return {"numbers": {r["provider"]: [_safe_row(r)] for r in rows}, "configured_providers": list({r["provider"] for r in rows})}
 
 
@@ -542,20 +566,8 @@ async def api_webhook_urls(auth: AuthContext = Depends(get_auth_context)):
 
 # ─── Internal helpers ───
 
-def _decrypt_creds(row: dict) -> dict:
-    raw = row.get("credentials")
-    if not raw:
-        return {}
-    try:
-        parsed = json.loads(raw) if isinstance(raw, str) else raw
-        return credentials._decrypt_config(parsed)
-    except Exception:
-        return {}
-
-
 async def _sync_agent_numbers(tenant_id: str, agent_id: str):
-    """Sync the agents.phone_numbers array from phone_numbers table."""
-    rows = await db.select("phone_numbers", {"agent_id": agent_id, "status": "neq.removed"}, select="number")
+    rows = await db.select("phone_numbers", {"assigned_agent_id": agent_id, "status": "neq.removed"}, select="number")
     numbers = [r["number"] for r in rows]
     await db.update("agents", {"id": agent_id}, {
         "phone_numbers": numbers,

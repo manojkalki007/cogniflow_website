@@ -351,7 +351,13 @@ async def voice_ws(websocket: WebSocket, provider_name: str):
 
         num_rows = await db.select("phone_numbers", {"number": call_info.called_number, "status": "active"}, limit=1)
         if num_rows:
-            max_conc = num_rows[0].get("concurrency", 5)
+            sip_cfg = num_rows[0].get("sip_config") or {}
+            if isinstance(sip_cfg, str):
+                try:
+                    sip_cfg = json.loads(sip_cfg)
+                except Exception:
+                    sip_cfg = {}
+            max_conc = sip_cfg.get("concurrency", 5)
             current = sum(1 for p in active_calls.values() if getattr(getattr(p, "state", None), "called_number", None) == call_info.called_number)
             if current >= max_conc:
                 logger.warning(f"Number {call_info.called_number} at concurrency limit ({max_conc})")
