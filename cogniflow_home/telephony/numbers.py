@@ -486,9 +486,9 @@ async def vobiz_connect_number(phone_number: str) -> bool:
 
     async with httpx.AsyncClient() as client:
         resp2 = await client.post(
-            f"{VOBIZ_API_BASE}/Account/{settings.vobiz_auth_id}/numbers/{encoded_number}/application",
+            f"{VOBIZ_API_BASE}/Account/{settings.vobiz_auth_id}/Number/{phone_number}/",
             headers=_vobiz_headers(),
-            json={"application_id": app_id},
+            json={"app_id": app_id},
             timeout=15.0,
         )
     if resp2.status_code not in (200, 201):
