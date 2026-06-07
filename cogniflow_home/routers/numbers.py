@@ -142,18 +142,42 @@ async def _connect_vobiz(creds: dict, phone_number: str) -> dict:
     if not app_id:
         return {"ok": False, "error": "Application created but no app_id returned"}
 
+    # Try multiple approaches to assign number to app
     from urllib.parse import quote as url_quote
     encoded_number = url_quote(phone_number, safe="")
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        resp2 = await client.post(
-            f"{base}/Account/{auth_id}/Number/{encoded_number}/",
-            headers=headers,
-            json={"app_id": app_id},
-        )
-    if resp2.status_code not in (200, 201):
-        return {"ok": False, "error": f"App created (ID: {app_id}) but number assignment failed: {resp2.text[:200]}"}
+    number_no_plus = phone_number.lstrip("+")
+    assign_body = {"app_id": app_id}
 
-    return {"ok": True, "app_id": app_id, "webhooks": _webhook_urls("vobiz")}
+    attempts = [
+        ("POST", f"{base}/Account/{auth_id}/Number/{number_no_plus}/", headers, assign_body),
+        ("POST", f"{base}/Account/{auth_id}/Number/{encoded_number}/", headers, assign_body),
+        ("POST", f"{base}/Account/{auth_id}/Number/{number_no_plus}/", None, assign_body),  # Basic Auth
+    ]
+
+    last_error = ""
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        for method, url, hdrs, body in attempts:
+            kwargs = {"json": body}
+            if hdrs:
+                kwargs["headers"] = hdrs
+            else:
+                kwargs["auth"] = (auth_id, auth_token)
+                kwargs["headers"] = {"Content-Type": "application/json"}
+            resp2 = await client.request(method, url, **kwargs)
+            if resp2.status_code in (200, 201, 202):
+                return {"ok": True, "app_id": app_id, "webhooks": _webhook_urls("vobiz")}
+            last_error = f"{resp2.status_code}: {resp2.text[:200]}"
+            logger.warning(f"Vobiz number assign attempt failed: {method} {url} -> {last_error}")
+
+    # All attempts failed — save the number anyway with the app created,
+    # user can link manually in Vobiz dashboard
+    logger.error(f"All Vobiz number assignment attempts failed. App {app_id} created. Last error: {last_error}")
+    return {
+        "ok": True,
+        "app_id": app_id,
+        "webhooks": _webhook_urls("vobiz"),
+        "warning": f"App created but auto-assignment failed. Go to console.vobiz.ai → Numbers → {phone_number} → set app to Cogniflow-{phone_number[-4:]}",
+    }
 
 
 async def _connect_twilio(creds: dict, phone_number: str) -> dict:

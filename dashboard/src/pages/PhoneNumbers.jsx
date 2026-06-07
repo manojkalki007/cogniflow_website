@@ -518,7 +518,17 @@ function VobizWizard({ onComplete, onBack, agents }) {
             <p className="flex items-center gap-2"><CheckCircle size={14} className="text-green-400" /> Credentials verified</p>
             <p className="flex items-center gap-2"><CheckCircle size={14} className="text-green-400" /> Created XML Application in Vobiz</p>
             <p className="flex items-center gap-2"><CheckCircle size={14} className="text-green-400" /> Set webhook to Cogniflow</p>
-            <p className="flex items-center gap-2"><CheckCircle size={14} className="text-green-400" /> Assigned {selected} to application</p>
+            {setupResult?.warning ? (
+              <div className="p-3 rounded-lg mt-2" style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.3)" }}>
+                <p className="flex items-center gap-2 text-yellow-400 font-medium"><AlertTriangle size={14} /> Manual step needed</p>
+                <p className="mt-1" style={{ color: "var(--text-muted)" }}>{setupResult.warning}</p>
+                <a href="https://console.vobiz.ai" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-2 text-cyan-400 hover:underline">
+                  Open Vobiz Console <ExternalLink size={11} />
+                </a>
+              </div>
+            ) : (
+              <p className="flex items-center gap-2"><CheckCircle size={14} className="text-green-400" /> Assigned {selected} to application</p>
+            )}
           </div>
           <div>
             <label className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>Assign to agent (optional)</label>
