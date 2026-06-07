@@ -174,12 +174,17 @@ async def exotel_outbound(request: Request):
 @router.post("/voice/vobiz/inbound")
 async def vobiz_inbound(request: Request):
     form = await request.form()
+    form_dict = dict(form)
     caller = form.get("From", "unknown")
     called = form.get("To", "unknown")
+    call_uuid = form.get("CallUUID", "")
+    direction = form.get("Direction", "unknown")
+    logger.info(f"[VOBIZ INBOUND] CallUUID={call_uuid} From={caller} To={called} Direction={direction} AllParams={form_dict}")
     ws_url = settings.public_url.replace("https://", "wss://").replace("http://", "ws://")
     ws_url = f"{ws_url}/voice/vobiz/ws"
     provider = get_provider("vobiz")
     xml = provider.get_twiml_or_response(ws_url, caller, called)
+    logger.info(f"[VOBIZ INBOUND] Returning XML: {xml}")
     return Response(content=xml, media_type="application/xml")
 
 
@@ -198,10 +203,11 @@ async def vobiz_outbound(request: Request):
 @router.post("/voice/vobiz/hangup")
 async def vobiz_hangup(request: Request):
     form = await request.form()
+    form_dict = dict(form)
     call_uuid = form.get("CallUUID", "")
     duration = form.get("Duration", "0")
     hangup_cause = form.get("HangupCause", "NORMAL_CLEARING")
-    logger.info(f"[VOBIZ] Call ended: {call_uuid} | Duration: {duration}s | Cause: {hangup_cause}")
+    logger.info(f"[VOBIZ HANGUP] CallUUID={call_uuid} Duration={duration}s Cause={hangup_cause} AllParams={form_dict}")
     return Response(content="OK", status_code=200)
 
 
@@ -341,6 +347,7 @@ async def voice_ws(websocket: WebSocket, provider_name: str):
 
     async def on_call_start(call_info: CallInfo):
         nonlocal pipeline
+        logger.info(f"[WS on_call_start] call_sid={call_info.call_sid} caller={call_info.caller_number} called={call_info.called_number} direction={call_info.direction} pending_overrides={list(_pending_agent_overrides.keys())}")
         # Try matching agent override by call_sid, then by any pending key
         # (Vobiz returns request_uuid from API but callId in WebSocket — they differ)
         override_id = _pending_agent_overrides.pop(call_info.call_sid, None)
@@ -384,6 +391,7 @@ async def voice_ws(websocket: WebSocket, provider_name: str):
                 logger.warning(f"Number {call_info.called_number} at concurrency limit ({max_conc})")
                 return
 
+        logger.info(f"[WS on_call_start] Agent resolved: name={getattr(agent_config, 'name', 'N/A')} id={getattr(agent_config, 'id', 'N/A')} override_id={override_id} greeting={agent_config.greeting[:50] if agent_config.greeting else 'NONE'}")
         pipeline = VoicePipeline(
             call_info, provider,
             instructions_override=agent_config.instructions,
