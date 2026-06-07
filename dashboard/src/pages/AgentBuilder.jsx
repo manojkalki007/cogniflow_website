@@ -500,6 +500,127 @@ function ProviderStack({ form }) {
   );
 }
 
+function OutboundCallSection({ agentId, isNew }) {
+  const [expanded, setExpanded] = useState(false);
+  const [toNumber, setToNumber] = useState("");
+  const [fromNumberId, setFromNumberId] = useState("");
+  const [calling, setCalling] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const { data: phoneNumbers } = useQuery({
+    queryKey: ["phone-numbers"],
+    queryFn: () => api.getPhoneNumbers(),
+    enabled: expanded && !isNew,
+  });
+
+  const activeNumbers = (phoneNumbers || []).filter(
+    (n) => n.status === "active" && !n.error
+  );
+
+  const handleCall = async () => {
+    if (!toNumber.trim() || !fromNumberId) return;
+    setCalling(true);
+    setResult(null);
+    const res = await api.makeOutboundCall(fromNumberId, toNumber.trim(), agentId);
+    setResult(res);
+    setCalling(false);
+  };
+
+  if (isNew) return null;
+
+  return (
+    <div className="space-y-3">
+      <SectionLabel>Outbound Call</SectionLabel>
+      {!expanded ? (
+        <button
+          onClick={() => setExpanded(true)}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200"
+          style={{
+            background: "var(--surface)",
+            color: "var(--text-secondary)",
+            border: "1px solid",
+            borderColor: "var(--border)",
+          }}
+        >
+          <Phone size={15} />
+          Make a Call
+        </button>
+      ) : (
+        <div
+          className="rounded-xl border p-3 space-y-3"
+          style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+        >
+          <div>
+            <label className="text-[10px] font-medium uppercase tracking-wider mb-1 block" style={{ color: "var(--text-muted)" }}>
+              From Number
+            </label>
+            <select
+              value={fromNumberId}
+              onChange={(e) => setFromNumberId(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg text-xs border outline-none"
+              style={{ background: "var(--bg-muted)", borderColor: "var(--border)", color: "var(--text-primary)" }}
+            >
+              <option value="">Select phone number</option>
+              {activeNumbers.map((n) => (
+                <option key={n.id} value={n.id}>
+                  {n.number} ({n.provider})
+                </option>
+              ))}
+            </select>
+            {activeNumbers.length === 0 && (
+              <p className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>
+                No active numbers. Connect one in Phone Numbers.
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="text-[10px] font-medium uppercase tracking-wider mb-1 block" style={{ color: "var(--text-muted)" }}>
+              To Number
+            </label>
+            <input
+              type="tel"
+              value={toNumber}
+              onChange={(e) => setToNumber(e.target.value)}
+              placeholder="+91XXXXXXXXXX"
+              className="w-full px-3 py-2 rounded-lg text-xs border outline-none"
+              style={{ background: "var(--bg-muted)", borderColor: "var(--border)", color: "var(--text-primary)" }}
+            />
+          </div>
+          {result && (
+            <div
+              className={`px-3 py-2 rounded-lg text-[11px] ${
+                result.error
+                  ? "bg-red-500/10 border border-red-500/20 text-red-500"
+                  : "bg-emerald-500/10 border border-emerald-500/20 text-emerald-600"
+              }`}
+            >
+              {result.error || "Call initiated!"}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setExpanded(false); setResult(null); }}
+              className="flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-colors"
+              style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleCall}
+              disabled={calling || !toNumber.trim() || !fromNumberId}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-white transition-colors disabled:opacity-40"
+              style={{ background: "#10B981" }}
+            >
+              {calling ? <Loader2 size={13} className="animate-spin" /> : <Phone size={13} />}
+              {calling ? "Calling..." : "Call"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RightPanel({ form, isNew, id, showTestCall, onTestCall, onCloseTestCall }) {
   return (
     <div
@@ -533,9 +654,9 @@ function RightPanel({ form, isNew, id, showTestCall, onTestCall, onCloseTestCall
           </div>
         </div>
 
-        {/* Test call */}
+        {/* Test call — browser voice */}
         <div className="space-y-3">
-          <SectionLabel>Test</SectionLabel>
+          <SectionLabel>Browser Test</SectionLabel>
           {showTestCall && !isNew ? (
             <TestCallPanel agent={{ id, name: form.name || "Agent" }} onClose={onCloseTestCall} />
           ) : (
@@ -555,6 +676,9 @@ function RightPanel({ form, isNew, id, showTestCall, onTestCall, onCloseTestCall
             </button>
           )}
         </div>
+
+        {/* Outbound call — via phone number */}
+        <OutboundCallSection agentId={id} isNew={isNew} />
       </div>
     </div>
   );
