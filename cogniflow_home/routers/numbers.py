@@ -131,7 +131,7 @@ async def _connect_vobiz(creds: dict, phone_number: str) -> dict:
                 "answer_method": "POST",
                 "hangup_url": f"{settings.public_url}/voice/vobiz/hangup",
                 "hangup_method": "POST",
-                "application_type": "voice",
+                "application_type": "XML",
             },
         )
     if resp.status_code not in (200, 201):

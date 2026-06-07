@@ -470,7 +470,7 @@ async def vobiz_connect_number(phone_number: str) -> bool:
                 "answer_method": "POST",
                 "hangup_url": f"{settings.public_url}/voice/vobiz/hangup",
                 "hangup_method": "POST",
-                "application_type": "voice",
+                "application_type": "XML",
             },
             timeout=15.0,
         )
