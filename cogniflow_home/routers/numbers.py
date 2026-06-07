@@ -142,9 +142,11 @@ async def _connect_vobiz(creds: dict, phone_number: str) -> dict:
     if not app_id:
         return {"ok": False, "error": "Application created but no app_id returned"}
 
+    from urllib.parse import quote as url_quote
+    encoded_number = url_quote(phone_number, safe="")
     async with httpx.AsyncClient(timeout=15.0) as client:
         resp2 = await client.post(
-            f"{base}/Account/{auth_id}/Number/{phone_number}/",
+            f"{base}/Account/{auth_id}/Number/{encoded_number}/",
             headers=headers,
             json={"app_id": app_id},
         )
