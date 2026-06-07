@@ -303,11 +303,12 @@ async def setup_phone_number(request: Request, auth: AuthContext = Depends(get_a
         "provider": provider,
         "number": phone_number,
         "status": status,
-        "agent_id": agent_id,
         "credentials": encrypted_creds,
-        "metadata": metadata,
+        "metadata": json.dumps(metadata),
         "concurrency": concurrency,
     }
+    if agent_id:
+        row["agent_id"] = agent_id
 
     if existing:
         result = await db.update("phone_numbers", {"id": existing[0]["id"]}, {**row, "id": existing[0]["id"]})
@@ -316,7 +317,7 @@ async def setup_phone_number(request: Request, auth: AuthContext = Depends(get_a
         result = await db.insert("phone_numbers", row)
 
     if not result:
-        logger.error(f"Failed to save phone number {phone_number} to DB")
+        logger.error(f"Failed to save phone number {phone_number} to DB. tenant_id={auth.tenant_id}")
         return JSONResponse({"error": "Phone number configured but failed to save to database. Please try again."}, status_code=500)
 
     if agent_id:
