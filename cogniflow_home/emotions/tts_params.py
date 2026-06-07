@@ -43,12 +43,12 @@ EMOTION_TTS_MAP = {
 }
 
 PROFILE_BASELINES = {
-    "empathetic":        {"temperature": 0.65, "pace": 0.95},
-    "energetic":         {"temperature": 0.75, "pace": 1.10},
-    "professional":      {"temperature": 0.50, "pace": 0.95},
-    "friendly":          {"temperature": 0.60, "pace": 1.00},
-    "hinglish":          {"temperature": 0.70, "pace": 1.05},
-    "hinglish_friendly": {"temperature": 0.70, "pace": 1.05},
+    "empathetic":        {"temperature": 0.65, "pace": 1.10},
+    "energetic":         {"temperature": 0.75, "pace": 1.25},
+    "professional":      {"temperature": 0.50, "pace": 1.10},
+    "friendly":          {"temperature": 0.60, "pace": 1.15},
+    "hinglish":          {"temperature": 0.70, "pace": 1.20},
+    "hinglish_friendly": {"temperature": 0.70, "pace": 1.20},
 }
 
 VOICE_MAP = {

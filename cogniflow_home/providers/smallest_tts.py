@@ -50,7 +50,7 @@ class SmallestTTS:
             "Authorization": f"Bearer {settings.smallest_ai_api_key}",
             "Content-Type": "application/json",
         }
-        effective_speed = max(0.5, min(2.0, speed)) if speed > 0 else 1.15
+        effective_speed = max(0.5, min(2.0, speed)) if speed > 0 else 1.30
         body = {
             "text": text,
             "voice_id": self.voice_id,

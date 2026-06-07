@@ -28,13 +28,13 @@ ELEVENLABS_EMOTION_PARAMS = {
 }
 
 SMALLEST_EMOTION_SPEED = {
-    "frustrated": 1.05,
-    "happy":      1.20,
-    "neutral":    1.15,
-    "angry":      1.00,
-    "confused":   1.05,
-    "sad":        1.00,
-    "anxious":    1.07,
+    "frustrated": 1.20,
+    "happy":      1.35,
+    "neutral":    1.30,
+    "angry":      1.15,
+    "confused":   1.20,
+    "sad":        1.10,
+    "anxious":    1.20,
 }
 
 
