@@ -304,8 +304,6 @@ async def setup_phone_number(request: Request, auth: AuthContext = Depends(get_a
         "number": phone_number,
         "status": status,
         "credentials": encrypted_creds,
-        "metadata": json.dumps(metadata),
-        "concurrency": concurrency,
     }
     if agent_id:
         row["agent_id"] = agent_id
