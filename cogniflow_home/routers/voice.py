@@ -348,6 +348,15 @@ async def voice_ws(websocket: WebSocket, provider_name: str):
                 agent_config = await get_agent_for_number(call_info.called_number)
         else:
             agent_config = await get_agent_for_number(call_info.called_number)
+
+        num_rows = await db.select("phone_numbers", {"number": call_info.called_number, "status": "active"}, limit=1)
+        if num_rows:
+            max_conc = num_rows[0].get("concurrency", 5)
+            current = sum(1 for p in active_calls.values() if getattr(getattr(p, "state", None), "called_number", None) == call_info.called_number)
+            if current >= max_conc:
+                logger.warning(f"Number {call_info.called_number} at concurrency limit ({max_conc})")
+                return
+
         pipeline = VoicePipeline(
             call_info, provider,
             instructions_override=agent_config.instructions,

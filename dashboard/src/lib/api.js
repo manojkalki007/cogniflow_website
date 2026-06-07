@@ -240,6 +240,27 @@ export const api = {
   testWhatsApp: (toPhone, template = "appointment_confirmation") =>
     request("/api/test-whatsapp", { method: "POST", body: JSON.stringify({ to_phone: toPhone, template }) }),
 
+  // Phone Numbers
+  getPhoneNumbers: () => request("/api/phone-numbers"),
+  setupPhoneNumber: (data) =>
+    request("/api/phone-numbers/setup", { method: "POST", body: JSON.stringify(data) }),
+  verifyPhoneCredentials: (provider, credentials) =>
+    request("/api/phone-numbers/verify-credentials", {
+      method: "POST",
+      body: JSON.stringify({ provider, credentials }),
+    }),
+  updatePhoneNumber: (id, updates) =>
+    request(`/api/phone-numbers/${id}`, { method: "PATCH", body: JSON.stringify(updates) }),
+  removePhoneNumber: (id) =>
+    request(`/api/phone-numbers/${id}`, { method: "DELETE" }),
+  verifyPhoneNumber: (id) =>
+    request(`/api/phone-numbers/${id}/verify`, { method: "POST" }),
+  testPhoneNumber: (id, toNumber) =>
+    request(`/api/phone-numbers/${id}/test-call`, {
+      method: "POST",
+      body: JSON.stringify({ to_number: toNumber }),
+    }),
+
   // API Hub
   getProviders: () => request("/api/providers"),
 

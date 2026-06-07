@@ -29,6 +29,7 @@ import EmailAutomation from "./pages/EmailAutomation";
 import AgentBuilder from "./pages/AgentBuilder";
 import AiSdr from "./pages/AiSdr";
 import Scheduling from "./pages/Scheduling";
+import PhoneNumbers from "./pages/PhoneNumbers";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 10_000, retry: 1 } },
@@ -53,6 +54,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                 <Route path="/home/agents" element={<Agents />} />
                 <Route path="/home/agents/:id" element={<AgentBuilder />} />
                 <Route path="/home/templates" element={<Templates />} />
+                <Route path="/home/phone-numbers" element={<PhoneNumbers />} />
                 <Route path="/home/campaigns" element={<Campaigns />} />
                 <Route path="/home/revenue" element={<Revenue />} />
                 <Route path="/home/compliance" element={<Compliance />} />
