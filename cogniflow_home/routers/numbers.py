@@ -314,7 +314,18 @@ async def setup_phone_number(request: Request, auth: AuthContext = Depends(get_a
         result = await db.update("phone_numbers", {"id": existing[0]["id"]}, {**row, "id": existing[0]["id"]})
         row["id"] = existing[0]["id"]
     else:
-        result = await db.insert("phone_numbers", row)
+        # Direct insert with error capture
+        import httpx as _httpx
+        _url = f"/rest/v1/phone_numbers"
+        _resp = await db._client.post(_url, json=row)
+        if _resp.status_code in (200, 201):
+            _rows = _resp.json()
+            result = _rows[0] if _rows else row
+        else:
+            logger.error(f"Phone number insert failed: {_resp.status_code} {_resp.text}")
+            return JSONResponse({
+                "error": f"Failed to save: {_resp.status_code} — {_resp.text[:300]}"
+            }, status_code=500)
 
     if not result:
         logger.error(f"Failed to save phone number {phone_number} to DB. tenant_id={auth.tenant_id}")
