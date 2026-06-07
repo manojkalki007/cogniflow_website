@@ -15,7 +15,6 @@ export const useSidebar = () => useContext(SidebarContext);
 
 const NAV_CORE = [
   { to: "/home", label: "Call Log", icon: Phone, end: true },
-  { to: "/home/call", label: "Make a Call", icon: PhoneOutgoing },
   { to: "/home/phone-numbers", label: "Phone Numbers", icon: Hash },
   { to: "/home/contacts", label: "Contacts", icon: Users },
   { to: "/home/analytics", label: "Analytics", icon: BarChart3 },
@@ -46,7 +45,6 @@ const NAV_ACCOUNT = [
 
 const PAGE_TITLES = {
   "/home": "Call Log",
-  "/home/call": "Make a Call",
   "/home/phone-numbers": "Phone Numbers",
   "/home/contacts": "Contacts",
   "/home/analytics": "Analytics",

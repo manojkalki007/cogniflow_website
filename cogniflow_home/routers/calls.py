@@ -105,12 +105,10 @@ async def list_calls(
     match = {}
     if auth.tenant_id:
         match["tenant_id"] = auth.tenant_id
-    if direction:
-        match["direction"] = direction
     if status:
         match["status"] = status
     if caller:
-        match["caller_number"] = caller
+        match["phone_number"] = caller
     calls = await db.select("calls", match or None, order="created_at.desc", limit=limit)
     return {"calls": calls, "count": len(calls)}
 

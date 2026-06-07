@@ -2,28 +2,12 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import {
-  PhoneIncoming, PhoneOutgoing, Clock, ChevronDown, ChevronUp,
+  PhoneOutgoing, Clock, ChevronDown, ChevronUp,
   Search, MessageSquare, BarChart3, Phone, ArrowUpRight,
-  TrendingUp, Activity, Play, Pause, DollarSign, Zap, Download,
+  TrendingUp, Activity, Play, Pause, DollarSign, Zap, Download, Hash,
 } from "lucide-react";
 import { Badge } from "../components/ui/badge";
 import PageHeader from "../components/PageHeader";
-
-const DISPOSITION_VARIANT = {
-  interested: "success",
-  not_interested: "destructive",
-  callback_requested: "warning",
-  escalated: "warning",
-  no_answer: "secondary",
-  voicemail: "secondary",
-};
-
-const SENTIMENT_BADGE = (score) => {
-  if (score == null) return null;
-  if (score > 0.3) return { label: "Positive", variant: "success" };
-  if (score < -0.3) return { label: "Negative", variant: "destructive" };
-  return { label: "Neutral", variant: "secondary" };
-};
 
 // Per-minute cost rates
 const COST_RATES = {
@@ -382,8 +366,6 @@ function formatDuration(seconds) {
 
 export default function CallLog() {
   const [expandedId, setExpandedId] = useState(null);
-  const [dirFilter, setDirFilter] = useState("");
-  const [dispositionFilter, setDispositionFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
   const { data: stats } = useQuery({
@@ -392,27 +374,19 @@ export default function CallLog() {
     refetchInterval: 15_000,
   });
   const { data: callsData } = useQuery({
-    queryKey: ["calls", dirFilter],
-    queryFn: () => api.getCalls(dirFilter ? { direction: dirFilter } : {}),
+    queryKey: ["calls"],
+    queryFn: () => api.getCalls(),
     refetchInterval: 10_000,
   });
 
   const allCalls = callsData?.calls || [];
   const calls = allCalls.filter((c) => {
-    if (dispositionFilter && c.disposition !== dispositionFilter) return false;
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
-    return (
-      (c.caller_number || "").includes(q) ||
-      (c.summary || "").toLowerCase().includes(q) ||
-      (c.agent_name || "").toLowerCase().includes(q)
-    );
+    return (c.phone_number || "").includes(q);
   });
 
   const today = stats?.today || {};
-  const dispositions = [
-    ...new Set(allCalls.map((c) => c.disposition).filter(Boolean)),
-  ];
 
   return (
     <div>
@@ -430,24 +404,21 @@ export default function CallLog() {
             value={today.total_calls ?? 0}
             icon={BarChart3}
             accent="var(--accent)"
-            trend={12}
             className="stat-card-blue"
           />
           <StatCard
-            label="Inbound"
-            value={today.inbound ?? 0}
-            icon={PhoneIncoming}
-            accent="var(--success)"
-            trend={8}
-            className="stat-card-emerald"
+            label="All Time"
+            value={stats?.all_time?.total_calls ?? 0}
+            icon={Hash}
+            accent="#8B5CF6"
+            className="stat-card-violet"
           />
           <StatCard
-            label="Outbound"
-            value={today.outbound ?? 0}
-            icon={PhoneOutgoing}
-            accent="#8B5CF6"
-            trend={-3}
-            className="stat-card-violet"
+            label="Active Now"
+            value={stats?.active_calls ?? 0}
+            icon={Activity}
+            accent="var(--success)"
+            className="stat-card-emerald"
           />
           <StatCard
             label="Avg Duration"
@@ -472,35 +443,12 @@ export default function CallLog() {
             />
             <input
               type="text"
-              placeholder="Search by caller, agent, or summary..."
+              placeholder="Search by phone number..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="glass-input w-full pl-10 pr-4 py-2.5 rounded-xl text-sm"
             />
           </div>
-          <select
-            value={dirFilter}
-            onChange={(e) => setDirFilter(e.target.value)}
-            className="glass-input rounded-xl px-4 py-2.5 text-sm cursor-pointer"
-          >
-            <option value="">All directions</option>
-            <option value="inbound">Inbound</option>
-            <option value="outbound">Outbound</option>
-          </select>
-          {dispositions.length > 0 && (
-            <select
-              value={dispositionFilter}
-              onChange={(e) => setDispositionFilter(e.target.value)}
-              className="glass-input rounded-xl px-4 py-2.5 text-sm cursor-pointer"
-            >
-              <option value="">All dispositions</option>
-              {dispositions.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
-          )}
         </div>
 
         {/* Table */}
@@ -512,61 +460,45 @@ export default function CallLog() {
               <thead>
                 <tr>
                   <th style={{ width: 44 }}></th>
-                  <th>Caller</th>
-                  <th>Agent</th>
+                  <th>Phone Number</th>
+                  <th>Status</th>
                   <th>Duration</th>
                   <th>Cost</th>
-                  <th>Disposition</th>
-                  <th>Sentiment</th>
-                  <th>Summary</th>
                   <th>Date</th>
                   <th style={{ width: 40 }}></th>
                 </tr>
               </thead>
               <tbody>
                 {calls.map((call) => {
-                  const sentiment = SENTIMENT_BADGE(call.sentiment_score);
                   const isExpanded = expandedId === call.id;
                   return (
                     <tr key={call.id}>
                       <td>
-                        {call.direction === "inbound" ? (
-                          <div
-                            className="w-7 h-7 rounded-lg flex items-center justify-center"
-                            style={{
-                              background: "rgba(16,185,129,0.08)",
-                              border: "1px solid rgba(16,185,129,0.1)",
-                            }}
-                          >
-                            <PhoneIncoming
-                              size={13}
-                              style={{ color: "var(--success)" }}
-                            />
-                          </div>
-                        ) : (
-                          <div
-                            className="w-7 h-7 rounded-lg flex items-center justify-center"
-                            style={{
-                              background: "var(--accent-subtle)",
-                              border: "1px solid rgba(34,211,238,0.1)",
-                            }}
-                          >
-                            <PhoneOutgoing
-                              size={13}
-                              style={{ color: "var(--accent)" }}
-                            />
-                          </div>
-                        )}
+                        <div
+                          className="w-7 h-7 rounded-lg flex items-center justify-center"
+                          style={{
+                            background: "var(--accent-subtle)",
+                            border: "1px solid rgba(34,211,238,0.1)",
+                          }}
+                        >
+                          <PhoneOutgoing
+                            size={13}
+                            style={{ color: "var(--accent)" }}
+                          />
+                        </div>
                       </td>
                       <td>
                         <span className="font-mono text-xs">
-                          {call.caller_number || "N/A"}
+                          {call.phone_number || "N/A"}
                         </span>
                       </td>
                       <td>
-                        <span className="text-xs">
-                          {call.agent_name || "Default"}
-                        </span>
+                        <Badge
+                          variant={call.status === "completed" ? "success" : call.status === "active" ? "warning" : "secondary"}
+                          className="text-[10px]"
+                        >
+                          {call.status || "unknown"}
+                        </Badge>
                       </td>
                       <td>
                         <span className="flex items-center gap-1.5 text-xs">
@@ -591,37 +523,6 @@ export default function CallLog() {
                       </td>
                       <td>
                         <CostBadge call={call} />
-                      </td>
-                      <td>
-                        {call.disposition ? (
-                          <Badge
-                            variant={
-                              DISPOSITION_VARIANT[call.disposition] || "outline"
-                            }
-                            className="text-[10px]"
-                          >
-                            {call.disposition}
-                          </Badge>
-                        ) : (
-                          <span style={{ color: "var(--text-muted)" }}>—</span>
-                        )}
-                      </td>
-                      <td>
-                        {sentiment ? (
-                          <Badge
-                            variant={sentiment.variant}
-                            className="text-[10px]"
-                          >
-                            {sentiment.label}
-                          </Badge>
-                        ) : (
-                          <span style={{ color: "var(--text-muted)" }}>—</span>
-                        )}
-                      </td>
-                      <td className="max-w-[200px]">
-                        <span className="text-xs truncate block">
-                          {call.summary || "—"}
-                        </span>
                       </td>
                       <td className="whitespace-nowrap text-xs">
                         {call.created_at
@@ -659,7 +560,7 @@ export default function CallLog() {
                 {/* Empty State */}
                 {calls.length === 0 && (
                   <tr>
-                    <td colSpan={10} style={{ border: "none" }}>
+                    <td colSpan={7} style={{ border: "none" }}>
                       <div className="flex flex-col items-center justify-center py-20 gap-3">
                         <div
                           className="w-14 h-14 rounded-2xl flex items-center justify-center"
@@ -807,11 +708,7 @@ export default function CallLog() {
           </p>
           {allCalls.length > calls.length && (
             <button
-              onClick={() => {
-                setSearchQuery("");
-                setDirFilter("");
-                setDispositionFilter("");
-              }}
+              onClick={() => setSearchQuery("")}
               className="text-xs font-medium flex items-center gap-1 cursor-pointer transition-colors"
               style={{ color: "var(--accent)" }}
             >

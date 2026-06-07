@@ -9,7 +9,6 @@ import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import AuthCallback from "./pages/AuthCallback";
 import CallLog from "./pages/CallLog";
-import MakeCall from "./pages/MakeCall";
 import Contacts from "./pages/Contacts";
 import ContactDetail from "./pages/ContactDetail";
 import Analytics from "./pages/Analytics";
@@ -47,7 +46,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(
               <Route element={<Layout />}>
                 <Route path="/" element={<Navigate to="/home" replace />} />
                 <Route path="/home" element={<CallLog />} />
-                <Route path="/home/call" element={<MakeCall />} />
                 <Route path="/home/contacts" element={<Contacts />} />
                 <Route path="/home/contacts/:id" element={<ContactDetail />} />
                 <Route path="/home/analytics" element={<Analytics />} />
