@@ -260,6 +260,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ to_number: toNumber }),
     }),
+  makeOutboundCall: (id, toNumber, agentId) =>
+    request(`/api/phone-numbers/${id}/call`, {
+      method: "POST",
+      body: JSON.stringify({ to_number: toNumber, agent_id: agentId || undefined }),
+    }),
 
   // API Hub
   getProviders: () => request("/api/providers"),

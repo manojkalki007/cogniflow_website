@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import {
-  Phone, Plus, CheckCircle, XCircle, AlertTriangle, Loader2,
+  Phone, PhoneOutgoing, Plus, CheckCircle, XCircle, AlertTriangle, Loader2,
   ExternalLink, ArrowLeft, Copy, PhoneCall, Settings2, Trash2,
   ChevronRight, Clock, Bot, RefreshCw, X, Eye, EyeOff,
 } from "lucide-react";
@@ -99,7 +99,7 @@ function ProviderBadge({ provider }) {
 
 // ─── Number Card ───
 
-function NumberCard({ num, agents, onAssign, onTest, onRemove, onSettings }) {
+function NumberCard({ num, agents, onAssign, onTest, onRemove, onSettings, onCall }) {
   return (
     <div
       className="p-4 rounded-xl transition-all duration-200 hover:shadow-md"
@@ -142,6 +142,11 @@ function NumberCard({ num, agents, onAssign, onTest, onRemove, onSettings }) {
           </div>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
+          {num.status === "active" && (
+            <Button size="sm" onClick={() => onCall(num)} title="Make outbound call">
+              <PhoneOutgoing size={14} className="mr-1" /> Call
+            </Button>
+          )}
           {!num.agent_id && (
             <Button size="sm" variant="outline" onClick={() => onAssign(num)}>
               Assign
@@ -282,6 +287,78 @@ function TestCallModal({ open, onClose, number, onTest }) {
           <Button variant="outline" onClick={onClose}>Close</Button>
           <Button onClick={handleTest} disabled={!toNumber || loading}>
             {loading ? <><Loader2 size={14} className="animate-spin mr-1" /> Calling...</> : "Make Test Call"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Outbound Call Modal ───
+
+function OutboundCallModal({ open, onClose, number, agents, onCall }) {
+  const [toNumber, setToNumber] = useState("");
+  const [agentId, setAgentId] = useState(number?.agent_id || "");
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (number) setAgentId(number.agent_id || "");
+  }, [number]);
+
+  const handleCall = async () => {
+    setLoading(true);
+    setResult(null);
+    const res = await onCall(number.id, toNumber, agentId);
+    setResult(res);
+    setLoading(false);
+  };
+
+  if (!open || !number) return null;
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <h3 className="text-base font-semibold mb-1" style={{ color: "var(--text-primary)" }}>
+          Outbound Call from {number.number}
+        </h3>
+        <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>
+          The AI agent will call this person and handle the conversation.
+        </p>
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>Call to</label>
+            <input
+              type="tel" value={toNumber} onChange={(e) => setToNumber(e.target.value)}
+              placeholder="+919876543210"
+              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+              style={{ background: "var(--bg-subtle)", border: "1px solid var(--border)", color: "var(--text-primary)" }}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>Agent</label>
+            <select
+              value={agentId} onChange={(e) => setAgentId(e.target.value)}
+              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+              style={{ background: "var(--bg-subtle)", border: "1px solid var(--border)", color: "var(--text-primary)" }}
+            >
+              <option value="">Default agent</option>
+              {(agents || []).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+          </div>
+        </div>
+        {result && (
+          <div className={`mt-3 p-3 rounded-lg text-xs ${result.ok ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+            {result.ok ? (
+              <span className="flex items-center gap-2"><CheckCircle size={14} /> Call initiated to {result.to}</span>
+            ) : (
+              <span className="flex items-center gap-2"><XCircle size={14} /> {result.error}</span>
+            )}
+          </div>
+        )}
+        <div className="flex justify-end gap-2 mt-4">
+          <Button variant="outline" onClick={onClose}>Close</Button>
+          <Button onClick={handleCall} disabled={!toNumber || loading}>
+            {loading ? <><Loader2 size={14} className="animate-spin mr-1" /> Calling...</> : <><PhoneOutgoing size={14} className="mr-1" /> Call Now</>}
           </Button>
         </div>
       </DialogContent>
@@ -976,6 +1053,7 @@ export default function PhoneNumbers() {
   const [assignModal, setAssignModal] = useState(null);
   const [testModal, setTestModal] = useState(null);
   const [settingsModal, setSettingsModal] = useState(null);
+  const [callModal, setCallModal] = useState(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["phone-numbers"],
@@ -1018,6 +1096,10 @@ export default function PhoneNumbers() {
   const handleRemove = async (num) => {
     if (!confirm(`Remove ${num.number}? This will unassign it from any agent.`)) return;
     await removeMutation.mutateAsync(num.id);
+  };
+
+  const handleOutboundCall = async (numberId, toNumber, agentId) => {
+    return api.makeOutboundCall(numberId, toNumber, agentId);
   };
 
   const handleWizardComplete = () => {
@@ -1085,6 +1167,15 @@ export default function PhoneNumbers() {
         onSave={handleSettings}
       />
 
+      {/* Outbound Call Modal */}
+      <OutboundCallModal
+        open={!!callModal}
+        onClose={() => setCallModal(null)}
+        number={callModal}
+        agents={agents}
+        onCall={handleOutboundCall}
+      />
+
       {/* Action Bar */}
       <div className="flex items-center justify-between mb-4">
         <div className="text-xs" style={{ color: "var(--text-muted)" }}>
@@ -1142,6 +1233,7 @@ export default function PhoneNumbers() {
               onTest={(n) => setTestModal(n)}
               onSettings={(n) => setSettingsModal(n)}
               onRemove={handleRemove}
+              onCall={(n) => setCallModal(n)}
             />
           ))}
         </div>

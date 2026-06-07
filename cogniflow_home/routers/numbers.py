@@ -310,15 +310,19 @@ async def setup_phone_number(request: Request, auth: AuthContext = Depends(get_a
     }
 
     if existing:
-        await db.update("phone_numbers", {"id": existing[0]["id"]}, {**row, "id": existing[0]["id"]})
+        result = await db.update("phone_numbers", {"id": existing[0]["id"]}, {**row, "id": existing[0]["id"]})
         row["id"] = existing[0]["id"]
     else:
-        await db.insert("phone_numbers", row)
+        result = await db.insert("phone_numbers", row)
+
+    if not result:
+        logger.error(f"Failed to save phone number {phone_number} to DB")
+        return JSONResponse({"error": "Phone number configured but failed to save to database. Please try again."}, status_code=500)
 
     if agent_id:
         await _sync_agent_numbers(auth.tenant_id, agent_id)
 
-    return {
+    resp = {
         "id": row["id"],
         "number": phone_number,
         "provider": provider,
@@ -326,6 +330,9 @@ async def setup_phone_number(request: Request, auth: AuthContext = Depends(get_a
         "webhooks": metadata.get("webhooks", {}),
         "metadata": {k: v for k, v in metadata.items() if k != "webhooks"},
     }
+    if setup_result.get("warning"):
+        resp["warning"] = setup_result["warning"]
+    return resp
 
 
 @router.post("/api/phone-numbers/verify-credentials")
@@ -465,6 +472,47 @@ async def test_call_number(number_id: str, request: Request, auth: AuthContext =
             return JSONResponse({"error": f"Test calls not supported for {provider}"}, status_code=400)
     except Exception as e:
         logger.exception(f"Test call failed for {row['number']}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@router.post("/api/phone-numbers/{number_id}/call")
+async def make_outbound_call(number_id: str, request: Request, auth: AuthContext = Depends(get_auth_context)):
+    """Make an outbound call FROM this phone number using its stored credentials."""
+    rows = await db.select("phone_numbers", {"id": number_id, "tenant_id": auth.tenant_id}, limit=1)
+    if not rows:
+        return JSONResponse({"error": "Number not found"}, status_code=404)
+
+    row = rows[0]
+    if row["status"] != "active":
+        return JSONResponse({"error": "Number is not active"}, status_code=400)
+
+    body = await request.json()
+    to_number = body.get("to_number", "")
+    agent_id = body.get("agent_id", row.get("agent_id"))
+    if not to_number:
+        return JSONResponse({"error": "to_number is required"}, status_code=400)
+
+    provider = row["provider"]
+    creds = _decrypt_creds(row)
+
+    try:
+        if provider == "twilio":
+            call_sid = await _test_call_twilio(creds, row["number"], to_number)
+        elif provider == "vobiz":
+            call_sid = await _test_call_vobiz(creds, row["number"], to_number)
+        elif provider == "exotel":
+            call_sid = await _test_call_exotel(creds, row["number"], to_number)
+        else:
+            return JSONResponse({"error": f"Outbound calls not supported for {provider}"}, status_code=400)
+
+        if agent_id:
+            from cogniflow_home.state import _pending_agent_overrides
+            _pending_agent_overrides[call_sid] = agent_id
+
+        await db.update("phone_numbers", {"id": number_id}, {"last_call_at": "now()"})
+        return {"ok": True, "call_sid": call_sid, "from": row["number"], "to": to_number, "provider": provider}
+    except Exception as e:
+        logger.exception(f"Outbound call failed from {row['number']}")
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
