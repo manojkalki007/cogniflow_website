@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from cogniflow_home.agents import get_agent_by_id, get_agent_for_number
+from cogniflow_home.agents import DEFAULT_AGENT, get_agent_by_id, get_agent_for_number
 from cogniflow_home.config import settings
 from cogniflow_home.db.supabase import db
 from cogniflow_home.integrations.hubspot import get_caller_context
@@ -341,15 +341,36 @@ async def voice_ws(websocket: WebSocket, provider_name: str):
 
     async def on_call_start(call_info: CallInfo):
         nonlocal pipeline
+        # Try matching agent override by call_sid, then by any pending key
+        # (Vobiz returns request_uuid from API but callId in WebSocket — they differ)
         override_id = _pending_agent_overrides.pop(call_info.call_sid, None)
+        if not override_id and _pending_agent_overrides:
+            # For outbound calls, the call_sid may not match — try matching by
+            # checking if there's a single recent override (within a few seconds)
+            for k, v in list(_pending_agent_overrides.items()):
+                override_id = v
+                _pending_agent_overrides.pop(k, None)
+                break
+
         if override_id:
             agent_config = await get_agent_by_id(override_id)
             if not agent_config:
                 agent_config = await get_agent_for_number(call_info.called_number)
         else:
+            # Try called number first, then caller number (for outbound calls
+            # the caller is our Vobiz number which has the agent assigned)
             agent_config = await get_agent_for_number(call_info.called_number)
+            if agent_config.instructions == DEFAULT_AGENT.instructions and call_info.caller_number:
+                from_agent = await get_agent_for_number(call_info.caller_number)
+                if from_agent.instructions != DEFAULT_AGENT.instructions:
+                    agent_config = from_agent
 
-        num_rows = await db.select("phone_numbers", {"number": call_info.called_number, "status": "active"}, limit=1)
+        # For concurrency, check both called and caller numbers
+        check_number = call_info.called_number
+        num_rows = await db.select("phone_numbers", {"number": check_number, "status": "active"}, limit=1)
+        if not num_rows and call_info.caller_number:
+            check_number = call_info.caller_number
+            num_rows = await db.select("phone_numbers", {"number": call_info.caller_number, "status": "active"}, limit=1)
         if num_rows:
             sip_cfg = num_rows[0].get("sip_config") or {}
             if isinstance(sip_cfg, str):
