@@ -50,11 +50,22 @@ DEFAULT_AGENT = AgentConfig(
 
 
 def _agent_from_row(agent: dict) -> AgentConfig:
+    instructions = (
+        agent.get("instructions")
+        or agent.get("system_prompt")
+        or AGENT_INSTRUCTIONS
+    )
+    greeting = (
+        agent.get("greeting")
+        or agent.get("welcome_message")
+        or agent.get("metadata", {}).get("greeting")
+        or GREETING
+    )
     return AgentConfig(
         id=agent["id"],
         name=agent["name"],
-        instructions=agent["instructions"],
-        greeting=agent.get("greeting", "") or agent.get("metadata", {}).get("greeting", GREETING),
+        instructions=instructions,
+        greeting=greeting,
         voice_id=agent.get("voice_id", VOICE_ID),
         language=agent.get("language", "en"),
         tenant_id=agent.get("tenant_id", ""),

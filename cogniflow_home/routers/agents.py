@@ -1,5 +1,6 @@
 """Agent CRUD, cloning, knowledge base, test chat, and performance."""
 
+import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -17,12 +18,15 @@ router = APIRouter(tags=["agents"])
 
 
 _AGENT_DB_COLUMNS = {
-    "name", "instructions", "voice_id", "language", "phone_numbers", "is_active",
-    "metadata", "greeting", "guardrails", "llm_provider", "llm_model", "tts_provider",
-    "tts_voice_name", "temperature", "tools_enabled", "max_call_duration",
-    "enable_memory", "enable_prediction", "enable_emotion", "enable_language_switch",
-    "enable_rag", "tenant_id",
+    "name", "voice_id", "language", "status",
+    "llm_model", "tenant_id", "description",
 }
+
+_FIELD_MAP = {
+    "instructions": "system_prompt",
+    "greeting": "welcome_message",
+}
+_FIELD_MAP_REVERSE = {v: k for k, v in _FIELD_MAP.items()}
 
 _AGENT_EXTRA_FIELDS = {
     "emotion_profile", "voice_gender", "stt_language", "endpointing_ms", "smart_format",
@@ -36,29 +40,45 @@ def _pack_agent_data(body: dict, tenant_id: str = "") -> dict:
     agent_data = {}
     extras = {}
     for k, v in body.items():
-        if k in _AGENT_DB_COLUMNS:
-            agent_data[k] = v
+        db_col = _FIELD_MAP.get(k, k)
+        if db_col in _AGENT_DB_COLUMNS:
+            agent_data[db_col] = v
+        elif k in ("instructions", "greeting"):
+            agent_data[_FIELD_MAP[k]] = v
         elif k in _AGENT_EXTRA_FIELDS:
             extras[k] = v
-    meta = agent_data.get("metadata") or {}
-    if isinstance(meta, dict):
-        meta.update(extras)
-    else:
-        meta = extras
-    agent_data["metadata"] = meta
+    meta = agent_data.pop("metadata", None) or {}
+    if not isinstance(meta, dict):
+        meta = {}
+    meta.update(extras)
+    agent_data["bolna_raw_config"] = json.dumps(meta)
     if tenant_id:
         agent_data["tenant_id"] = tenant_id
+    agent_data["status"] = body.get("status", "active")
     return agent_data
 
 
 def _unpack_agent(row: dict) -> dict:
     if not row:
         return row
-    meta = row.get("metadata") or {}
+    r = {**row}
+    r["instructions"] = r.pop("system_prompt", "") or ""
+    r["greeting"] = r.pop("welcome_message", "") or ""
+    raw = r.pop("bolna_raw_config", None)
+    meta = {}
+    if raw:
+        if isinstance(raw, str):
+            try:
+                meta = json.loads(raw)
+            except Exception:
+                meta = {}
+        elif isinstance(raw, dict):
+            meta = raw
+    r["metadata"] = meta
     for field in _AGENT_EXTRA_FIELDS:
-        if field in meta and field not in row:
-            row[field] = meta[field]
-    return row
+        if field in meta and field not in r:
+            r[field] = meta[field]
+    return r
 
 
 @router.get("/api/me")
@@ -119,20 +139,27 @@ async def api_update_agent(agent_id: str, request: Request, auth: AuthContext = 
         if not agents:
             return {"error": "Agent not found"}
     body = await request.json()
-    allowed = _AGENT_DB_COLUMNS | _AGENT_EXTRA_FIELDS
-    filtered = {k: v for k, v in body.items() if k in allowed}
-    if not filtered:
+    db_updates = {}
+    extras = {}
+    for k, v in body.items():
+        mapped = _FIELD_MAP.get(k, k)
+        if mapped in _AGENT_DB_COLUMNS:
+            db_updates[mapped] = v
+        elif k in ("instructions", "greeting"):
+            db_updates[_FIELD_MAP[k]] = v
+        elif k in _AGENT_EXTRA_FIELDS:
+            extras[k] = v
+    if not db_updates and not extras:
         return {"error": "No valid fields to update"}
-    db_updates = {k: v for k, v in filtered.items() if k in _AGENT_DB_COLUMNS}
-    extras = {k: v for k, v in filtered.items() if k in _AGENT_EXTRA_FIELDS}
     if extras:
         match = {"id": agent_id}
         if auth.tenant_id:
             match["tenant_id"] = auth.tenant_id
         existing = await db.select("agents", match)
-        old_meta = (existing[0].get("metadata") or {}) if existing else {}
+        raw = (existing[0].get("bolna_raw_config") or "{}") if existing else "{}"
+        old_meta = json.loads(raw) if isinstance(raw, str) else (raw or {})
         old_meta.update(extras)
-        db_updates["metadata"] = old_meta
+        db_updates["bolna_raw_config"] = json.dumps(old_meta)
     result = await update_agent(agent_id, db_updates, tenant_id=auth.tenant_id)
     return _unpack_agent(result) if result else {"error": "Agent not found"}
 
