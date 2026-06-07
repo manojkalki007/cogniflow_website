@@ -513,7 +513,7 @@ function OutboundCallSection({ agentId, isNew }) {
     enabled: expanded && !isNew,
   });
 
-  const activeNumbers = (phoneNumbers || []).filter(
+  const activeNumbers = (phoneNumbers?.numbers || []).filter(
     (n) => n.status === "active" && !n.error
   );
 
