@@ -2,6 +2,10 @@
 
 Subscribes to the event bus and writes/updates call records
 and contact records as calls progress.
+
+calls table columns: id (uuid), user_id, agent_id, bolna_call_id, phone_number,
+  status, duration_seconds, transcript (jsonb), recording_url, started_at,
+  ended_at, created_at, campaign_id, tenant_id
 """
 
 import logging
@@ -40,21 +44,25 @@ async def _generate_summary(transcript: list[dict]) -> str:
 
 async def on_call_started(event: str, data: dict[str, Any]):
     call_data = {
-        "id": data["call_id"],
-        "direction": data.get("direction", "inbound"),
-        "caller_number": data.get("caller_number", ""),
-        "called_number": data.get("called_number", ""),
-        "agent_name": data.get("agent_name", ""),
-        "provider": data.get("provider", "twilio"),
+        "bolna_call_id": data["call_id"],
+        "phone_number": data.get("caller_number", ""),
         "status": "active",
+        "started_at": datetime.now(timezone.utc).isoformat(),
     }
-    await db.insert("calls", call_data)
-    logger.info(f"Call {data['call_id']} logged as active")
+    if data.get("tenant_id"):
+        call_data["tenant_id"] = data["tenant_id"]
+    if data.get("agent_id"):
+        call_data["agent_id"] = data["agent_id"]
+
+    result = await db.insert("calls", call_data)
+    if result:
+        logger.info(f"Call {data['call_id']} logged as active")
+    else:
+        logger.error(f"Failed to log call {data['call_id']}")
 
 
 async def on_call_completed(event: str, data: dict[str, Any]):
     transcript = data.get("transcript", [])
-    summary = await _generate_summary(transcript)
     duration = data.get("duration_seconds", 0)
 
     call_update = {
@@ -62,36 +70,26 @@ async def on_call_completed(event: str, data: dict[str, Any]):
         "ended_at": datetime.now(timezone.utc).isoformat(),
         "duration_seconds": duration,
         "transcript": transcript,
-        "summary": summary,
     }
-    await db.update("calls", {"id": data["call_id"]}, call_update)
 
-    phone = data.get("caller_number", "")
-    if phone:
-        existing = await db.select("contacts", {"phone_number": phone})
-        if existing:
-            contact = existing[0]
-            await db.update("contacts", {"id": contact["id"]}, {
-                "total_calls": contact.get("total_calls", 0) + 1,
-                "last_call_at": datetime.now(timezone.utc).isoformat(),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            })
-        else:
-            await db.insert("contacts", {
-                "phone_number": phone,
-                "total_calls": 1,
-                "last_call_at": datetime.now(timezone.utc).isoformat(),
-            })
-            await bus.emit("contact.created", {"phone_number": phone})
+    updated = await db.update("calls", {"bolna_call_id": data["call_id"]}, call_update)
+    if not updated:
+        call_update["bolna_call_id"] = data["call_id"]
+        call_update["phone_number"] = data.get("caller_number", "")
+        call_update["started_at"] = datetime.now(timezone.utc).isoformat()
+        if data.get("tenant_id"):
+            call_update["tenant_id"] = data["tenant_id"]
+        if data.get("agent_id"):
+            call_update["agent_id"] = data["agent_id"]
+        await db.insert("calls", call_update)
 
     logger.info(f"Call {data['call_id']} completed — {duration}s, {len(transcript)} turns")
 
 
 async def on_call_failed(event: str, data: dict[str, Any]):
-    await db.update("calls", {"id": data["call_id"]}, {
+    await db.update("calls", {"bolna_call_id": data["call_id"]}, {
         "status": "failed",
         "ended_at": datetime.now(timezone.utc).isoformat(),
-        "metadata": {"error": data.get("error", "unknown")},
     })
 
 

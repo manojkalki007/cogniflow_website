@@ -437,6 +437,8 @@ class VoicePipeline:
             "agent_name": self.state.agent_name,
             "provider": self.state.provider,
             "language": self.state.language,
+            "tenant_id": self.state.tenant_id,
+            "agent_id": getattr(self, "agent_id", None),
         })
 
         await self._speak(greeting)
@@ -920,6 +922,7 @@ class VoicePipeline:
             "turn_quality": turn_summary,
             "barge_in_quality": barge_summary,
             "tenant_id": self.state.tenant_id,
+            "agent_id": getattr(self, "agent_id", None),
         })
 
         if self.state.tenant_id and duration > 0:

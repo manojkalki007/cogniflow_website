@@ -411,6 +411,7 @@ async def voice_ws(websocket: WebSocket, provider_name: str):
             enable_speculative=agent_config.enable_speculative,
             enable_filler=agent_config.enable_filler,
         )
+        pipeline.agent_id = getattr(agent_config, "id", None)
         crm_context = await get_caller_context(call_info.caller_number)
         if crm_context:
             pipeline.inject_context(crm_context)
