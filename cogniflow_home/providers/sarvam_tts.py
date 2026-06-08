@@ -90,10 +90,9 @@ class SarvamTTS:
                         audio_bytes = audio_bytes[44:]
                     yield audio_bytes
             else:
-                raise RuntimeError(f"Sarvam TTS error: {resp.status_code}")
+                logger.warning(f"Sarvam TTS error: {resp.status_code} {resp.text}")
         except Exception:
             logger.exception("Sarvam TTS request failed")
-            raise
 
     async def close(self):
         await self._client.aclose()

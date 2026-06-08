@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import {
-  BarChart3, TrendingUp, Clock, PhoneIncoming, PhoneOutgoing,
-  Target, Bot, Activity, DollarSign,
+  BarChart3, TrendingUp, Clock, PhoneIncoming,
+  Bot, Activity, DollarSign,
 } from "lucide-react";
 import {
   LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -13,10 +13,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs"
 import PageHeader from "../components/PageHeader";
 
 const COLORS = ["#00BCD4", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"];
-const DISPOSITION_COLORS = {
-  interested: "#10b981", not_interested: "#ef4444", callback_requested: "#f59e0b",
-  escalated: "#f97316", no_answer: "#6b7280", voicemail: "#8b5cf6", unknown: "#94a3b8",
-};
 
 function StatCard({ label, value, icon: Icon, iconColor, sub }) {
   return (
@@ -80,28 +76,19 @@ export default function Analytics() {
 
   const COST_PER_MIN = 0.0283; // STT + LLM + TTS + Telephony
 
-  const dispositions = {};
-  let totalSentimentScore = 0, sentimentCount = 0, totalQuality = 0, qualityCount = 0;
+  const statuses = {};
   let totalCost = 0, costCallCount = 0;
   calls.forEach((c) => {
-    if (c.disposition) dispositions[c.disposition] = (dispositions[c.disposition] || 0) + 1;
-    if (c.sentiment_score != null) { totalSentimentScore += c.sentiment_score; sentimentCount++; }
-    if (c.quality_score != null) { totalQuality += c.quality_score; qualityCount++; }
-    // Cost: use actual if available, otherwise estimate from duration
-    if (c.cost != null) {
-      totalCost += c.cost;
-      costCallCount++;
-    } else if (c.cost_breakdown?.total != null) {
-      totalCost += c.cost_breakdown.total;
-      costCallCount++;
-    } else if (c.duration_seconds) {
+    const s = c.status || "unknown";
+    statuses[s] = (statuses[s] || 0) + 1;
+    if (c.duration_seconds) {
       totalCost += (c.duration_seconds / 60) * COST_PER_MIN;
       costCallCount++;
     }
   });
 
   const avgCostPerCall = costCallCount > 0 ? (totalCost / costCallCount) : 0;
-  const costIsEstimated = calls.length > 0 && calls.every((c) => c.cost == null && c.cost_breakdown == null);
+  const costIsEstimated = true;
 
   // Build cost trend data from daily trends
   const costTrends = trends.map((t) => ({
@@ -109,11 +96,8 @@ export default function Analytics() {
     estimated_cost: +((((t.inbound || 0) + (t.outbound || 0)) * (t.avg_duration || 0) / 60) * COST_PER_MIN).toFixed(2),
   }));
 
-  const avgSentiment = sentimentCount > 0 ? (totalSentimentScore / sentimentCount).toFixed(2) : "0";
-  const avgQuality = qualityCount > 0 ? Math.round((totalQuality / qualityCount) * 100) + "%" : "0%";
-
-  const pieData = Object.entries(dispositions).map(([name, value]) => ({ name, value }));
-  const totalDispositions = pieData.reduce((sum, d) => sum + d.value, 0);
+  const pieData = Object.entries(statuses).map(([name, value]) => ({ name, value }));
+  const totalStatuses = pieData.reduce((sum, d) => sum + d.value, 0);
 
   const periodAction = (
     <div className="flex gap-1 rounded-xl p-1 border" style={{ borderColor: 'var(--border)', background: 'var(--bg-muted)' }}>
@@ -142,8 +126,8 @@ export default function Analytics() {
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-          <StatCard icon={TrendingUp} label="Avg Sentiment" value={avgSentiment} sub="Scale: -1.0 to 1.0" iconColor="var(--info)" />
-          <StatCard icon={Target} label="Avg Quality" value={avgQuality} sub="Agent performance" iconColor="#8b5cf6" />
+          <StatCard icon={BarChart3} label="Total Calls" value={calls.length} sub="This period" iconColor="var(--info)" />
+          <StatCard icon={DollarSign} label="Avg Cost / Call" value={avgCostPerCall > 0 ? `$${avgCostPerCall.toFixed(4)}` : "$0.00"} sub="Estimated" iconColor="#8b5cf6" />
           <StatCard icon={Activity} label="Active Calls" value={stats?.active_calls ?? 0} iconColor="var(--accent)" />
         </div>
 
@@ -226,15 +210,15 @@ export default function Analytics() {
                 ) : <EmptyChart />}
               </ChartCard>
 
-              <ChartCard title="Disposition Breakdown">
+              <ChartCard title="Call Status Breakdown">
                 {pieData.length > 0 ? (
                   <ResponsiveContainer width="100%" height={250}>
                     <PieChart>
                       <Pie data={pieData} cx="50%" cy="50%" innerRadius={65} outerRadius={95}
                         paddingAngle={3} dataKey="value" strokeWidth={0}
-                        label={({ name, value }) => `${name} (${Math.round(value / totalDispositions * 100)}%)`}>
+                        label={({ name, value }) => `${name} (${Math.round(value / totalStatuses * 100)}%)`}>
                         {pieData.map((entry, i) => (
-                          <Cell key={entry.name} fill={DISPOSITION_COLORS[entry.name] || COLORS[i % COLORS.length]} />
+                          <Cell key={entry.name} fill={COLORS[i % COLORS.length]} />
                         ))}
                       </Pie>
                       <Tooltip {...tooltipStyle} />

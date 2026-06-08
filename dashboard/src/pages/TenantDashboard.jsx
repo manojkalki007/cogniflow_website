@@ -337,7 +337,7 @@ export default function TenantDashboard() {
                     <Phone size={13} className="shrink-0" style={{ color: 'var(--text-muted)' }} />
                     <div className="min-w-0">
                       <p className="text-sm truncate" style={{ color: 'var(--text-secondary)' }}>
-                        {call.caller_number || call.phone_number || "Unknown"}
+                        {call.phone_number || "Unknown"}
                       </p>
                       <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
                         {call.created_at ? new Date(call.created_at).toLocaleString() : ""}

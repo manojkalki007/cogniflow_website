@@ -151,7 +151,7 @@ export default function Revenue() {
                       return (
                         <TableRow key={i}>
                           <TableCell className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>{deal.call_id?.slice(0, 8)}...</TableCell>
-                          <TableCell style={{ color: 'var(--text-secondary)' }}>{deal.caller_number || "—"}</TableCell>
+                          <TableCell style={{ color: 'var(--text-secondary)' }}>{deal.phone_number || "—"}</TableCell>
                           <TableCell>
                             <Badge variant={stageConf.badge}>{stageConf.label}</Badge>
                           </TableCell>

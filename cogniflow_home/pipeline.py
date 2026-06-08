@@ -605,7 +605,6 @@ class VoicePipeline:
                 if spoken_text:
                     self.llm.add_message("assistant", spoken_text)
                 else:
-                    self.llm.conversation_history.pop()
                     await self._generate_and_speak(redacted, eot_ts=eot_ts)
             else:
                 await self._generate_and_speak(redacted, eot_ts=eot_ts)
