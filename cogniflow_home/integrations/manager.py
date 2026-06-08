@@ -25,7 +25,9 @@ INTEGRATION_NAMES = {
     "leadrat": "LeadRat CRM",
     "hubspot": "HubSpot",
     "calcom": "Cal.com",
+    "calendar_calcom": "Cal.com",
     "google_calendar": "Google Calendar",
+    "calendar_google": "Google Calendar",
     "razorpay": "Razorpay",
     "salesforce": "Salesforce",
 }
@@ -118,7 +120,9 @@ class IntegrationManager:
             "leadrat": self._test_leadrat,
             "hubspot": self._test_hubspot,
             "calcom": self._test_calcom,
+            "calendar_calcom": self._test_calcom,
             "google_calendar": self._test_google_calendar,
+            "calendar_google": self._test_google_calendar,
             "razorpay": self._test_razorpay,
             "salesforce": self._test_salesforce,
         }.get(integration)
