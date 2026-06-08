@@ -151,10 +151,10 @@ async def api_provider_status(auth: AuthContext = Depends(get_auth_context)):
 
     total_calls = len(calls)
     total_minutes = sum(c.get("duration_seconds", 0) for c in calls) / 60
-    calls_by_provider = {}
+    calls_by_status = {}
     for c in calls:
-        p = c.get("provider", "twilio")
-        calls_by_provider[p] = calls_by_provider.get(p, 0) + 1
+        s = c.get("status", "unknown")
+        calls_by_status[s] = calls_by_status.get(s, 0) + 1
 
     summary = {
         "total_providers": len(providers),
@@ -162,7 +162,7 @@ async def api_provider_status(auth: AuthContext = Depends(get_auth_context)):
         "not_configured": sum(1 for p in providers if not p["configured"]),
         "this_month_calls": total_calls,
         "this_month_minutes": round(total_minutes, 1),
-        "calls_by_provider": calls_by_provider,
+        "calls_by_status": calls_by_status,
     }
     return {"providers": providers, "summary": summary}
 

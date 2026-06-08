@@ -567,12 +567,9 @@ async def api_webhook_urls(auth: AuthContext = Depends(get_auth_context)):
 # ─── Internal helpers ───
 
 async def _sync_agent_numbers(tenant_id: str, agent_id: str):
-    rows = await db.select("phone_numbers", {"assigned_agent_id": agent_id, "status": "neq.removed"}, select="number")
-    numbers = [r["number"] for r in rows]
-    await db.update("agents", {"id": agent_id}, {
-        "phone_numbers": numbers,
-        "metadata": {"telephony_provider": "multi"},
-    })
+    """Sync is a no-op — agents don't have a phone_numbers column. Agent-to-number
+    mapping is done via the phone_numbers table's assigned_agent_id column."""
+    pass
 
 
 async def _test_call_twilio(creds: dict, from_number: str, to_number: str) -> str:

@@ -73,11 +73,12 @@ export default function AiSdr() {
     staleTime: 30_000,
   });
 
-  const { data: voiceAgents } = useQuery({
+  const { data: voiceAgentsData } = useQuery({
     queryKey: ["cogniflow-agents-sdr"],
     queryFn: () => api.getAgents(),
     staleTime: 60_000,
   });
+  const voiceAgents = voiceAgentsData?.agents || [];
 
   const stats = agents?.stats || {};
   const pipeline = agents?.pipeline || {};
@@ -87,7 +88,7 @@ export default function AiSdr() {
     <div className="space-y-6">
       <PageHeader
         title="AI SDR"
-        subtitle="Multi-agent sales development — research, personalize, and send across email, WhatsApp, LinkedIn, and voice"
+        description="Multi-agent sales development — research, personalize, and send across email, WhatsApp, LinkedIn, and voice"
       />
 
       {/* Stats Row */}

@@ -343,7 +343,7 @@ export default function Contacts() {
                   style={{ borderColor: 'var(--border)' }}
                   onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-muted)'}
                   onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                  onClick={() => navigate(`/dashboard/contacts/${c.id}`)}>
+                  onClick={() => navigate(`/home/contacts/${c.id}`)}>
                   <td className="p-4 flex items-center gap-2.5">
                     <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'var(--accent-subtle)' }}>
                       <User size={13} style={{ color: 'var(--accent)' }} />
@@ -372,7 +372,7 @@ export default function Contacts() {
                   </td>
                   <td className="p-4">
                     <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/call?phone=${encodeURIComponent(c.phone_number)}`); }}
+                      <button onClick={(e) => { e.stopPropagation(); navigate(`/home/agents?call=${encodeURIComponent(c.phone_number)}`); }}
                         className="p-1 rounded-lg transition-all" style={{ color: 'var(--accent)' }}><Phone size={14} /></button>
                       <button onClick={(e) => { e.stopPropagation(); if (confirm("Delete this contact?")) deleteMut.mutate(c.id); }}
                         className="p-1 rounded-lg transition-all" style={{ color: 'var(--text-muted)' }}><Trash2 size={14} /></button>

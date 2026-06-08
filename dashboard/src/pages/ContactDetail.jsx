@@ -70,7 +70,7 @@ export default function ContactDetail() {
               </div>
               <div className="flex gap-3">
                 <Button size="sm" className="text-white" style={{ background: 'var(--accent)' }}
-                  onClick={() => navigate(`/dashboard/call?phone=${encodeURIComponent(contact.phone_number)}`)}>
+                  onClick={() => navigate(`/home/agents?call=${encodeURIComponent(contact.phone_number)}`)}>
                   <Phone size={12} /> Call
                 </Button>
                 {!editing && (
@@ -145,23 +145,18 @@ export default function ContactDetail() {
                   <div key={call.id} className="rounded-xl border p-4" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
                     <div className="flex justify-between text-sm mb-2">
                       <div className="flex gap-2">
-                        <Badge variant={call.direction === "inbound" ? "default" : "secondary"} className="text-[10px]">
-                          {call.direction}
+                        <Badge variant={call.status === "completed" ? "success" : "secondary"} className="text-[10px]">
+                          {call.status || "unknown"}
                         </Badge>
                         <span className="text-xs flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
                           <Clock size={10} />
                           {call.duration_seconds || 0}s
                         </span>
-                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{call.provider || "twilio"}</span>
                       </div>
                       <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                        {call.started_at ? new Date(call.started_at).toLocaleString() : ""}
+                        {call.started_at ? new Date(call.started_at).toLocaleString() : call.created_at ? new Date(call.created_at).toLocaleString() : ""}
                       </span>
                     </div>
-                    {call.summary && <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{call.summary}</p>}
-                    {call.disposition && (
-                      <Badge variant="outline" className="mt-2 text-[10px]">{call.disposition}</Badge>
-                    )}
                   </div>
                 ))}
               </div>

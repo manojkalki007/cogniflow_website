@@ -33,7 +33,7 @@ function CampaignCreateDialog({ open, onOpenChange, agents }) {
   });
 
   const uploadMut = useMutation({
-    mutationFn: (formData) => fetch("/api/campaigns/upload", { method: "POST", body: formData }).then(r => r.json()),
+    mutationFn: (formData) => api.createCampaign(Object.fromEntries(formData)),
     onSuccess: () => { queryClient.invalidateQueries(["campaigns"]); onOpenChange(false); setStep(1); },
   });
 

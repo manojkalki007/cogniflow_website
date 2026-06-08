@@ -186,22 +186,14 @@ async def api_campaign_analytics(campaign_id: str, auth: AuthContext = Depends(g
     total = len(calls)
     if total == 0:
         return {"total_calls": 0, "dispositions": {}, "conversion_rate": 0, "avg_duration": 0}
-    dispositions = {}
-    durations = []
-    sentiments = []
+    durations = [c["duration_seconds"] for c in calls if c.get("duration_seconds")]
+    statuses = {}
     for c in calls:
-        d = c.get("disposition", "unknown")
-        dispositions[d] = dispositions.get(d, 0) + 1
-        if c.get("duration_seconds"):
-            durations.append(c["duration_seconds"])
-        if c.get("sentiment_score") is not None:
-            sentiments.append(c["sentiment_score"])
-    interested = dispositions.get("interested", 0)
+        s = c.get("status", "unknown")
+        statuses[s] = statuses.get(s, 0) + 1
     return {
         "total_calls": total,
-        "dispositions": dispositions,
-        "conversion_rate": round(interested / total * 100, 1) if total else 0,
+        "statuses": statuses,
         "avg_duration": round(sum(durations) / len(durations), 1) if durations else 0,
-        "avg_sentiment": round(sum(sentiments) / len(sentiments), 2) if sentiments else 0,
-        "unique_contacts": len(set(c.get("caller_number", "") for c in calls)),
+        "unique_contacts": len(set(c.get("phone_number", "") for c in calls)),
     }

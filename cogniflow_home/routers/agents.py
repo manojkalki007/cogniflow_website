@@ -202,20 +202,16 @@ async def api_agent_performance(agent_id: str, auth: AuthContext = Depends(get_a
     calls = await db.select("calls", calls_match, order="created_at.desc", limit=200)
     total = len(calls)
     if total == 0:
-        return {"total_calls": 0, "avg_duration": 0, "avg_sentiment": 0, "conversion_rate": 0, "dispositions": {}}
+        return {"total_calls": 0, "avg_duration": 0, "statuses": {}}
     durations = [c.get("duration_seconds", 0) for c in calls if c.get("duration_seconds")]
-    sentiments = [c.get("sentiment_score", 0) for c in calls if c.get("sentiment_score") is not None]
-    dispositions = {}
+    statuses = {}
     for c in calls:
-        d = c.get("disposition", "unknown")
-        dispositions[d] = dispositions.get(d, 0) + 1
-    interested = dispositions.get("interested", 0)
+        s = c.get("status", "unknown")
+        statuses[s] = statuses.get(s, 0) + 1
     return {
         "total_calls": total,
         "avg_duration": round(sum(durations) / len(durations), 1) if durations else 0,
-        "avg_sentiment": round(sum(sentiments) / len(sentiments), 2) if sentiments else 0,
-        "conversion_rate": round(interested / total * 100, 1) if total else 0,
-        "dispositions": dispositions,
+        "statuses": statuses,
     }
 
 
@@ -229,7 +225,7 @@ async def api_test_agent_chat(agent_id: str, request: Request, auth: AuthContext
     agents = await db.select("agents", match)
     if not agents:
         return JSONResponse({"error": "Agent not found"}, status_code=404)
-    agent = agents[0]
+    agent = _unpack_agent(agents[0])
     body = await request.json()
     messages = body.get("messages", [])
     user_msg = body.get("message", "")
@@ -285,9 +281,14 @@ async def api_clone_agent(request: Request, auth: AuthContext = Depends(get_auth
         source = agents[0]
         if auth.tenant_id and source.get("tenant_id") != auth.tenant_id:
             return {"error": "Source agent not found"}
-        clone_fields = {k: v for k, v in source.items() if k not in ("id", "created_at", "updated_at")}
+        safe_cols = {"name", "description", "voice_id", "language", "status",
+                     "llm_model", "system_prompt", "welcome_message", "bolna_raw_config", "tenant_id"}
+        clone_fields = {k: v for k, v in source.items() if k in safe_cols}
         clone_fields["name"] = agent_name
-        clone_fields["metadata"] = {**(clone_fields.get("metadata") or {}), "cloned_from": source_agent_id}
+        raw = clone_fields.get("bolna_raw_config") or "{}"
+        meta = json.loads(raw) if isinstance(raw, str) else (raw or {})
+        meta["cloned_from"] = source_agent_id
+        clone_fields["bolna_raw_config"] = json.dumps(meta)
         if auth.tenant_id:
             clone_fields["tenant_id"] = auth.tenant_id
         result = await create_agent(clone_fields)
@@ -299,14 +300,15 @@ async def api_clone_agent(request: Request, auth: AuthContext = Depends(get_auth
     cloner = AgentCloner()
     try:
         system_prompt = await cloner.clone_from_recordings(recording_urls, agent_name)
-        agent_data = {
+        agent_data = _pack_agent_data({
             "name": agent_name,
             "instructions": system_prompt,
-            "is_active": True,
-            "metadata": {"cloned": True, "source_recordings": len(recording_urls)},
-        }
-        if auth.tenant_id:
-            agent_data["tenant_id"] = auth.tenant_id
+            "status": "active",
+        }, auth.tenant_id)
+        meta = json.loads(agent_data.get("bolna_raw_config", "{}"))
+        meta["cloned"] = True
+        meta["source_recordings"] = len(recording_urls)
+        agent_data["bolna_raw_config"] = json.dumps(meta)
         result = await create_agent(agent_data)
         return result or {"error": "Failed to save cloned agent"}
     except Exception:

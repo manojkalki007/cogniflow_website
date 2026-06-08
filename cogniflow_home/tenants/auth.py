@@ -235,8 +235,9 @@ async def get_auth_context(
             raise HTTPException(status_code=403, detail="Account suspended. Contact support@cogniflow.ai")
 
         import asyncio
+        from datetime import datetime, timezone
         asyncio.create_task(db.update("api_keys", {"id": key_row["id"]}, {
-            "last_used_at": "now()",
+            "last_used_at": datetime.now(timezone.utc).isoformat(),
             "total_requests": key_row.get("total_requests", 0) + 1,
         }))
 

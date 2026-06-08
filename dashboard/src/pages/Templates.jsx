@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import { api } from "../lib/api";
 import {
   Loader2, Eye, Rocket, Settings2, Sparkles, Globe, Flag,
   Wrench, Clock, MessageSquare, ArrowRight, CheckCircle2,
@@ -11,21 +12,6 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "../components/ui/dialog";
 import PageHeader from "../components/PageHeader";
-
-const BASE = import.meta.env.VITE_API_URL || "";
-const API_KEY = import.meta.env.VITE_API_KEY || "";
-
-async function request(path, options = {}) {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      "X-Api-Key": API_KEY,
-      ...options.headers,
-    },
-    ...options,
-  });
-  return res.json();
-}
 
 const LANGUAGE_LABELS = {
   en: "English", hi: "Hindi", ta: "Tamil", te: "Telugu",
@@ -111,11 +97,7 @@ function PreviewDialog({ open, onOpenChange, template }) {
   const [deployResult, setDeployResult] = useState(null);
 
   const deployMut = useMutation({
-    mutationFn: (body) =>
-      request(`/api/templates/${template?.id}/deploy`, {
-        method: "POST",
-        body: JSON.stringify(body),
-      }),
+    mutationFn: (body) => api.deployTemplate(template?.id, body),
     onSuccess: (data) => setDeployResult(data),
   });
 
@@ -312,7 +294,7 @@ export default function Templates() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["templates"],
-    queryFn: () => request("/api/templates"),
+    queryFn: () => api.getTemplates(),
   });
 
   const templates = data?.templates || [];

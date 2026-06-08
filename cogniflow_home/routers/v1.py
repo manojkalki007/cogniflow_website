@@ -104,12 +104,10 @@ async def v1_call_status(call_sid: str, auth: AuthContext = Depends(get_auth_con
     return {
         "callSid": call_sid,
         "status": call.get("status", "completed"),
-        "duration": call.get("duration"),
+        "duration": call.get("duration_seconds"),
         "transcript": call.get("transcript"),
-        "summary": call.get("summary"),
-        "endedReason": call.get("ended_reason"),
         "recordingUrl": call.get("recording_url"),
-        "startedAt": call.get("created_at"),
+        "startedAt": call.get("started_at") or call.get("created_at"),
         "endedAt": call.get("ended_at"),
     }
 

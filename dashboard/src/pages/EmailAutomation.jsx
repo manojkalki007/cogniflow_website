@@ -197,12 +197,12 @@ export default function EmailAutomation() {
                     {emailCalls.map((call, i) => (
                       <TableRow key={i}>
                         <TableCell className="font-mono text-xs" style={{ color: 'var(--text-secondary)' }}>
-                          {call.call_id?.slice(0, 8)}...
+                          {call.id?.slice(0, 8)}...
                         </TableCell>
-                        <TableCell>{call.caller_number || "N/A"}</TableCell>
+                        <TableCell>{call.phone_number || "N/A"}</TableCell>
                         <TableCell>
-                          <Badge variant={call.direction === "inbound" ? "default" : "secondary"}>
-                            {call.direction}
+                          <Badge variant={call.status === "completed" ? "success" : "secondary"}>
+                            {call.status || "unknown"}
                           </Badge>
                         </TableCell>
                         <TableCell>{call.duration_seconds ? `${call.duration_seconds}s` : "N/A"}</TableCell>

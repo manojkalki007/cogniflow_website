@@ -98,7 +98,7 @@ class FunnelTracker:
         if estimated and estimated > 0:
             update["estimated_revenue"] = estimated
 
-        await db.update("calls", {"id": call_id}, update)
+        await db.update("calls", {"bolna_call_id": call_id}, update)
         logger.info(
             f"Call {call_id} classified: {stage} "
             f"(value: ₹{estimated}, confidence: {analysis.get('confidence', 0)})"
@@ -112,7 +112,7 @@ class FunnelTracker:
 
 
 async def handle_deal_closed(deal_id: str, amount: float, contact_phone: str):
-    calls = await db.select("calls", {"caller_number": contact_phone})
+    calls = await db.select("calls", {"phone_number": contact_phone})
     qualified = [
         c for c in calls
         if c.get("funnel_stage") in ("lead_qualified", "appointment_booked")

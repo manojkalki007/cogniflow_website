@@ -70,19 +70,16 @@ function DNCSection() {
   const queryClient = useQueryClient();
   const [phone, setPhone] = useState("");
 
-  const { data } = useQuery({ queryKey: ["dnc"], queryFn: () => fetch("/api/dnc").then((r) => r.json()) });
+  const { data } = useQuery({ queryKey: ["dnc"], queryFn: () => api.getDNC() });
   const dncList = data?.dnc_list || [];
 
   const addMut = useMutation({
-    mutationFn: () => fetch("/api/dnc", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone_number: phone }),
-    }).then((r) => r.json()),
+    mutationFn: () => api.addDNC(phone),
     onSuccess: () => { queryClient.invalidateQueries(["dnc"]); setPhone(""); },
   });
 
   const removeMut = useMutation({
-    mutationFn: (number) => fetch(`/api/dnc/${encodeURIComponent(number)}`, { method: "DELETE" }).then((r) => r.json()),
+    mutationFn: (number) => api.removeDNC(number),
     onSuccess: () => queryClient.invalidateQueries(["dnc"]),
   });
 
@@ -128,11 +125,21 @@ function ImportSection() {
   const handleImport = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await fetch("/api/contacts/import", { method: "POST", body: fd });
-    const data = await res.json();
-    setResult(data);
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const text = ev.target.result;
+      const lines = text.split("\n").filter(Boolean);
+      const headers = lines[0].split(",").map(h => h.trim().toLowerCase());
+      const contacts = lines.slice(1).map(line => {
+        const vals = line.split(",").map(v => v.trim());
+        const obj = {};
+        headers.forEach((h, i) => { obj[h] = vals[i] || ""; });
+        return { name: obj.name || "", phone_number: obj.phone || obj.phone_number || "", email: obj.email || "", company: obj.company || "" };
+      }).filter(c => c.phone_number);
+      const data = await api.importContacts(contacts);
+      setResult(data);
+    };
+    reader.readAsText(file);
   };
 
   return (
