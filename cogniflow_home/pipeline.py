@@ -298,6 +298,7 @@ class VoicePipeline:
         self.on_latency = None
         self._speak_lock = asyncio.Lock()
         self._pending_final_task: asyncio.Task | None = None
+        self._end_requested: bool = False
 
         self._enable_memory = enable_memory
         self._enable_prediction = enable_prediction
@@ -309,8 +310,10 @@ class VoicePipeline:
         self._enable_filler = enable_filler
 
         from cogniflow_home.providers.tools import TOOL_DEFINITIONS
+        _ALWAYS_AVAILABLE = {"schedule_callback", "end_call"}
         if tools_enabled is not None:
-            self._tools = [t for t in TOOL_DEFINITIONS if t["function"]["name"] in tools_enabled]
+            allowed = set(tools_enabled) | _ALWAYS_AVAILABLE
+            self._tools = [t for t in TOOL_DEFINITIONS if t["function"]["name"] in allowed]
         else:
             self._tools = TOOL_DEFINITIONS
 
@@ -612,6 +615,10 @@ class VoicePipeline:
             await self._generate_and_speak(redacted, eot_ts=eot_ts)
 
         await self.tracer.check_alert()
+
+        if self._end_requested:
+            logger.info(f"End-call requested for {self.state.call_sid} — stopping pipeline")
+            await self.stop()
 
     async def _call_timeout_watchdog(self):
         """Auto-stop pipeline after 45 minutes to prevent zombie calls."""

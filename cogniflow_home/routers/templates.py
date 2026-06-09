@@ -73,7 +73,7 @@ async def api_deploy_template(template_id: str, request: Request, auth: AuthCont
         "llm_model": llm_model,
         "tts_provider": tts_provider,
         "voice_id": body.get("voice_id", tpl["persona"].get("voice_id", "")),
-        "tools_enabled": tpl.get("tools_used", []),
+        "tools_enabled": list({*tpl.get("tools_used", []), "schedule_callback", "end_call"}),
         "metadata": {"template_id": template_id},
     }
     if auth.tenant_id:

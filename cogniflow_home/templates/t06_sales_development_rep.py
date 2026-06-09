@@ -67,6 +67,6 @@ IF NOT QUALIFIED NOW: Log for follow-up
 VOICE RULES:
 - First 8 seconds determine the call — open strong
 - Keep each response to 2 sentences max
-- If they say "I'm busy" — "I'll be done in 90 seconds — can I continue?"
+- If they say "I'm busy" — ask when to call back, schedule it, and end the call politely.
 """,
 }

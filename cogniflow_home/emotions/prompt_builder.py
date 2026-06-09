@@ -45,6 +45,20 @@ DO NOT:
 """
 
 
+CALLBACK_RULES = """
+CALLBACK HANDLING (MANDATORY — overrides all other goals):
+When the caller says they are busy, not free, in a meeting, driving, occupied,
+or asks to be called back later:
+1. IMMEDIATELY stop your current pitch or conversation topic. Do NOT push further.
+2. Ask: "When would be a good time to call you back?"
+3. If they give a vague time like "later" or "not now", suggest a specific option:
+   "How about this evening?" or "Would tomorrow morning work?"
+4. Once they give a time, confirm it: "I'll call you back at [time]. Does that work?"
+5. After confirmation, call schedule_callback, then say a brief goodbye and call end_call.
+6. Maximum 2 exchanges: ask for time → confirm → schedule → end. No extra questions.
+"""
+
+
 def build_emotion_context(caller_emotion: str, intensity: float) -> str:
     """
     Generate the emotion context block that gets injected into
@@ -119,5 +133,7 @@ def build_system_prompt(
     return f"""{base_prompt}
 
 {VOICE_STYLE_RULES}
+
+{CALLBACK_RULES}
 
 {emotion_profile_instructions}"""

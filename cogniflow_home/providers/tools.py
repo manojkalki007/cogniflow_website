@@ -164,6 +164,53 @@ TOOL_DEFINITIONS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "schedule_callback",
+            "description": (
+                "Schedule a callback when the caller says they are busy, not free, "
+                "in a meeting, driving, or asks to be called back later. Extract the "
+                "preferred callback time from the conversation. Always confirm the "
+                "time with the caller before calling this tool."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "callback_time": {
+                        "type": "string",
+                        "description": "When to call back (e.g. '2026-06-10T15:00', 'tomorrow 3pm', 'in 2 hours', 'evening')",
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Why the caller wants a callback (e.g. 'busy in a meeting', 'driving')",
+                    },
+                },
+                "required": ["callback_time"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "end_call",
+            "description": (
+                "End the current call gracefully. Use ONLY after schedule_callback "
+                "has been confirmed, or when the caller explicitly wants to hang up. "
+                "Say a brief polite goodbye BEFORE calling this tool."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "description": "Why the call is ending (e.g. 'callback scheduled', 'caller requested')",
+                    },
+                },
+                "required": ["reason"],
+            },
+        },
+    },
 ]
 
 
@@ -385,6 +432,56 @@ async def _push_to_leadrat(args: dict, ctx: dict) -> str:
     return await handle_push_to_leadrat(args, ctx)
 
 
+async def _schedule_callback(args: dict, ctx: dict) -> str:
+    caller = ctx.get("caller_number", "")
+    callback_time = args.get("callback_time", "")
+    reason = args.get("reason", "")
+
+    if not callback_time:
+        return "I need a time to schedule the callback. When would you like us to call back?"
+
+    callback_record = {
+        "phone_number": caller,
+        "callback_time": callback_time,
+        "reason": reason,
+        "call_id": ctx.get("call_id", ""),
+        "agent_id": ctx.get("agent_id", ""),
+        "tenant_id": ctx.get("tenant_id", ""),
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    try:
+        await db.insert("callbacks", callback_record)
+    except Exception:
+        logger.debug("callbacks table insert failed, saving to contacts metadata", exc_info=True)
+        if caller:
+            await db.update("contacts", {"phone_number": caller}, {
+                "metadata": {"pending_callback": callback_record},
+            })
+
+    await bus.emit("callback.scheduled", callback_record)
+
+    return f"Callback scheduled for {callback_time}. You may now end the call politely."
+
+
+async def _end_call(args: dict, ctx: dict) -> str:
+    call_id = ctx.get("call_id", "")
+    reason = args.get("reason", "caller requested")
+
+    await bus.emit("call.end_requested", {
+        "call_id": call_id,
+        "reason": reason,
+    })
+
+    from cogniflow_home.state import active_calls
+    pipeline = active_calls.get(call_id)
+    if pipeline:
+        pipeline._end_requested = True
+
+    return ""
+
+
 TOOL_HANDLERS = {
     "book_appointment": _book_appointment,
     "transfer_call": _transfer_call,
@@ -394,4 +491,6 @@ TOOL_HANDLERS = {
     "check_availability": _check_availability,
     "create_payment_link": _create_payment_link,
     "push_to_leadrat": _push_to_leadrat,
+    "schedule_callback": _schedule_callback,
+    "end_call": _end_call,
 }
