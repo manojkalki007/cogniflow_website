@@ -129,7 +129,66 @@ async def on_followup_scheduled(event: str, data: dict[str, Any]):
         logger.info(f"Callback scheduled for {phone}: {details} ({when})")
 
 
+async def on_call_completed_wa(event: str, data: dict[str, Any]):
+    """Send WhatsApp follow-up after a call if the agent has it enabled."""
+    phone = data.get("caller_number", "")
+    tenant_id = data.get("tenant_id", "")
+    agent_id = data.get("agent_id", "")
+    if not phone or not tenant_id or not agent_id:
+        return
+
+    import json
+    agents = await db.select("agents", {"id": agent_id}, limit=1)
+    if not agents:
+        return
+    raw = agents[0].get("bolna_raw_config") or "{}"
+    meta = json.loads(raw) if isinstance(raw, str) else (raw or {})
+    ic = meta.get("integration_config", {})
+    if not ic.get("enable_wa_post_call_followup"):
+        return
+
+    try:
+        from cogniflow_home.whatsapp.tool import get_whatsapp
+        wa = await get_whatsapp(tenant_id)
+        try:
+            summary = (data.get("summary") or "our recent conversation")[:100]
+            await wa.send_template(
+                to_phone=phone,
+                template_name="appointment_confirmation",
+                parameters=[summary, "follow-up", "soon"],
+            )
+            logger.info(f"Post-call WhatsApp follow-up sent to {phone}")
+        finally:
+            await wa.close()
+    except Exception:
+        logger.debug(f"Post-call WA follow-up failed for {phone}", exc_info=True)
+
+
+async def on_callback_scheduled_wa(event: str, data: dict[str, Any]):
+    """Notify the caller via WhatsApp when a callback is scheduled."""
+    phone = data.get("phone_number", "")
+    callback_time = data.get("callback_time", "")
+    tenant_id = data.get("tenant_id", "")
+    if not phone or not tenant_id:
+        return
+    try:
+        from cogniflow_home.whatsapp.tool import get_whatsapp
+        wa = await get_whatsapp(tenant_id)
+        try:
+            await wa.send_text(
+                phone,
+                f"We'll call you back at {callback_time}. Reply here if you need to reschedule.",
+            )
+            logger.info(f"Callback notification sent to {phone}")
+        finally:
+            await wa.close()
+    except Exception:
+        logger.debug(f"Callback WA notification failed for {phone}", exc_info=True)
+
+
 def register():
     bus.on("appointment.booked", on_appointment_booked)
     bus.on("followup.scheduled", on_followup_scheduled)
-    logger.info("Notification confirmations registered (email + WhatsApp)")
+    bus.on("call.completed", on_call_completed_wa)
+    bus.on("callback.scheduled", on_callback_scheduled_wa)
+    logger.info("Notification confirmations registered (email + WhatsApp + proactive)")

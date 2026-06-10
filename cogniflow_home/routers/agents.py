@@ -32,7 +32,7 @@ _AGENT_EXTRA_FIELDS = {
     "emotion_profile", "voice_gender", "stt_language", "endpointing_ms", "smart_format",
     "max_tokens", "silence_timeout", "enable_recording", "enable_barge_in",
     "enable_speculative", "enable_filler", "webhook_url", "fallback_message",
-    "max_retries", "concurrent_call_limit",
+    "max_retries", "concurrent_call_limit", "integration_config",
 }
 
 

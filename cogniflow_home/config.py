@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     # WhatsApp Business API
     whatsapp_api_key: str = ""
     whatsapp_api_url: str = "https://graph.facebook.com/v18.0"
+    whatsapp_verify_token: str = "cogniflow_wa_verify"
+    whatsapp_app_secret: str = ""
 
     # Webhooks
     webhook_secret: str = ""

@@ -226,6 +226,17 @@ export const api = {
   testWhatsApp: (toPhone, template = "appointment_confirmation") =>
     request("/api/test-whatsapp", { method: "POST", body: JSON.stringify({ to_phone: toPhone, template }) }),
 
+  // WhatsApp Chat
+  getWhatsAppConversations: () => request("/api/whatsapp/conversations"),
+  getWhatsAppMessages: (phone) => request(`/api/whatsapp/conversations/${encodeURIComponent(phone)}`),
+  resolveWhatsAppConversation: (phone) =>
+    request(`/api/whatsapp/conversations/${encodeURIComponent(phone)}/resolve`, { method: "POST" }),
+  sendWhatsAppReply: (phone, text) =>
+    request(`/api/whatsapp/conversations/${encodeURIComponent(phone)}/reply`, {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    }),
+
   // Phone Numbers
   getPhoneNumbers: () => request("/api/phone-numbers"),
   setupPhoneNumber: (data) =>

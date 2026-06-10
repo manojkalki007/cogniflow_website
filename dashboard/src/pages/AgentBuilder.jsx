@@ -89,6 +89,9 @@ const AVAILABLE_TOOLS = [
   { id: "send_whatsapp", label: "Send WhatsApp", icon: MessageCircle, desc: "Send WhatsApp messages & templates" },
   { id: "check_availability", label: "Check Calendar", icon: Clock, desc: "Check available time slots in real-time" },
   { id: "create_payment_link", label: "Payment Link", icon: CreditCard, desc: "Generate Razorpay payment links" },
+  { id: "query_crm", label: "CRM Lookup", icon: Users, desc: "Look up caller info in your CRM during calls" },
+  { id: "update_crm", label: "CRM Update", icon: Eye, desc: "Update notes and activity in CRM" },
+  { id: "send_email", label: "Send Email", icon: Mail, desc: "Compose and send emails during calls" },
 ];
 
 const FEATURE_TOGGLES = [
@@ -122,6 +125,7 @@ const NAV_SECTIONS = [
   { id: "agent", icon: MessageSquare, label: "Agent" },
   { id: "call", icon: Phone, label: "Call Settings" },
   { id: "tools", icon: Wrench, label: "Tools" },
+  { id: "integrations", icon: Link, label: "Integrations" },
   { id: "features", icon: Sparkles, label: "Features" },
   { id: "advanced", icon: Code2, label: "Advanced" },
 ];
@@ -161,6 +165,14 @@ const defaultForm = {
   fallback_message: "I'm sorry, I'm having trouble right now. Could you repeat that?",
   max_retries: 3,
   concurrent_call_limit: 5,
+  integration_config: {
+    crm_provider: "none",
+    calcom_event_type_id: "",
+    whatsapp_phone_number_id: "",
+    email_from_name: "",
+    enable_crm_lookup: false,
+    enable_crm_logging: true,
+  },
 };
 
 /* ─────────────────────────────────────────────
@@ -1385,6 +1397,147 @@ function FeaturesSection({ form, set }) {
 }
 
 /* ─────────────────────────────────────────────
+   SECTION: INTEGRATIONS
+   ───────────────────────────────────────────── */
+
+const CRM_PROVIDERS = [
+  { id: "none", label: "None" },
+  { id: "hubspot", label: "HubSpot" },
+  { id: "salesforce", label: "Salesforce" },
+  { id: "leadrat", label: "LeadRat" },
+];
+
+function IntegrationsSection({ form, set }) {
+  const ic = form.integration_config || {};
+  const setIC = useCallback((key, value) => {
+    set("integration_config", { ...ic, [key]: value });
+  }, [ic, set]);
+
+  return (
+    <div className="space-y-8">
+      <SectionTitle title="Integrations" subtitle="Connect this agent to your CRM, calendar, WhatsApp, and email." />
+
+      {/* CRM */}
+      <div className="rounded-xl border p-5" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+        <div className="flex items-center gap-2.5 mb-4">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--accent-subtle)" }}>
+            <Users size={15} style={{ color: "var(--accent)" }} />
+          </div>
+          <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>CRM</span>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <SectionLabel className="mb-2">CRM Provider</SectionLabel>
+            <select
+              value={ic.crm_provider || "none"}
+              onChange={(e) => setIC("crm_provider", e.target.value)}
+              className={inputClass}
+              style={inputStyle}
+            >
+              {CRM_PROVIDERS.map((p) => (
+                <option key={p.id} value={p.id}>{p.label}</option>
+              ))}
+            </select>
+            <p className="text-[10px] mt-1.5" style={{ color: "var(--text-muted)" }}>
+              Select which CRM this agent uses. Credentials are configured in Settings &gt; Integrations.
+            </p>
+          </div>
+
+          {ic.crm_provider && ic.crm_provider !== "none" && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 rounded-lg border" style={{ borderColor: "var(--border)" }}>
+                <div>
+                  <div className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>Look up caller before call</div>
+                  <div className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>Inject caller's CRM info into agent context</div>
+                </div>
+                <Toggle checked={!!ic.enable_crm_lookup} onChange={(v) => setIC("enable_crm_lookup", v)} />
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg border" style={{ borderColor: "var(--border)" }}>
+                <div>
+                  <div className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>Log calls to CRM</div>
+                  <div className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>Auto-log call summary after completion</div>
+                </div>
+                <Toggle checked={ic.enable_crm_logging !== false} onChange={(v) => setIC("enable_crm_logging", v)} />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Cal.com */}
+      <div className="rounded-xl border p-5" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+        <div className="flex items-center gap-2.5 mb-4">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(245, 158, 11, 0.1)" }}>
+            <Calendar size={15} style={{ color: "var(--warning)" }} />
+          </div>
+          <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>Cal.com</span>
+        </div>
+        <div>
+          <SectionLabel className="mb-2">Event Type ID</SectionLabel>
+          <input
+            value={ic.calcom_event_type_id || ""}
+            onChange={(e) => setIC("calcom_event_type_id", e.target.value)}
+            className={inputClass + " font-mono text-xs"}
+            style={inputStyle}
+            placeholder="e.g. 123456"
+          />
+          <p className="text-[10px] mt-1.5" style={{ color: "var(--text-muted)" }}>
+            Override the default Cal.com event type for this agent's bookings.
+          </p>
+        </div>
+      </div>
+
+      {/* WhatsApp */}
+      <div className="rounded-xl border p-5" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+        <div className="flex items-center gap-2.5 mb-4">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(37, 211, 102, 0.1)" }}>
+            <MessageCircle size={15} className="text-[#25D366]" />
+          </div>
+          <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>WhatsApp</span>
+        </div>
+        <div>
+          <SectionLabel className="mb-2">Phone Number ID</SectionLabel>
+          <input
+            value={ic.whatsapp_phone_number_id || ""}
+            onChange={(e) => setIC("whatsapp_phone_number_id", e.target.value)}
+            className={inputClass + " font-mono text-xs"}
+            style={inputStyle}
+            placeholder="e.g. 1234567890"
+          />
+          <p className="text-[10px] mt-1.5" style={{ color: "var(--text-muted)" }}>
+            Meta WhatsApp Business phone number ID. Used for outbound messages and incoming chat routing.
+          </p>
+        </div>
+      </div>
+
+      {/* Email */}
+      <div className="rounded-xl border p-5" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+        <div className="flex items-center gap-2.5 mb-4">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(99, 102, 241, 0.1)" }}>
+            <Mail size={15} style={{ color: "var(--accent)" }} />
+          </div>
+          <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>Email</span>
+        </div>
+        <div>
+          <SectionLabel className="mb-2">From Name</SectionLabel>
+          <input
+            value={ic.email_from_name || ""}
+            onChange={(e) => setIC("email_from_name", e.target.value)}
+            className={inputClass}
+            style={inputStyle}
+            placeholder="e.g. Dr. Sharma Clinic"
+          />
+          <p className="text-[10px] mt-1.5" style={{ color: "var(--text-muted)" }}>
+            Override the "From" name on emails sent by this agent. Leave empty for default.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
    SECTION: ADVANCED
    ───────────────────────────────────────────── */
 
@@ -1630,6 +1783,10 @@ export default function AgentBuilder() {
         fallback_message: agentData.fallback_message || defaultForm.fallback_message,
         max_retries: agentData.max_retries ?? 3,
         concurrent_call_limit: agentData.concurrent_call_limit ?? 5,
+        integration_config: {
+          ...defaultForm.integration_config,
+          ...(agentData.integration_config || {}),
+        },
       };
       setForm(populated);
       setInitialForm(populated);
@@ -1762,6 +1919,8 @@ export default function AgentBuilder() {
         return <CallSettingsSection form={form} set={set} />;
       case "tools":
         return <ToolsSection form={form} set={set} />;
+      case "integrations":
+        return <IntegrationsSection form={form} set={set} />;
       case "features":
         return <FeaturesSection form={form} set={set} />;
       case "advanced":

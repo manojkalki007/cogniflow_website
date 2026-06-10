@@ -167,6 +167,56 @@ TOOL_DEFINITIONS = [
     {
         "type": "function",
         "function": {
+            "name": "query_crm",
+            "description": "Look up a contact or lead in the CRM by phone number or email. Use this to get context about who you're speaking with.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "phone": {"type": "string", "description": "Phone number to search"},
+                    "email": {"type": "string", "description": "Email to search"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_crm",
+            "description": "Update CRM with notes or activity from this call. Use after gathering important information.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": ["add_note", "log_activity"],
+                        "description": "Type of CRM update",
+                    },
+                    "note": {"type": "string", "description": "Note or activity details to record"},
+                },
+                "required": ["action", "note"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "send_email",
+            "description": "Send a personalized email to the caller. Use when they request information in writing or ask for something to be emailed.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "to_email": {"type": "string", "description": "Recipient email address"},
+                    "subject": {"type": "string", "description": "Email subject line"},
+                    "body": {"type": "string", "description": "Email body content in plain text"},
+                },
+                "required": ["to_email", "subject", "body"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "schedule_callback",
             "description": (
                 "Schedule a callback when the caller says they are busy, not free, "
@@ -205,6 +255,35 @@ TOOL_DEFINITIONS = [
                     "reason": {
                         "type": "string",
                         "description": "Why the call is ending (e.g. 'callback scheduled', 'caller requested')",
+                    },
+                },
+                "required": ["reason"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "handoff_to_human",
+            "description": (
+                "Escalate this conversation to a human agent. Use when the user "
+                "explicitly asks to speak with a person, or when you cannot resolve "
+                "their issue after reasonable attempts."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "department": {
+                        "type": "string",
+                        "description": "Department to route to (sales, support, billing)",
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Why the conversation needs a human",
+                    },
+                    "summary": {
+                        "type": "string",
+                        "description": "Brief summary of the conversation so far",
                     },
                 },
                 "required": ["reason"],
@@ -432,6 +511,145 @@ async def _push_to_leadrat(args: dict, ctx: dict) -> str:
     return await handle_push_to_leadrat(args, ctx)
 
 
+async def _query_crm(args: dict, ctx: dict) -> str:
+    tenant_id = ctx.get("tenant_id", "")
+    config = ctx.get("integration_config", {})
+    crm = config.get("crm_provider", "")
+    phone = args.get("phone", ctx.get("caller_number", ""))
+    email = args.get("email", "")
+
+    if crm == "hubspot":
+        try:
+            from cogniflow_home.integrations.hubspot import get_hubspot
+            client = await get_hubspot(tenant_id)
+            contact = await client.find_contact_by_phone(phone)
+            if contact:
+                props = contact.get("properties", {})
+                name = f"{props.get('firstname', '')} {props.get('lastname', '')}".strip()
+                parts = []
+                if name:
+                    parts.append(f"Name: {name}")
+                if props.get("company"):
+                    parts.append(f"Company: {props['company']}")
+                if props.get("lifecyclestage"):
+                    parts.append(f"Stage: {props['lifecyclestage']}")
+                if props.get("email"):
+                    parts.append(f"Email: {props['email']}")
+                return f"CRM contact found. {', '.join(parts)}."
+            return "No matching contact found in HubSpot."
+        except Exception:
+            logger.exception("HubSpot CRM lookup failed")
+            return "I wasn't able to check the CRM right now."
+
+    elif crm == "salesforce":
+        try:
+            from cogniflow_home.integrations.salesforce import get_salesforce
+            client = await get_salesforce(tenant_id)
+            contact = await client.find_contact(phone)
+            if contact:
+                return f"CRM contact found. Name: {contact.get('Name', '')}, Account: {contact.get('Account', {}).get('Name', '')}."
+            lead = await client.find_lead(phone)
+            if lead:
+                return f"CRM lead found. Name: {lead.get('Name', '')}, Company: {lead.get('Company', '')}, Status: {lead.get('Status', '')}."
+            return "No matching contact or lead found in Salesforce."
+        except Exception:
+            logger.exception("Salesforce CRM lookup failed")
+            return "I wasn't able to check the CRM right now."
+
+    elif crm == "leadrat":
+        return "LeadRat is a write-only CRM. Use push_to_leadrat to save leads."
+
+    return "CRM is not configured for this agent."
+
+
+async def _update_crm(args: dict, ctx: dict) -> str:
+    tenant_id = ctx.get("tenant_id", "")
+    config = ctx.get("integration_config", {})
+    crm = config.get("crm_provider", "")
+    action = args.get("action", "add_note")
+    note = args.get("note", "")
+    caller = ctx.get("caller_number", "")
+
+    if not note:
+        return "I need some details to record. What should I note?"
+
+    if crm == "hubspot":
+        try:
+            from cogniflow_home.integrations.hubspot import get_hubspot
+            client = await get_hubspot(tenant_id)
+            contact = await client.find_contact_by_phone(caller)
+            if contact:
+                contact_id = contact.get("id", "")
+                await client.log_call(
+                    contact_id=contact_id,
+                    summary=note,
+                    transcript=note,
+                    duration_ms=0,
+                    direction="INBOUND",
+                )
+                return "Note recorded in HubSpot."
+            return "Couldn't find the contact in HubSpot to update."
+        except Exception:
+            logger.exception("HubSpot CRM update failed")
+            return "I wasn't able to update the CRM right now."
+
+    elif crm == "salesforce":
+        try:
+            from cogniflow_home.integrations.salesforce import get_salesforce
+            client = await get_salesforce(tenant_id)
+            contact = await client.find_contact(caller)
+            who_id = contact.get("Id", "") if contact else ""
+            if not who_id:
+                lead = await client.find_lead(caller)
+                who_id = lead.get("Id", "") if lead else ""
+            if who_id:
+                await client.create_task(
+                    who_id=who_id,
+                    subject=f"Call note: {note[:50]}",
+                    description=note,
+                )
+                return "Note recorded in Salesforce."
+            return "Couldn't find the contact in Salesforce to update."
+        except Exception:
+            logger.exception("Salesforce CRM update failed")
+            return "I wasn't able to update the CRM right now."
+
+    elif crm == "leadrat":
+        return "Use the push_to_leadrat tool to save data to LeadRat."
+
+    return "CRM is not configured for this agent."
+
+
+async def _send_email(args: dict, ctx: dict) -> str:
+    to_email = args.get("to_email", "")
+    if not to_email:
+        return "I need an email address to send to. Could you share your email?"
+
+    subject = args.get("subject", "Information from your call")
+    body = args.get("body", "")
+    if not body:
+        return "I need some content for the email. What would you like me to include?"
+
+    tenant_id = ctx.get("tenant_id", "")
+    config = ctx.get("integration_config", {})
+    from_name = config.get("email_from_name", "")
+
+    from html import escape
+    safe_body = escape(body).replace("\n", "<br>")
+
+    html_body = f"""<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; color: #1a1a1a;">
+<p style="font-size: 15px; line-height: 1.6;">{safe_body}</p>
+<hr style="border: none; border-top: 1px solid #eee; margin: 24px 0 16px;">
+<p style="color: #aaa; font-size: 11px; text-align: center;">Sent via Cogniflow</p>
+</div>"""
+
+    from cogniflow_home.integrations.email import email_sender
+    sent = await email_sender.send(to_email, subject, html_body, text_body=body, tenant_id=tenant_id)
+    if sent:
+        return f"Email sent to {to_email} with subject '{subject}'."
+    return "I wasn't able to send the email right now. I've noted it for follow-up."
+
+
 async def _schedule_callback(args: dict, ctx: dict) -> str:
     caller = ctx.get("caller_number", "")
     callback_time = args.get("callback_time", "")
@@ -482,6 +700,46 @@ async def _end_call(args: dict, ctx: dict) -> str:
     return ""
 
 
+async def _handoff_to_human(args: dict, ctx: dict) -> str:
+    tenant_id = ctx.get("tenant_id", "")
+    agent_id = ctx.get("agent_id", "")
+    phone = ctx.get("caller_number", "")
+    reason = args.get("reason", "")
+    department = args.get("department", "support")
+    summary = args.get("summary", "")
+
+    if phone and tenant_id:
+        try:
+            existing = await db.select("whatsapp_conversations", {
+                "tenant_id": tenant_id,
+                "agent_id": agent_id,
+                "phone_number": phone,
+            }, limit=1)
+            if existing:
+                import json as _json
+                await db.update("whatsapp_conversations", {"id": existing[0]["id"]}, {
+                    "status": "escalated",
+                    "metadata": _json.dumps({
+                        "escalation_reason": reason,
+                        "escalation_department": department,
+                        "escalation_summary": summary,
+                    }),
+                })
+        except Exception:
+            logger.exception("Failed to escalate conversation")
+
+    await bus.emit("whatsapp.handoff.requested", {
+        "tenant_id": tenant_id,
+        "agent_id": agent_id,
+        "phone_number": phone,
+        "department": department,
+        "reason": reason,
+        "summary": summary,
+    })
+
+    return "I'm connecting you with a team member who can help further. They'll respond shortly."
+
+
 TOOL_HANDLERS = {
     "book_appointment": _book_appointment,
     "transfer_call": _transfer_call,
@@ -491,6 +749,10 @@ TOOL_HANDLERS = {
     "check_availability": _check_availability,
     "create_payment_link": _create_payment_link,
     "push_to_leadrat": _push_to_leadrat,
+    "query_crm": _query_crm,
+    "update_crm": _update_crm,
+    "send_email": _send_email,
     "schedule_callback": _schedule_callback,
     "end_call": _end_call,
+    "handoff_to_human": _handoff_to_human,
 }

@@ -17,6 +17,7 @@ from cogniflow_home.routers.benchmarks import router as benchmarks_router
 from cogniflow_home.routers.v1 import router as v1_router
 from cogniflow_home.routers.numbers import router as numbers_router
 from cogniflow_home.routers.callbacks import router as callbacks_router
+from cogniflow_home.routers.whatsapp import router as whatsapp_router
 
 all_routers = [
     health_router,
@@ -36,4 +37,5 @@ all_routers = [
     v1_router,
     numbers_router,
     callbacks_router,
+    whatsapp_router,
 ]

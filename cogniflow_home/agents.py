@@ -8,8 +8,9 @@ configured in agent.py. Add agents via the API or database.
 Future: route inbound calls to different agents based on the called number.
 """
 
+import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from cogniflow_home.agent import AGENT_INSTRUCTIONS, AGENT_NAME, GREETING, LANGUAGE, VOICE_ID
 from cogniflow_home.db.supabase import db
@@ -37,6 +38,7 @@ class AgentConfig:
     enable_barge_in: bool = True
     enable_speculative: bool = True
     enable_filler: bool = True
+    integration_config: dict = field(default_factory=dict)
 
 
 DEFAULT_AGENT = AgentConfig(
@@ -61,6 +63,18 @@ def _agent_from_row(agent: dict) -> AgentConfig:
         or agent.get("metadata", {}).get("greeting")
         or GREETING
     )
+
+    raw = agent.get("bolna_raw_config")
+    meta = {}
+    if raw:
+        if isinstance(raw, str):
+            try:
+                meta = json.loads(raw)
+            except Exception:
+                meta = {}
+        elif isinstance(raw, dict):
+            meta = raw
+
     return AgentConfig(
         id=agent["id"],
         name=agent["name"],
@@ -69,17 +83,18 @@ def _agent_from_row(agent: dict) -> AgentConfig:
         voice_id=agent.get("voice_id", VOICE_ID),
         language=agent.get("language", "en"),
         tenant_id=agent.get("tenant_id", ""),
-        emotion_profile=agent.get("emotion_profile", "friendly"),
-        voice_gender=agent.get("voice_gender", "female"),
+        emotion_profile=meta.get("emotion_profile", agent.get("emotion_profile", "friendly")),
+        voice_gender=meta.get("voice_gender", agent.get("voice_gender", "female")),
         tools_enabled=agent.get("tools_enabled"),
-        enable_memory=agent.get("enable_memory", True),
-        enable_prediction=agent.get("enable_prediction", True),
-        enable_emotion=agent.get("enable_emotion", True),
-        enable_language_switch=agent.get("enable_language_switch", True),
-        enable_rag=agent.get("enable_rag", False),
-        enable_barge_in=agent.get("enable_barge_in", True),
-        enable_speculative=agent.get("enable_speculative", True),
-        enable_filler=agent.get("enable_filler", True),
+        enable_memory=meta.get("enable_memory", agent.get("enable_memory", True)),
+        enable_prediction=meta.get("enable_prediction", agent.get("enable_prediction", True)),
+        enable_emotion=meta.get("enable_emotion", agent.get("enable_emotion", True)),
+        enable_language_switch=meta.get("enable_language_switch", agent.get("enable_language_switch", True)),
+        enable_rag=meta.get("enable_rag", agent.get("enable_rag", False)),
+        enable_barge_in=meta.get("enable_barge_in", agent.get("enable_barge_in", True)),
+        enable_speculative=meta.get("enable_speculative", agent.get("enable_speculative", True)),
+        enable_filler=meta.get("enable_filler", agent.get("enable_filler", True)),
+        integration_config=meta.get("integration_config", {}),
     )
 
 

@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from cogniflow_home.agents import DEFAULT_AGENT, get_agent_by_id, get_agent_for_number
 from cogniflow_home.config import settings
 from cogniflow_home.db.supabase import db
-from cogniflow_home.integrations.hubspot import get_caller_context
+from cogniflow_home.integrations.hubspot import get_caller_context as _hubspot_caller_context
 from cogniflow_home.pipeline import VoicePipeline
 from cogniflow_home.state import (
     active_calls,
@@ -412,7 +412,29 @@ async def voice_ws(websocket: WebSocket, provider_name: str):
             enable_filler=agent_config.enable_filler,
         )
         pipeline.agent_id = getattr(agent_config, "id", None)
-        crm_context = await get_caller_context(call_info.caller_number)
+        pipeline.llm.call_context["integration_config"] = agent_config.integration_config
+
+        ic = agent_config.integration_config
+        crm_context = ""
+        if ic.get("enable_crm_lookup"):
+            crm_provider = ic.get("crm_provider", "")
+            if crm_provider == "hubspot":
+                crm_context = await _hubspot_caller_context(call_info.caller_number)
+            elif crm_provider == "salesforce":
+                try:
+                    from cogniflow_home.integrations.salesforce import get_salesforce
+                    sf = await get_salesforce(agent_config.tenant_id)
+                    contact = await sf.find_contact(call_info.caller_number)
+                    if contact:
+                        crm_context = f"You're speaking with {contact.get('Name', '')}. Account: {contact.get('Account', {}).get('Name', '')}."
+                    else:
+                        lead = await sf.find_lead(call_info.caller_number)
+                        if lead:
+                            crm_context = f"You're speaking with {lead.get('Name', '')} from {lead.get('Company', '')}. Status: {lead.get('Status', '')}."
+                except Exception:
+                    logger.debug("Salesforce caller lookup failed", exc_info=True)
+        else:
+            crm_context = await _hubspot_caller_context(call_info.caller_number)
         if crm_context:
             pipeline.inject_context(crm_context)
         active_calls[call_info.call_sid] = pipeline
