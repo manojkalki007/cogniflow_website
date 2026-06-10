@@ -101,20 +101,6 @@ export const api = {
   startCampaign: (id) => request(`/api/campaigns/${id}/start`, { method: "POST" }),
   pauseCampaign: (id) => request(`/api/campaigns/${id}/pause`, { method: "POST" }),
 
-  // Revenue
-  getRevenue: () => request("/api/revenue"),
-  closeDeal: (data) =>
-    request("/api/revenue/deal-closed", { method: "POST", body: JSON.stringify(data) }),
-
-  // Compliance
-  getComplianceEvents: (params = {}) => {
-    const qs = new URLSearchParams(params).toString();
-    return request(`/api/compliance/events${qs ? `?${qs}` : ""}`);
-  },
-
-  // Latency
-  getLatency: () => request("/api/latency"),
-
   // Agent Cloning
   cloneAgent: (data) =>
     request("/api/agents/clone", { method: "POST", body: JSON.stringify(data) }),

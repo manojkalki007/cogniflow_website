@@ -46,7 +46,7 @@ class SarvamTTS:
         self.language = voice_config["language"]
         self.sample_rate = sample_rate
         self.temperature = temperature
-        self.pace = pace
+        self.pace = pace if pace != 1.0 else 0.92
         self._raw_pcm = raw_pcm
         self._client = httpx.AsyncClient(timeout=15.0)
         self._headers = {

@@ -15,9 +15,7 @@ import Analytics from "./pages/Analytics";
 import Agents from "./pages/Agents";
 import Campaigns from "./pages/Campaigns";
 import Settings from "./pages/Settings";
-import Revenue from "./pages/Revenue";
-import Compliance from "./pages/Compliance";
-import Latency from "./pages/Latency";
+
 import WhatsApp from "./pages/WhatsApp";
 import Integrations from "./pages/Integrations";
 import Templates from "./pages/Templates";
@@ -54,9 +52,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                 <Route path="/home/templates" element={<Templates />} />
                 <Route path="/home/phone-numbers" element={<PhoneNumbers />} />
                 <Route path="/home/campaigns" element={<Campaigns />} />
-                <Route path="/home/revenue" element={<Revenue />} />
-                <Route path="/home/compliance" element={<Compliance />} />
-                <Route path="/home/latency" element={<Latency />} />
+
                 <Route path="/home/whatsapp" element={<WhatsApp />} />
                 <Route path="/home/email" element={<EmailAutomation />} />
                 <Route path="/home/ai-sdr" element={<AiSdr />} />

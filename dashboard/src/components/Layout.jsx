@@ -5,7 +5,7 @@ import {
   Phone, PhoneOutgoing, Users, BarChart3, Bot,
   LayoutTemplate, Megaphone, Settings, Target,
   UserCircle, ShieldAlert, Cable, MessageSquare,
-  Mail, DollarSign, ShieldCheck, Timer, Plug, Calendar,
+  Mail, Plug, Calendar,
   PanelLeftClose, PanelLeftOpen, Search, Bell,
   ChevronRight, Command, LogOut, Menu, X, Hash,
 } from "lucide-react";
@@ -31,12 +31,6 @@ const NAV_CHANNELS = [
   { to: "/home/integrations", label: "Integrations", icon: Plug },
 ];
 
-const NAV_INSIGHTS = [
-  { to: "/home/revenue", label: "Revenue", icon: DollarSign },
-  { to: "/home/compliance", label: "Compliance", icon: ShieldCheck },
-  { to: "/home/latency", label: "Latency", icon: Timer },
-];
-
 const NAV_ACCOUNT = [
   { to: "/home/tenant", label: "My Account", icon: UserCircle },
   { to: "/home/admin", label: "Admin Panel", icon: ShieldAlert },
@@ -55,9 +49,7 @@ const PAGE_TITLES = {
   "/home/email": "Email",
   "/home/ai-sdr": "AI SDR",
   "/home/integrations": "Integrations",
-  "/home/revenue": "Revenue",
-  "/home/compliance": "Compliance",
-  "/home/latency": "Latency",
+
   "/home/tenant": "My Account",
   "/home/admin": "Admin Panel",
   "/home/api-hub": "API Hub",
@@ -190,13 +182,6 @@ export default function Layout() {
             <SectionLabel collapsed={!isMobile && collapsed}>Channels</SectionLabel>
             <div className="space-y-0.5">
               {NAV_CHANNELS.map((item) => (
-                <NavItem key={item.to} {...item} collapsed={!isMobile && collapsed} />
-              ))}
-            </div>
-
-            <SectionLabel collapsed={!isMobile && collapsed}>Insights</SectionLabel>
-            <div className="space-y-0.5">
-              {NAV_INSIGHTS.map((item) => (
                 <NavItem key={item.to} {...item} collapsed={!isMobile && collapsed} />
               ))}
             </div>
