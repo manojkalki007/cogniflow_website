@@ -43,7 +43,13 @@ INDIAN_LANGUAGES = {"hi", "ta", "te", "kn", "ml", "bn", "mr", "gu", "pa", "od", 
 SARVAM_TTS_LANGUAGES = {"hi", "ta", "te", "kn", "ml", "bn", "mr", "gu", "pa", "od", "as", "ur", "ne", "en-in"}
 
 
+FLUX_LANGUAGES = {"en", "hi", "en-in", "en-hi"}
+
+
 def _create_stt(language: str, sample_rate: int = 8000):
+    if language in FLUX_LANGUAGES and settings.deepgram_api_key:
+        from cogniflow_home.providers.deepgram_flux_stt import DeepgramFluxSTT
+        return DeepgramFluxSTT(language=language, sample_rate=sample_rate)
     if language in INDIAN_LANGUAGES:
         from cogniflow_home.providers.sarvam_stt import SarvamSTT
         return SarvamSTT(language=language, sample_rate=sample_rate)
@@ -269,7 +275,8 @@ class VoicePipeline:
             sample_rate=sample_rate, raw_pcm=self._raw_pcm,
         )
 
-        self.eot = SemanticEOTDetector(threshold=0.65)
+        self._uses_flux = language in FLUX_LANGUAGES and settings.deepgram_api_key
+        self.eot = None if self._uses_flux else SemanticEOTDetector(threshold=0.65)
         self.tracer = LatencyTracer(call_id)
         self.compliance = ComplianceEngine()
         self.speculative = SpeculativeGenerator(eot_threshold=0.70, min_words=5)
@@ -484,7 +491,8 @@ class VoicePipeline:
                     self.state.barge_in = True
                     self.state.is_agent_speaking = False
                     self._audio_chunk_count = 0
-                    self.eot.cancel()
+                    if self.eot:
+                        self.eot.cancel()
                     if self._enable_speculative:
                         self.speculative.cancel()
                     if self._pending_final_task and not self._pending_final_task.done():
@@ -515,7 +523,7 @@ class VoicePipeline:
                     break
 
                 if not result.is_final:
-                    eot_prob = self.eot.predict(result.transcript)
+                    eot_prob = self.eot.predict(result.transcript) if self.eot else 0.0
                     if self._enable_speculative:
                         await self.speculative.on_partial_transcript(
                             result.transcript, eot_prob
@@ -796,6 +804,9 @@ class VoicePipeline:
             await self.stt.close()
             self.stt = _create_stt(language, sample_rate=self._sample_rate)
             await self.stt.connect()
+
+            self._uses_flux = language in FLUX_LANGUAGES and settings.deepgram_api_key
+            self.eot = None if self._uses_flux else SemanticEOTDetector(threshold=0.65)
 
             await self.tts.close()
             self.tts = _create_tts(language, "", sample_rate=self._sample_rate, raw_pcm=self._raw_pcm,
