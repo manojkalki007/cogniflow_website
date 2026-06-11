@@ -1,10 +1,10 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import {
   Upload, Play, Pause, Plus, ChevronDown, ChevronUp, BarChart3,
   Users, Phone, CheckCircle, XCircle, Clock, Beaker, Download,
-  Flame, Thermometer, Snowflake, Skull, HelpCircle, FileDown, ExternalLink,
+  Flame, Thermometer, Snowflake, Skull, HelpCircle, FileDown, ExternalLink, Volume2, Square, Play as PlayIcon,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -234,6 +234,72 @@ function LeadBadge({ score }) {
   );
 }
 
+function InlinePlayer({ url }) {
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const audioRef = useRef(null);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const onTime = () => {
+      if (audio.duration) setProgress((audio.currentTime / audio.duration) * 100);
+    };
+    const onMeta = () => setDuration(audio.duration || 0);
+    const onEnd = () => { setPlaying(false); setProgress(0); };
+    audio.addEventListener("timeupdate", onTime);
+    audio.addEventListener("loadedmetadata", onMeta);
+    audio.addEventListener("ended", onEnd);
+    return () => {
+      audio.removeEventListener("timeupdate", onTime);
+      audio.removeEventListener("loadedmetadata", onMeta);
+      audio.removeEventListener("ended", onEnd);
+    };
+  }, []);
+
+  const toggle = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (playing) { audio.pause(); } else { audio.play().catch(() => {}); }
+    setPlaying(!playing);
+  };
+
+  const seek = (e) => {
+    const audio = audioRef.current;
+    if (!audio || !audio.duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    audio.currentTime = pct * audio.duration;
+  };
+
+  const fmt = (s) => {
+    if (!s || !isFinite(s)) return "0:00";
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2, "0")}`;
+  };
+
+  return (
+    <div className="flex items-center gap-1.5 min-w-[140px]">
+      <audio ref={audioRef} src={url} preload="metadata" />
+      <button onClick={toggle}
+        className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-colors"
+        style={{ background: playing ? "var(--accent)" : "var(--accent-subtle)", color: playing ? "#fff" : "var(--accent)" }}>
+        {playing ? <Square size={8} /> : <PlayIcon size={9} style={{ marginLeft: 1 }} />}
+      </button>
+      <div className="flex-1 flex flex-col gap-0.5">
+        <div className="h-1.5 rounded-full cursor-pointer" style={{ background: "var(--bg-muted)" }} onClick={seek}>
+          <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: "var(--accent)" }} />
+        </div>
+        <span className="text-[9px] font-mono tabular-nums" style={{ color: "var(--text-muted)" }}>
+          {fmt(audioRef.current?.currentTime)} / {fmt(duration)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function ConversionFunnel({ funnel }) {
   if (!funnel || !funnel.total) return null;
   const steps = [
@@ -373,10 +439,7 @@ function CampaignAnalytics({ campaignId }) {
                     </td>
                     <td className="px-3 py-2">
                       {c.recording_url ? (
-                        <a href={c.recording_url} target="_blank" rel="noopener noreferrer"
-                          className="flex items-center gap-1" style={{ color: 'var(--accent)' }}>
-                          <ExternalLink size={10} /> Play
-                        </a>
+                        <InlinePlayer url={c.recording_url} />
                       ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                     </td>
                   </tr>
