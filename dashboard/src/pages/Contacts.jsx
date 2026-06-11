@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useDropzone } from "react-dropzone";
 import Papa from "papaparse";
 import { api } from "../lib/api";
-import { Search, Phone, User, Upload, Plus, X, FileSpreadsheet, AlertTriangle, Trash2 } from "lucide-react";
+import { Search, Phone, User, Upload, Plus, X, FileSpreadsheet, AlertTriangle, Trash2, Download } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
@@ -157,14 +157,74 @@ function CSVImportDialog({ open, onOpenChange }) {
         </DialogHeader>
 
         {step === "upload" && (
-          <div {...getRootProps()} className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all duration-200`}
-            style={{ borderColor: isDragActive ? 'var(--accent)' : 'var(--border)', background: isDragActive ? 'var(--accent-subtle)' : 'transparent' }}>
-            <input {...getInputProps()} />
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4" style={{ background: 'var(--accent-subtle)' }}>
-              <FileSpreadsheet size={22} style={{ color: 'var(--accent)' }} />
+          <div className="space-y-4">
+            <div {...getRootProps()} className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all duration-200`}
+              style={{ borderColor: isDragActive ? 'var(--accent)' : 'var(--border)', background: isDragActive ? 'var(--accent-subtle)' : 'transparent' }}>
+              <input {...getInputProps()} />
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4" style={{ background: 'var(--accent-subtle)' }}>
+                <FileSpreadsheet size={22} style={{ color: 'var(--accent)' }} />
+              </div>
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{isDragActive ? "Drop your CSV file here..." : "Drag & drop a CSV file, or click to browse"}</p>
+              <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>Supports .csv files up to 5MB</p>
             </div>
-            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{isDragActive ? "Drop your CSV file here..." : "Drag & drop a CSV file, or click to browse"}</p>
-            <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>Supports .csv files up to 5MB</p>
+
+            <div className="rounded-xl border p-4" style={{ background: 'var(--bg-muted)', borderColor: 'var(--border)' }}>
+              <div className="flex items-center justify-between mb-2.5">
+                <p className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Expected CSV Format</p>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const csv = "phone_number,name,email,company,tags,notes\n+919876543210,Rahul Sharma,rahul@example.com,Acme Corp,\"lead,enterprise\",Interested in premium plan\n+918765432109,Priya Patel,priya@example.com,TechStart,,Follow up next week\n+14155551234,John Smith,john@acme.com,Acme Inc,inbound,";
+                    const blob = new Blob([csv], { type: "text/csv" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = "contacts_template.csv";
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-lg transition-colors"
+                  style={{ color: 'var(--accent)', background: 'var(--accent-subtle)' }}
+                >
+                  <Download size={10} /> Download Template
+                </button>
+              </div>
+              <div className="rounded-lg border overflow-x-auto" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+                <table className="w-full text-[11px] font-mono">
+                  <thead>
+                    <tr style={{ color: 'var(--accent)', borderBottom: '1px solid var(--border)' }}>
+                      <th className="text-left px-3 py-1.5">phone_number *</th>
+                      <th className="text-left px-3 py-1.5">name</th>
+                      <th className="text-left px-3 py-1.5">email</th>
+                      <th className="text-left px-3 py-1.5">company</th>
+                      <th className="text-left px-3 py-1.5">tags</th>
+                      <th className="text-left px-3 py-1.5">notes</th>
+                    </tr>
+                  </thead>
+                  <tbody style={{ color: 'var(--text-muted)' }}>
+                    <tr>
+                      <td className="px-3 py-1">+919876543210</td>
+                      <td className="px-3 py-1">Rahul Sharma</td>
+                      <td className="px-3 py-1">rahul@acme.com</td>
+                      <td className="px-3 py-1">Acme Corp</td>
+                      <td className="px-3 py-1">lead,enterprise</td>
+                      <td className="px-3 py-1">Interested</td>
+                    </tr>
+                    <tr>
+                      <td className="px-3 py-1">+14155551234</td>
+                      <td className="px-3 py-1">John Smith</td>
+                      <td className="px-3 py-1">john@co.com</td>
+                      <td className="px-3 py-1">TechStart</td>
+                      <td className="px-3 py-1">inbound</td>
+                      <td className="px-3 py-1"></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[10px] mt-2" style={{ color: 'var(--text-muted)' }}>
+                Only <strong>phone_number</strong> is required. Column headers are auto-detected — names like "Phone", "Mobile", "phone_number" all work. Tags use comma-separated values.
+              </p>
+            </div>
           </div>
         )}
 

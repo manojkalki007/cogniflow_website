@@ -12,7 +12,7 @@ import {
   ChevronDown, Info, Calendar, PhoneForwarded, UserPlus,
   Mail, MessageCircle, CreditCard, Clock, Shield,
   Zap, Globe, BookOpen, Radio, Waves, SlidersHorizontal,
-  ToggleLeft, Link, RotateCcw, Users, Eye,
+  ToggleLeft, Link, RotateCcw, Users, Eye, Variable, Plus, GripVertical,
 } from "lucide-react";
 
 /* ─────────────────────────────────────────────
@@ -92,6 +92,7 @@ const AVAILABLE_TOOLS = [
   { id: "query_crm", label: "CRM Lookup", icon: Users, desc: "Look up caller info in your CRM during calls" },
   { id: "update_crm", label: "CRM Update", icon: Eye, desc: "Update notes and activity in CRM" },
   { id: "send_email", label: "Send Email", icon: Mail, desc: "Compose and send emails during calls" },
+  { id: "collect_info", label: "Collect Info", icon: Variable, desc: "Save structured data (name, email, phone) during calls" },
 ];
 
 const FEATURE_TOGGLES = [
@@ -125,6 +126,7 @@ const NAV_SECTIONS = [
   { id: "agent", icon: MessageSquare, label: "Agent" },
   { id: "call", icon: Phone, label: "Call Settings" },
   { id: "tools", icon: Wrench, label: "Tools" },
+  { id: "variables", icon: Variable, label: "Variables" },
   { id: "integrations", icon: Link, label: "Integrations" },
   { id: "features", icon: Sparkles, label: "Features" },
   { id: "advanced", icon: Code2, label: "Advanced" },
@@ -160,7 +162,9 @@ const defaultForm = {
   tools_enabled: [
     "book_appointment", "transfer_call", "save_contact_info",
     "send_followup", "send_whatsapp", "check_availability", "create_payment_link",
+    "collect_info",
   ],
+  variables: [],
   webhook_url: "",
   fallback_message: "I'm sorry, I'm having trouble right now. Could you repeat that?",
   max_retries: 3,
@@ -1346,6 +1350,286 @@ function ToolsSection({ form, set }) {
 }
 
 /* ─────────────────────────────────────────────
+   SECTION: VARIABLES
+   ───────────────────────────────────────────── */
+
+const VARIABLE_TYPES = [
+  { id: "text", label: "Text", placeholder: "e.g. John Smith" },
+  { id: "email", label: "Email", placeholder: "e.g. john@acme.com" },
+  { id: "phone", label: "Phone", placeholder: "e.g. +919876543210" },
+  { id: "number", label: "Number", placeholder: "e.g. 25" },
+  { id: "date", label: "Date", placeholder: "e.g. 2025-03-15" },
+  { id: "url", label: "URL", placeholder: "e.g. https://acme.com" },
+  { id: "select", label: "Single Select", placeholder: "option1, option2, option3" },
+];
+
+const PRESET_VARIABLES = [
+  { name: "full_name", label: "Full Name", type: "text", description: "The caller's full name", required: true },
+  { name: "email", label: "Email Address", type: "email", description: "Email address for follow-ups", required: false },
+  { name: "phone_number", label: "Phone Number", type: "phone", description: "WhatsApp or mobile number", required: false },
+  { name: "company", label: "Company Name", type: "text", description: "Organization or company name", required: false },
+  { name: "budget", label: "Budget", type: "text", description: "Budget range or amount", required: false },
+  { name: "interest", label: "Interest / Product", type: "text", description: "What product or service they're interested in", required: false },
+  { name: "location", label: "City / Location", type: "text", description: "Where the caller is based", required: false },
+];
+
+function VariablesSection({ form, set }) {
+  const variables = form.variables || [];
+  const [editIdx, setEditIdx] = useState(null);
+
+  const addVariable = (v) => {
+    if (variables.some((e) => e.name === v.name)) return;
+    set("variables", [...variables, v]);
+  };
+
+  const removeVariable = (idx) => {
+    set("variables", variables.filter((_, i) => i !== idx));
+    if (editIdx === idx) setEditIdx(null);
+  };
+
+  const updateVariable = (idx, updates) => {
+    set("variables", variables.map((v, i) => (i === idx ? { ...v, ...updates } : v)));
+  };
+
+  const addBlank = () => {
+    const idx = variables.length;
+    set("variables", [...variables, { name: "", label: "", type: "text", description: "", required: false, options: "" }]);
+    setEditIdx(idx);
+  };
+
+  const unusedPresets = PRESET_VARIABLES.filter((p) => !variables.some((v) => v.name === p.name));
+
+  return (
+    <div className="space-y-8">
+      <SectionTitle
+        title="Variables"
+        subtitle="Define what information the agent should collect during conversations. These get injected into the system prompt and stored with each call."
+      />
+
+      {/* Quick-add presets */}
+      {unusedPresets.length > 0 && (
+        <div>
+          <SectionLabel className="mb-3">Quick Add</SectionLabel>
+          <div className="flex flex-wrap gap-2">
+            {unusedPresets.map((p) => (
+              <button
+                key={p.name}
+                onClick={() => addVariable({ ...p, options: "" })}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all duration-200 hover:border-[var(--accent)]"
+                style={{ background: "var(--surface)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
+              >
+                <Plus size={12} style={{ color: "var(--accent)" }} />
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Variable list */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <SectionLabel>
+            Defined Variables ({variables.length})
+          </SectionLabel>
+          <button
+            onClick={addBlank}
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+            style={{ color: "var(--accent)", background: "var(--accent-subtle)" }}
+          >
+            <Plus size={12} /> Custom Variable
+          </button>
+        </div>
+
+        {variables.length === 0 && (
+          <div
+            className="p-8 rounded-xl border-2 border-dashed text-center"
+            style={{ borderColor: "var(--border)" }}
+          >
+            <Variable size={28} className="mx-auto mb-3" style={{ color: "var(--text-muted)", opacity: 0.5 }} />
+            <p className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>No variables defined</p>
+            <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+              Add variables to tell the agent what data to collect from callers
+            </p>
+          </div>
+        )}
+
+        {variables.map((v, idx) => {
+          const isEditing = editIdx === idx;
+          const typeInfo = VARIABLE_TYPES.find((t) => t.id === v.type) || VARIABLE_TYPES[0];
+          return (
+            <div
+              key={idx}
+              className="rounded-xl border transition-all duration-200"
+              style={{
+                background: isEditing ? "var(--accent-subtle)" : "var(--surface)",
+                borderColor: isEditing ? "var(--accent)" : "var(--border)",
+              }}
+            >
+              {/* Collapsed row */}
+              <div
+                className="flex items-center gap-3 px-4 py-3 cursor-pointer"
+                onClick={() => setEditIdx(isEditing ? null : idx)}
+              >
+                <GripVertical size={14} style={{ color: "var(--text-muted)", opacity: 0.4 }} />
+                <div className="flex-1 min-w-0 flex items-center gap-2">
+                  <span className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>
+                    {v.label || v.name || "Untitled"}
+                  </span>
+                  {v.name && (
+                    <code
+                      className="text-[10px] px-1.5 py-0.5 rounded font-mono"
+                      style={{ background: "var(--bg-muted)", color: "var(--text-muted)" }}
+                    >
+                      {`{${v.name}}`}
+                    </code>
+                  )}
+                </div>
+                <span
+                  className="text-[10px] font-medium uppercase px-2 py-0.5 rounded-full"
+                  style={{ background: "var(--bg-muted)", color: "var(--text-muted)" }}
+                >
+                  {typeInfo.label}
+                </span>
+                {v.required && (
+                  <span
+                    className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                    style={{ background: "rgba(239,68,68,0.08)", color: "#EF4444" }}
+                  >
+                    Required
+                  </span>
+                )}
+                <button
+                  onClick={(e) => { e.stopPropagation(); removeVariable(idx); }}
+                  className="p-1 rounded-lg transition-colors hover:bg-[rgba(239,68,68,0.1)]"
+                >
+                  <Trash2 size={14} style={{ color: "var(--text-muted)" }} />
+                </button>
+                <ChevronDown
+                  size={14}
+                  style={{
+                    color: "var(--text-muted)",
+                    transform: isEditing ? "rotate(180deg)" : "none",
+                    transition: "transform 200ms",
+                  }}
+                />
+              </div>
+
+              {/* Expanded editor */}
+              {isEditing && (
+                <div className="px-4 pb-4 pt-1 space-y-3 border-t" style={{ borderColor: "var(--border)" }}>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-medium block mb-1" style={{ color: "var(--text-muted)" }}>
+                        Variable Name (slug)
+                      </label>
+                      <input
+                        value={v.name}
+                        onChange={(e) => updateVariable(idx, { name: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_") })}
+                        className={inputClass + " text-xs font-mono"}
+                        style={inputStyle}
+                        placeholder="e.g. full_name"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-medium block mb-1" style={{ color: "var(--text-muted)" }}>
+                        Display Label
+                      </label>
+                      <input
+                        value={v.label || ""}
+                        onChange={(e) => updateVariable(idx, { label: e.target.value })}
+                        className={inputClass + " text-xs"}
+                        style={inputStyle}
+                        placeholder="e.g. Full Name"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-medium block mb-1" style={{ color: "var(--text-muted)" }}>
+                        Type
+                      </label>
+                      <select
+                        value={v.type}
+                        onChange={(e) => updateVariable(idx, { type: e.target.value })}
+                        className={inputClass + " text-xs"}
+                        style={inputStyle}
+                      >
+                        {VARIABLE_TYPES.map((t) => (
+                          <option key={t.id} value={t.id}>{t.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex items-end gap-4 pb-1">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <Toggle checked={!!v.required} onChange={(val) => updateVariable(idx, { required: val })} />
+                        <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>Required</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-medium block mb-1" style={{ color: "var(--text-muted)" }}>
+                      Description / Prompt Hint
+                    </label>
+                    <input
+                      value={v.description || ""}
+                      onChange={(e) => updateVariable(idx, { description: e.target.value })}
+                      className={inputClass + " text-xs"}
+                      style={inputStyle}
+                      placeholder="Tells the agent how/when to ask for this info"
+                    />
+                  </div>
+
+                  {v.type === "select" && (
+                    <div>
+                      <label className="text-[11px] font-medium block mb-1" style={{ color: "var(--text-muted)" }}>
+                        Options (comma-separated)
+                      </label>
+                      <input
+                        value={v.options || ""}
+                        onChange={(e) => updateVariable(idx, { options: e.target.value })}
+                        className={inputClass + " text-xs"}
+                        style={inputStyle}
+                        placeholder="Option A, Option B, Option C"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Preview */}
+      {variables.length > 0 && (
+        <div>
+          <SectionLabel className="mb-2">System Prompt Preview</SectionLabel>
+          <div
+            className="rounded-xl border p-4 font-mono text-[11px] leading-relaxed whitespace-pre-wrap"
+            style={{ background: "var(--surface)", borderColor: "var(--border)", color: "var(--text-muted)" }}
+          >
+            {`DATA COLLECTION\nDuring the conversation, naturally collect the following information:\n${variables.map((v) => {
+              let line = `- ${v.label || v.name}${v.required ? " (REQUIRED)" : " (optional)"}`;
+              if (v.description) line += `: ${v.description}`;
+              if (v.type === "email") line += " [validate email format]";
+              if (v.type === "phone") line += " [validate phone format with country code]";
+              if (v.type === "number") line += " [must be a number]";
+              if (v.type === "date") line += " [parse as a date]";
+              if (v.type === "url") line += " [must be a valid URL]";
+              if (v.type === "select" && v.options) line += ` [options: ${v.options}]`;
+              return line;
+            }).join("\n")}\n\nUse the collect_info tool to save each field (call once per field with the key and value).\nDo NOT ask all questions at once — weave them naturally into the conversation.`}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
    SECTION: FEATURES
    ───────────────────────────────────────────── */
 
@@ -1779,6 +2063,7 @@ export default function AgentBuilder() {
         enable_speculative: agentData.enable_speculative ?? true,
         enable_filler: agentData.enable_filler ?? true,
         tools_enabled: agentData.tools_enabled || defaultForm.tools_enabled,
+        variables: agentData.variables || [],
         webhook_url: agentData.webhook_url || "",
         fallback_message: agentData.fallback_message || defaultForm.fallback_message,
         max_retries: agentData.max_retries ?? 3,
@@ -1919,6 +2204,8 @@ export default function AgentBuilder() {
         return <CallSettingsSection form={form} set={set} />;
       case "tools":
         return <ToolsSection form={form} set={set} />;
+      case "variables":
+        return <VariablesSection form={form} set={set} />;
       case "integrations":
         return <IntegrationsSection form={form} set={set} />;
       case "features":

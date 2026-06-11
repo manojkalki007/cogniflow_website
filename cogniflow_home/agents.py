@@ -39,6 +39,7 @@ class AgentConfig:
     enable_speculative: bool = True
     enable_filler: bool = True
     integration_config: dict = field(default_factory=dict)
+    variables: list = field(default_factory=list)
 
 
 DEFAULT_AGENT = AgentConfig(
@@ -95,6 +96,7 @@ def _agent_from_row(agent: dict) -> AgentConfig:
         enable_speculative=meta.get("enable_speculative", agent.get("enable_speculative", True)),
         enable_filler=meta.get("enable_filler", agent.get("enable_filler", True)),
         integration_config=meta.get("integration_config", {}),
+        variables=meta.get("variables", []),
     )
 
 

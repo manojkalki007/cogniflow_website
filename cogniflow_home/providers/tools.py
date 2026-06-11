@@ -58,15 +58,19 @@ TOOL_DEFINITIONS = [
         "type": "function",
         "function": {
             "name": "save_contact_info",
-            "description": "Save or update the caller's contact information.",
+            "description": "Save or update the caller's contact information. Use additional_fields for any custom data the agent is configured to collect (budget, location, interest, etc.).",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "name": {"type": "string"},
                     "email": {"type": "string"},
                     "company": {"type": "string"},
+                    "additional_fields": {
+                        "type": "object",
+                        "description": "Any extra fields to store, e.g. {\"budget\": \"50k\", \"location\": \"Mumbai\"}",
+                    },
                 },
-                "required": ["name"],
+                "required": [],
             },
         },
     },
@@ -290,6 +294,32 @@ TOOL_DEFINITIONS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "collect_info",
+            "description": (
+                "Save a piece of structured information collected from the caller. "
+                "Use this whenever the caller provides data you were asked to collect "
+                "(name, email, phone number, company, etc.). Call once per field. "
+                "If validation fails, ask the caller to provide the value again."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "field": {
+                        "type": "string",
+                        "description": "The variable key (e.g. 'email', 'whatsapp_number', 'user_name', 'company')",
+                    },
+                    "value": {
+                        "type": "string",
+                        "description": "The value provided by the caller",
+                    },
+                },
+                "required": ["field", "value"],
+            },
+        },
+    },
 ]
 
 
@@ -417,6 +447,22 @@ async def _save_contact_info(args: dict, ctx: dict) -> str:
         updates["email"] = args["email"]
     if args.get("company"):
         updates["company"] = args["company"]
+
+    extra = args.get("additional_fields")
+    if isinstance(extra, dict) and extra:
+        existing = await db.select("contacts", {"phone_number": caller}, limit=1)
+        old_meta = {}
+        if existing:
+            old_meta = existing[0].get("metadata") or {}
+            if isinstance(old_meta, str):
+                try:
+                    old_meta = json.loads(old_meta)
+                except Exception:
+                    old_meta = {}
+        collected = old_meta.get("collected_variables", {})
+        collected.update(extra)
+        old_meta["collected_variables"] = collected
+        updates["metadata"] = old_meta
 
     if updates:
         updates["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -740,6 +786,86 @@ async def _handoff_to_human(args: dict, ctx: dict) -> str:
     return "I'm connecting you with a team member who can help further. They'll respond shortly."
 
 
+_EMAIL_RE = re.compile(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$')
+_PHONE_RE = re.compile(r'^\+?[1-9]\d{6,14}$')
+
+_VARIABLE_VALIDATORS = {
+    "email": lambda v: bool(_EMAIL_RE.match(v.strip())),
+    "phone": lambda v: bool(_PHONE_RE.match(v.strip().replace(" ", "").replace("-", ""))),
+    "whatsapp_number": lambda v: bool(_PHONE_RE.match(v.strip().replace(" ", "").replace("-", ""))),
+    "number": lambda v: v.strip().replace(".", "", 1).replace("-", "", 1).isdigit(),
+    "date": lambda v: bool(_DATE_RE.match(v.strip())),
+}
+
+
+def _validate_variable(field: str, value: str, var_defs: list) -> tuple[bool, str]:
+    var_def = next((v for v in var_defs if v.get("key") == field or v.get("name") == field), None)
+    var_type = var_def.get("type", "text") if var_def else "text"
+    validator = _VARIABLE_VALIDATORS.get(var_type)
+    if validator and not validator(value):
+        return False, f"'{value}' is not a valid {var_type}. Please ask again."
+    return True, ""
+
+
+async def _collect_info(args: dict, ctx: dict) -> str:
+    field = args.get("field", "").strip()
+    value = args.get("value", "").strip()
+    if not field or not value:
+        return "I need both a field name and a value to save."
+
+    var_defs = ctx.get("variables", [])
+    ok, err = _validate_variable(field, value, var_defs)
+    if not ok:
+        return err
+
+    call_id = ctx.get("call_id", "")
+    caller = ctx.get("caller_number", "")
+    tenant_id = ctx.get("tenant_id", "")
+
+    if call_id:
+        try:
+            rows = await db.select("calls", {"id": call_id}, select="collected_data", limit=1)
+            existing = (rows[0].get("collected_data") or {}) if rows else {}
+            existing[field] = value
+            await db.update("calls", {"id": call_id}, {"collected_data": existing})
+        except Exception:
+            logger.debug("Could not save to calls table", exc_info=True)
+
+    if caller and tenant_id:
+        try:
+            rows = await db.select(
+                "whatsapp_conversations",
+                {"phone_number": caller, "tenant_id": tenant_id},
+                select="collected_data", limit=1,
+            )
+            existing = (rows[0].get("collected_data") or {}) if rows else {}
+            existing[field] = value
+            await db.update(
+                "whatsapp_conversations",
+                {"phone_number": caller, "tenant_id": tenant_id},
+                {"collected_data": existing},
+            )
+        except Exception:
+            logger.debug("Could not save to conversations table", exc_info=True)
+
+    if caller:
+        contact_field_map = {
+            "user_name": "name", "name": "name", "full_name": "name",
+            "email": "email", "email_id": "email",
+            "company": "company", "company_name": "company",
+        }
+        db_field = contact_field_map.get(field)
+        if db_field:
+            try:
+                await db.update("contacts", {"phone_number": caller}, {db_field: value})
+            except Exception:
+                logger.debug("Could not update contact", exc_info=True)
+
+    var_def = next((v for v in var_defs if v.get("key") == field or v.get("name") == field), None)
+    label = var_def.get("label", field) if var_def else field
+    return f"Got it, saved {label}: {value}."
+
+
 TOOL_HANDLERS = {
     "book_appointment": _book_appointment,
     "transfer_call": _transfer_call,
@@ -755,4 +881,5 @@ TOOL_HANDLERS = {
     "schedule_callback": _schedule_callback,
     "end_call": _end_call,
     "handoff_to_human": _handoff_to_human,
+    "collect_info": _collect_info,
 }

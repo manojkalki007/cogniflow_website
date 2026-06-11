@@ -119,6 +119,37 @@ def build_emotion_context(caller_emotion: str, intensity: float) -> str:
     return f"\n[CALLER EMOTION: {instruction}]\n"
 
 
+def build_variables_prompt(variables: list) -> str:
+    if not variables:
+        return ""
+    lines = ["DATA COLLECTION", "During the conversation, naturally collect the following information:"]
+    for v in variables:
+        label = v.get("label") or v.get("name", "")
+        req = " (REQUIRED)" if v.get("required") else " (optional)"
+        line = f"- {label}{req}"
+        desc = v.get("description")
+        if desc:
+            line += f": {desc}"
+        vtype = v.get("type", "text")
+        if vtype == "email":
+            line += " [validate email format]"
+        elif vtype == "phone":
+            line += " [validate phone format with country code]"
+        elif vtype == "number":
+            line += " [must be a number]"
+        elif vtype == "date":
+            line += " [parse as a date]"
+        elif vtype == "url":
+            line += " [must be a valid URL]"
+        elif vtype == "select" and v.get("options"):
+            line += f" [options: {v['options']}]"
+        lines.append(line)
+    lines.append("")
+    lines.append("Use the collect_info tool to save each field (call once per field with the key and value).")
+    lines.append("Do NOT ask all questions at once — weave them naturally into the conversation.")
+    return "\n".join(lines)
+
+
 def build_system_prompt(
     base_prompt: str,
     emotion_profile_instructions: str,

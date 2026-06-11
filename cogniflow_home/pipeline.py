@@ -29,7 +29,7 @@ from cogniflow_home.latency.filler import FillerAudioManager
 from cogniflow_home.latency.speculative import SpeculativeGenerator
 from cogniflow_home.latency.tracer import LatencyTracer
 from cogniflow_home.emotions.text_enricher import TextEnricher
-from cogniflow_home.emotions.prompt_builder import build_system_prompt, build_emotion_context
+from cogniflow_home.emotions.prompt_builder import build_system_prompt, build_emotion_context, build_variables_prompt
 from cogniflow_home.language.detector import LanguageDetector, LanguageRouter
 from cogniflow_home.monitoring.turn_quality import TurnEvent, TurnQualityAnalyzer
 from cogniflow_home.monitoring.barge_in import BargeInTracker
@@ -229,7 +229,7 @@ class VoicePipeline:
                  enable_emotion: bool = True, enable_language_switch: bool = True,
                  enable_rag: bool = False, enable_barge_in: bool = True,
                  enable_speculative: bool = True, enable_filler: bool = True,
-                 tts_provider: str = ""):
+                 tts_provider: str = "", variables: list | None = None):
         call_id = call_info.call_sid or str(uuid.uuid4())
         self._sample_rate = sample_rate
         self._tts_provider = tts_provider
@@ -253,6 +253,9 @@ class VoicePipeline:
         self.text_enricher = TextEnricher()
 
         base_instructions = instructions_override or AGENT_INSTRUCTIONS
+        vars_prompt = build_variables_prompt(variables or [])
+        if vars_prompt:
+            base_instructions = base_instructions + "\n\n" + vars_prompt
         emotion_instructions = self.emotion_adapter.get_llm_emotion_instructions()
         self._instructions = build_system_prompt(base_instructions, emotion_instructions)
         self._greeting = greeting_override or GREETING

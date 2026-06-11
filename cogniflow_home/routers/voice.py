@@ -410,9 +410,11 @@ async def voice_ws(websocket: WebSocket, provider_name: str):
             enable_barge_in=agent_config.enable_barge_in,
             enable_speculative=agent_config.enable_speculative,
             enable_filler=agent_config.enable_filler,
+            variables=agent_config.variables,
         )
         pipeline.agent_id = getattr(agent_config, "id", None)
         pipeline.llm.call_context["integration_config"] = agent_config.integration_config
+        pipeline.llm.call_context["variables"] = agent_config.variables
 
         ic = agent_config.integration_config
         crm_context = ""
@@ -510,6 +512,7 @@ async def browser_voice_test(websocket: WebSocket):
             enable_barge_in=agent_config.enable_barge_in,
             enable_speculative=agent_config.enable_speculative,
             enable_filler=agent_config.enable_filler,
+            variables=agent_config.variables,
         )
 
         async def _send_transcript(role: str, text: str):

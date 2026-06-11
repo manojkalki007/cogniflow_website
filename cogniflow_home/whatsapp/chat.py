@@ -7,12 +7,13 @@ from datetime import datetime, timezone
 from cogniflow_home.db.supabase import db
 from cogniflow_home.events import bus
 from cogniflow_home.providers.tools import TOOL_DEFINITIONS
+from cogniflow_home.emotions.prompt_builder import build_variables_prompt
 
 logger = logging.getLogger("cogniflow_home.whatsapp.chat")
 
 MAX_HISTORY = 20
 
-_WA_ALWAYS_AVAILABLE = {"schedule_callback", "handoff_to_human"}
+_WA_ALWAYS_AVAILABLE = {"schedule_callback", "handoff_to_human", "collect_info"}
 _WA_EXCLUDED = {"end_call", "transfer_call"}
 
 WA_SYSTEM_SUFFIX = (
@@ -21,6 +22,7 @@ WA_SYSTEM_SUFFIX = (
     "send emails, create payment links, and more. When a tool result confirms an action, "
     "summarize it briefly for the user."
 )
+
 
 
 def _filter_tools(meta: dict) -> list[dict] | None:
@@ -86,6 +88,10 @@ class WhatsAppChatEngine:
         )
         system_prompt += WA_SYSTEM_SUFFIX
 
+        vars_prompt = build_variables_prompt(meta.get("variables", []))
+        if vars_prompt:
+            system_prompt += "\n\n" + vars_prompt
+
         try:
             from cogniflow_home.memory.caller_memory import caller_memory
             profile = await caller_memory.recall(from_phone)
@@ -122,6 +128,7 @@ class WhatsAppChatEngine:
             "tenant_id": tenant_id,
             "agent_id": agent_id,
             "integration_config": ic,
+            "variables": meta.get("variables", []),
         }
 
         from cogniflow_home.providers.groq_llm import GroqLLM

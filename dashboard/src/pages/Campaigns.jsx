@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import {
   Upload, Play, Pause, Plus, ChevronDown, ChevronUp, BarChart3,
-  Users, Phone, CheckCircle, XCircle, Clock, Beaker,
+  Users, Phone, CheckCircle, XCircle, Clock, Beaker, Download,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -114,7 +114,29 @@ function CampaignCreateDialog({ open, onOpenChange, agents }) {
                     <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Click to select CSV</p>
                   </label>
                 </div>
-                <Button size="sm" variant="outline" onClick={handleUpload} className="mt-3 w-full">
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                    CSV with a <strong>phone_number</strong> column
+                  </p>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const csv = "phone_number\n+919876543210\n+918765432109\n+14155551234";
+                      const blob = new Blob([csv], { type: "text/csv" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = "campaign_phones_template.csv";
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md transition-colors"
+                    style={{ color: 'var(--accent)', background: 'var(--accent-subtle)' }}
+                  >
+                    <Download size={9} /> Template
+                  </button>
+                </div>
+                <Button size="sm" variant="outline" onClick={handleUpload} className="mt-2 w-full">
                   <Upload size={12} /> Upload & Create
                 </Button>
               </div>
