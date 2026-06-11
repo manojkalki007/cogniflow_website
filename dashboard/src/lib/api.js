@@ -100,6 +100,7 @@ export const api = {
     request("/api/campaigns", { method: "POST", body: JSON.stringify(data) }),
   startCampaign: (id) => request(`/api/campaigns/${id}/start`, { method: "POST" }),
   pauseCampaign: (id) => request(`/api/campaigns/${id}/pause`, { method: "POST" }),
+  exportCampaign: (id) => `${BASE}/api/campaigns/${id}/export`,
 
   // Agent Cloning
   cloneAgent: (data) =>

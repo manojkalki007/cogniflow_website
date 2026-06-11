@@ -1,5 +1,7 @@
-"""Campaign CRUD, upload, start/pause, A/B testing, analytics, and callbacks."""
+"""Campaign CRUD, upload, start/pause, A/B testing, analytics, export, and callbacks."""
 
+import csv
+import io
 import logging
 
 from fastapi import APIRouter, Depends, Request
@@ -185,15 +187,114 @@ async def api_campaign_analytics(campaign_id: str, auth: AuthContext = Depends(g
     calls = await db.select("calls", calls_match, limit=2000)
     total = len(calls)
     if total == 0:
-        return {"total_calls": 0, "dispositions": {}, "conversion_rate": 0, "avg_duration": 0}
+        return {"total_calls": 0, "statuses": {}, "lead_scores": {}, "conversion_rate": 0, "avg_duration": 0, "calls": []}
     durations = [c["duration_seconds"] for c in calls if c.get("duration_seconds")]
     statuses = {}
+    lead_scores = {}
     for c in calls:
         s = c.get("status", "unknown")
         statuses[s] = statuses.get(s, 0) + 1
+        ls = c.get("lead_score", "unknown")
+        lead_scores[ls] = lead_scores.get(ls, 0) + 1
+
+    hot = lead_scores.get("hot", 0)
+    warm = lead_scores.get("warm", 0)
+    connected = statuses.get("completed", 0)
+    conversion_rate = round((hot + warm) / connected * 100, 1) if connected else 0
+
+    call_rows = []
+    for c in calls:
+        transcript = c.get("transcript") or []
+        if isinstance(transcript, str):
+            import json as _json
+            try:
+                transcript = _json.loads(transcript)
+            except Exception:
+                transcript = []
+        transcript_text = "\n".join(
+            f"{t.get('role', 'unknown')}: {t.get('text', '')}" for t in transcript
+        ) if transcript else ""
+        call_rows.append({
+            "id": c.get("id"),
+            "phone_number": c.get("phone_number", ""),
+            "status": c.get("status", "unknown"),
+            "lead_score": c.get("lead_score", "unknown"),
+            "duration_seconds": c.get("duration_seconds", 0),
+            "recording_url": c.get("recording_url", ""),
+            "started_at": c.get("started_at", ""),
+            "transcript_preview": transcript_text[:200] if transcript_text else "",
+            "collected_data": c.get("collected_data") or {},
+        })
+
     return {
         "total_calls": total,
         "statuses": statuses,
+        "lead_scores": lead_scores,
+        "conversion_rate": conversion_rate,
         "avg_duration": round(sum(durations) / len(durations), 1) if durations else 0,
         "unique_contacts": len(set(c.get("phone_number", "") for c in calls)),
+        "funnel": {
+            "total": total,
+            "connected": connected,
+            "interested": hot + warm,
+            "hot": hot,
+        },
+        "calls": call_rows,
     }
+
+
+# ─── Campaign Export ───
+
+@router.get("/api/campaigns/{campaign_id}/export")
+async def api_campaign_export(campaign_id: str, auth: AuthContext = Depends(get_auth_context)):
+    if not valid_uuid(campaign_id):
+        return Response(content="Invalid campaign ID", status_code=400)
+    campaign = await get_campaign(campaign_id)
+    if not campaign:
+        return Response(content="Campaign not found", status_code=404)
+    if auth.tenant_id and campaign.get("tenant_id") != auth.tenant_id:
+        return Response(content="Campaign not found", status_code=404)
+
+    calls_match = {"campaign_id": campaign_id}
+    if auth.tenant_id:
+        calls_match["tenant_id"] = auth.tenant_id
+    calls = await db.select("calls", calls_match, limit=5000)
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([
+        "Phone Number", "Status", "Lead Score", "Duration (sec)",
+        "Started At", "Recording URL", "Transcript", "Collected Data",
+    ])
+
+    for c in calls:
+        transcript = c.get("transcript") or []
+        if isinstance(transcript, str):
+            import json as _json
+            try:
+                transcript = _json.loads(transcript)
+            except Exception:
+                transcript = []
+        transcript_text = "\n".join(
+            f"{t.get('role', 'unknown')}: {t.get('text', '')}" for t in transcript
+        )
+        collected = c.get("collected_data") or {}
+        collected_str = ", ".join(f"{k}: {v}" for k, v in collected.items()) if isinstance(collected, dict) else str(collected)
+
+        writer.writerow([
+            c.get("phone_number", ""),
+            c.get("status", "unknown"),
+            c.get("lead_score", "unknown"),
+            c.get("duration_seconds", 0),
+            c.get("started_at", ""),
+            c.get("recording_url", ""),
+            transcript_text,
+            collected_str,
+        ])
+
+    safe_name = (campaign.get("name") or "campaign").replace(" ", "_")[:30]
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}_export.csv"'},
+    )

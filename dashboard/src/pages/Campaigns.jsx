@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import {
   Upload, Play, Pause, Plus, ChevronDown, ChevronUp, BarChart3,
   Users, Phone, CheckCircle, XCircle, Clock, Beaker, Download,
+  Flame, Thermometer, Snowflake, Skull, HelpCircle, FileDown, ExternalLink,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -214,7 +215,51 @@ function CampaignCreateDialog({ open, onOpenChange, agents }) {
   );
 }
 
+const LEAD_CONFIG = {
+  hot:     { label: "Hot",     color: "#EF4444", bg: "rgba(239,68,68,0.08)",  border: "rgba(239,68,68,0.2)",  icon: Flame },
+  warm:    { label: "Warm",    color: "#F59E0B", bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.2)", icon: Thermometer },
+  cold:    { label: "Cold",    color: "#3B82F6", bg: "rgba(59,130,246,0.08)", border: "rgba(59,130,246,0.2)", icon: Snowflake },
+  dead:    { label: "Dead",    color: "#6B7280", bg: "rgba(107,114,128,0.08)",border: "rgba(107,114,128,0.2)",icon: Skull },
+  unknown: { label: "Unknown", color: "#9CA3AF", bg: "rgba(156,163,175,0.08)",border: "rgba(156,163,175,0.2)",icon: HelpCircle },
+};
+
+function LeadBadge({ score }) {
+  const cfg = LEAD_CONFIG[score] || LEAD_CONFIG.unknown;
+  const Icon = cfg.icon;
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border"
+      style={{ background: cfg.bg, color: cfg.color, borderColor: cfg.border }}>
+      <Icon size={10} /> {cfg.label}
+    </span>
+  );
+}
+
+function ConversionFunnel({ funnel }) {
+  if (!funnel || !funnel.total) return null;
+  const steps = [
+    { label: "Total", value: funnel.total, color: "var(--text-muted)" },
+    { label: "Connected", value: funnel.connected, color: "#3B82F6" },
+    { label: "Interested", value: funnel.interested, color: "#F59E0B" },
+    { label: "Hot Leads", value: funnel.hot, color: "#EF4444" },
+  ];
+  return (
+    <div className="flex items-end gap-1 h-20">
+      {steps.map((s, i) => {
+        const pct = Math.max((s.value / funnel.total) * 100, 4);
+        return (
+          <div key={i} className="flex-1 flex flex-col items-center gap-1">
+            <span className="text-[10px] font-bold tabular-nums" style={{ color: s.color }}>{s.value}</span>
+            <div className="w-full rounded-t-lg transition-all duration-500" style={{ height: `${pct}%`, background: s.color, opacity: 0.7 }} />
+            <span className="text-[9px] font-medium" style={{ color: 'var(--text-muted)' }}>{s.label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function CampaignAnalytics({ campaignId }) {
+  const [filter, setFilter] = useState("all");
   const { data } = useQuery({
     queryKey: ["campaign-analytics", campaignId],
     queryFn: () => api.getCampaignAnalytics(campaignId),
@@ -223,28 +268,122 @@ function CampaignAnalytics({ campaignId }) {
 
   if (!data || data.total_calls === 0) return <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>No analytics yet</p>;
 
-  const dispositions = data.dispositions || {};
+  const leadScores = data.lead_scores || {};
+  const calls = data.calls || [];
+  const filtered = filter === "all" ? calls : calls.filter(c => c.lead_score === filter);
+
+  const handleExport = () => {
+    const url = api.exportCampaign(campaignId);
+    window.open(url, "_blank");
+  };
 
   return (
-    <div className="mt-4 space-y-3">
-      <div className="grid grid-cols-4 gap-3">
+    <div className="mt-4 space-y-4">
+      {/* Stats row */}
+      <div className="grid grid-cols-5 gap-2">
         {[
-          { label: "Total Calls", value: data.total_calls },
-          { label: "Conversion", value: `${data.conversion_rate}%` },
-          { label: "Avg Duration", value: `${data.avg_duration}s` },
-          { label: "Unique Contacts", value: data.unique_contacts },
-        ].map(({ label, value }) => (
-          <div key={label} className="rounded-xl p-3 text-center" style={{ background: 'var(--bg-muted)' }}>
-            <p className="text-[10px] uppercase tracking-wider font-medium" style={{ color: 'var(--text-muted)' }}>{label}</p>
-            <p className="text-sm font-bold" style={{ color: 'var(--accent)' }}>{value}</p>
+          { label: "Total", value: data.total_calls, color: "var(--accent)" },
+          { label: "Avg Duration", value: `${data.avg_duration}s`, color: "var(--accent)" },
+          { label: "Conversion", value: `${data.conversion_rate}%`, color: "#10B981" },
+          { label: "Unique", value: data.unique_contacts, color: "var(--accent)" },
+          { label: "Hot Leads", value: leadScores.hot || 0, color: "#EF4444" },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="rounded-xl p-2.5 text-center" style={{ background: 'var(--bg-muted)' }}>
+            <p className="text-[9px] uppercase tracking-wider font-medium" style={{ color: 'var(--text-muted)' }}>{label}</p>
+            <p className="text-sm font-bold tabular-nums" style={{ color }}>{value}</p>
           </div>
         ))}
       </div>
-      {Object.keys(dispositions).length > 0 && (
-        <div className="flex gap-2 flex-wrap">
-          {Object.entries(dispositions).map(([d, count]) => (
-            <Badge key={d} variant="outline" className="text-[10px]">{d}: {count}</Badge>
+
+      {/* Funnel + Lead distribution */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="rounded-xl border p-4" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+          <p className="text-[10px] uppercase tracking-wider font-medium mb-3" style={{ color: 'var(--text-muted)' }}>Conversion Funnel</p>
+          <ConversionFunnel funnel={data.funnel} />
+        </div>
+        <div className="rounded-xl border p-4" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+          <p className="text-[10px] uppercase tracking-wider font-medium mb-3" style={{ color: 'var(--text-muted)' }}>Lead Distribution</p>
+          <div className="space-y-2">
+            {["hot", "warm", "cold", "dead"].map(score => {
+              const count = leadScores[score] || 0;
+              const pct = data.total_calls > 0 ? (count / data.total_calls) * 100 : 0;
+              const cfg = LEAD_CONFIG[score];
+              return (
+                <div key={score} className="flex items-center gap-2">
+                  <span className="text-[10px] font-medium w-10" style={{ color: cfg.color }}>{cfg.label}</span>
+                  <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--bg-muted)' }}>
+                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: cfg.color }} />
+                  </div>
+                  <span className="text-[10px] font-mono tabular-nums w-8 text-right" style={{ color: 'var(--text-muted)' }}>{count}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Filter + Export */}
+      <div className="flex items-center justify-between">
+        <div className="flex gap-1.5">
+          {["all", "hot", "warm", "cold", "dead"].map(f => (
+            <button key={f} onClick={() => setFilter(f)}
+              className="text-[10px] font-semibold px-2.5 py-1 rounded-lg transition-all"
+              style={{
+                background: filter === f ? (f === "all" ? "var(--accent-subtle)" : (LEAD_CONFIG[f]?.bg || "var(--bg-muted)")) : "transparent",
+                color: filter === f ? (f === "all" ? "var(--accent)" : (LEAD_CONFIG[f]?.color || "var(--text-muted)")) : "var(--text-muted)",
+                border: filter === f ? `1px solid ${f === "all" ? "var(--accent)" : (LEAD_CONFIG[f]?.border || "var(--border)")}` : "1px solid transparent",
+              }}>
+              {f === "all" ? `All (${calls.length})` : `${LEAD_CONFIG[f]?.label} (${leadScores[f] || 0})`}
+            </button>
           ))}
+        </div>
+        <button onClick={handleExport}
+          className="flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-lg transition-colors"
+          style={{ color: "var(--accent)", background: "var(--accent-subtle)" }}>
+          <FileDown size={12} /> Export CSV
+        </button>
+      </div>
+
+      {/* Calls table */}
+      {filtered.length > 0 && (
+        <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
+          <div className="overflow-x-auto max-h-80 overflow-y-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr style={{ background: 'var(--bg-muted)' }}>
+                  <th className="text-left px-3 py-2 font-medium" style={{ color: 'var(--text-muted)' }}>Phone</th>
+                  <th className="text-left px-3 py-2 font-medium" style={{ color: 'var(--text-muted)' }}>Lead</th>
+                  <th className="text-left px-3 py-2 font-medium" style={{ color: 'var(--text-muted)' }}>Duration</th>
+                  <th className="text-left px-3 py-2 font-medium" style={{ color: 'var(--text-muted)' }}>Status</th>
+                  <th className="text-left px-3 py-2 font-medium" style={{ color: 'var(--text-muted)' }}>Transcript</th>
+                  <th className="text-left px-3 py-2 font-medium" style={{ color: 'var(--text-muted)' }}>Recording</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((c, i) => (
+                  <tr key={c.id || i} className="border-t" style={{ borderColor: 'var(--border)' }}>
+                    <td className="px-3 py-2 font-mono" style={{ color: 'var(--text-primary)' }}>{c.phone_number}</td>
+                    <td className="px-3 py-2"><LeadBadge score={c.lead_score} /></td>
+                    <td className="px-3 py-2 tabular-nums" style={{ color: 'var(--text-secondary)' }}>
+                      {c.duration_seconds ? `${Math.floor(c.duration_seconds / 60)}m ${c.duration_seconds % 60}s` : "—"}
+                    </td>
+                    <td className="px-3 py-2"><Badge variant={c.status === "completed" ? "default" : "destructive"} className="text-[10px]">{c.status}</Badge></td>
+                    <td className="px-3 py-2 max-w-[200px] truncate" style={{ color: 'var(--text-muted)' }} title={c.transcript_preview}>
+                      {c.transcript_preview || "—"}
+                    </td>
+                    <td className="px-3 py-2">
+                      {c.recording_url ? (
+                        <a href={c.recording_url} target="_blank" rel="noopener noreferrer"
+                          className="flex items-center gap-1" style={{ color: 'var(--accent)' }}>
+                          <ExternalLink size={10} /> Play
+                        </a>
+                      ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
