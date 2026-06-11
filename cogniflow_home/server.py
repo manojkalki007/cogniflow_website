@@ -88,6 +88,15 @@ async def lifespan(app):
     except Exception:
         logger.debug("Storage bucket setup skipped", exc_info=True)
 
+    # Warm the Groq client so first test-chat doesn't pay cold-start
+    try:
+        from cogniflow_home.routers.agents import _get_groq_client
+        if settings.groq_api_key:
+            _get_groq_client()
+            logger.info("Groq client pre-warmed")
+    except Exception:
+        logger.debug("Groq client warm-up skipped", exc_info=True)
+
     yield
 
     for call_id, pipeline in list(active_calls.items()):

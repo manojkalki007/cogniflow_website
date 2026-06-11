@@ -16,6 +16,19 @@ logger = logging.getLogger("cogniflow_home")
 
 router = APIRouter(tags=["agents"])
 
+_groq_client = None
+
+
+def _get_groq_client():
+    global _groq_client
+    if _groq_client is None:
+        from openai import AsyncOpenAI
+        _groq_client = AsyncOpenAI(
+            api_key=settings.groq_api_key,
+            base_url="https://api.groq.com/openai/v1",
+        )
+    return _groq_client
+
 
 _AGENT_DB_COLUMNS = {
     "name", "voice_id", "language", "status",
@@ -239,24 +252,49 @@ async def api_test_agent_chat(agent_id: str, request: Request, auth: AuthContext
     if greeting:
         system_prompt += f"\n\nYour greeting when starting a conversation: {greeting}"
 
+    meta = agent.get("metadata") or {}
+    variables = meta.get("variables") or agent.get("variables") or []
+    if variables:
+        from cogniflow_home.emotions.prompt_builder import build_variables_prompt
+        vp = build_variables_prompt(variables)
+        if vp:
+            system_prompt += "\n\n" + vp
+
     model = agent.get("llm_model", "llama-3.3-70b-versatile")
     temperature = agent.get("temperature", 0.7)
 
     try:
-        from openai import AsyncOpenAI
         if not settings.groq_api_key:
             return JSONResponse({"error": "No LLM provider configured. Add GROQ_API_KEY to .env"}, status_code=500)
-        client = AsyncOpenAI(
-            api_key=settings.groq_api_key,
-            base_url="https://api.groq.com/openai/v1",
-        )
-        resp = await client.chat.completions.create(
+        client = _get_groq_client()
+
+        tools_enabled = agent.get("tools_enabled") or []
+        from cogniflow_home.providers.tools import TOOL_DEFINITIONS
+        tools = [t for t in TOOL_DEFINITIONS if t["function"]["name"] in tools_enabled
+                 and t["function"]["name"] not in ("end_call", "transfer_call")]
+
+        kwargs = dict(
             model=model,
             messages=[{"role": "system", "content": system_prompt}] + messages,
             temperature=temperature,
             max_tokens=500,
         )
-        reply = resp.choices[0].message.content
+        if tools:
+            kwargs["tools"] = tools
+            kwargs["tool_choice"] = "auto"
+
+        resp = await client.chat.completions.create(**kwargs)
+        choice = resp.choices[0]
+
+        if choice.message.tool_calls:
+            tool_results = []
+            for tc in choice.message.tool_calls:
+                tool_results.append(f"[Tool: {tc.function.name}({tc.function.arguments})]")
+            reply = (choice.message.content or "") + " " + " ".join(tool_results)
+            reply = reply.strip()
+        else:
+            reply = choice.message.content
+
         return {"reply": reply, "model": model, "provider": "groq"}
     except Exception as e:
         logger.error(f"Test chat error: {e}")
