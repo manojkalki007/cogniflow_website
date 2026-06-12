@@ -7,6 +7,8 @@ class Settings(BaseSettings):
 
     # LLM
     groq_api_key: str = ""
+    cerebras_api_key: str = ""
+    together_api_key: str = ""
 
     # Embeddings (used by knowledge base RAG)
     openai_api_key: str = ""

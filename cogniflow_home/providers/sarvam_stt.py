@@ -49,7 +49,7 @@ class SarvamSTT:
         self._running = False
         self._flush_task = None
         self._buffer_duration_ms = 0
-        self._flush_threshold_ms = 500
+        self._flush_threshold_ms = 250
 
     async def connect(self):
         self._running = True
@@ -66,7 +66,7 @@ class SarvamSTT:
     async def _auto_flush_loop(self):
         try:
             while self._running:
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(0.15)
                 if self._buffer_duration_ms >= self._flush_threshold_ms:
                     await self._flush()
         except asyncio.CancelledError:

@@ -14,6 +14,10 @@ class TextEnricher:
 
     def enrich(self, text: str, emotion: str, intensity: float) -> str:
         text = self._clean_for_tts(text)
+        if emotion != "neutral" and intensity >= 0.2:
+            text = self._ensure_filler_pauses(text)
+            text = self._add_emotion_markers(text, emotion, intensity)
+            text = self._ensure_trail_offs(text)
         return text
 
     def _ensure_filler_pauses(self, text: str) -> str:

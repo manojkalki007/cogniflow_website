@@ -36,11 +36,13 @@ async def lifespan(app):
     from cogniflow_home.integrations import salesforce
     from cogniflow_home.integrations import leadrat as leadrat_integration
     from cogniflow_home.analysis import behaviour as behaviour_analysis
+    from cogniflow_home.analysis import call_scorer
     from cogniflow_home.notifications import confirmations
 
     call_logger.register()
     post_call.register()
     behaviour_analysis.register()
+    call_scorer.register()
     confirmations.register()
     hubspot.register()
     dispatcher.register()

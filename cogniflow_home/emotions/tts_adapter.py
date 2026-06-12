@@ -70,11 +70,9 @@ class EmotionTTSAdapter:
             )
 
     def get_tts_kwargs(self) -> dict:
-        """Returns kwargs for SarvamTTS.synthesize() (temperature, pace, voice)."""
+        """Returns kwargs for SarvamTTS.synthesize() (temperature, pace). Voice is NOT overridden here — the TTS instance already has the agent-configured voice."""
         state = self.emotion_detector.current
-        params = get_tts_params(self._profile_name, state.emotion, state.intensity)
-        params["voice"] = self.voice
-        return params
+        return get_tts_params(self._profile_name, state.emotion, state.intensity)
 
     def get_elevenlabs_kwargs(self) -> dict:
         emotion = self.emotion_detector.current.emotion

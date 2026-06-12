@@ -14,6 +14,7 @@ Key improvements over basic architecture:
 import asyncio
 import base64
 import logging
+import random
 import re
 import time
 import uuid
@@ -34,6 +35,7 @@ from cogniflow_home.language.detector import LanguageDetector, LanguageRouter
 from cogniflow_home.monitoring.turn_quality import TurnEvent, TurnQualityAnalyzer
 from cogniflow_home.monitoring.barge_in import BargeInTracker
 from cogniflow_home.emotions.tts_adapter import EmotionTTSAdapter
+from cogniflow_home.intelligence.flow_engine import ConversationFlowEngine
 from cogniflow_home.providers.failover import ProviderChain, register_chain
 from cogniflow_home.telephony.base import CallInfo, TelephonyProvider
 
@@ -200,6 +202,39 @@ def _create_llm(system_prompt: str):
     return GroqLLM(system_prompt=system_prompt)
 
 
+def _create_llm_chain(system_prompt: str):
+    """Build LLM failover chain: Groq → Cerebras → Together AI."""
+    from cogniflow_home.providers.groq_llm import GroqLLM
+    providers = []
+
+    if settings.groq_api_key:
+        providers.append(("groq", GroqLLM(system_prompt=system_prompt)))
+
+    if settings.cerebras_api_key:
+        providers.append(("cerebras", GroqLLM(
+            system_prompt=system_prompt,
+            model="llama-3.3-70b",
+            fallback_model="llama-3.1-8b",
+            api_key=settings.cerebras_api_key,
+            base_url="https://api.cerebras.ai/v1/chat/completions",
+        )))
+
+    if settings.together_api_key:
+        providers.append(("together", GroqLLM(
+            system_prompt=system_prompt,
+            model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            fallback_model="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+            api_key=settings.together_api_key,
+            base_url="https://api.together.xyz/v1/chat/completions",
+        )))
+
+    if len(providers) > 1:
+        chain = ProviderChain(providers, failure_threshold=2, reset_timeout=30.0)
+        register_chain("llm", chain)
+        return chain
+    return None
+
+
 @dataclass
 class CallState:
     call_sid: str
@@ -262,6 +297,7 @@ class VoicePipeline:
 
         self.stt = _create_stt(language, sample_rate=sample_rate)
         self.llm = _create_llm(self._instructions)
+        self._llm_chain = _create_llm_chain(self._instructions)
         self.llm.call_context = {
             "call_id": call_id,
             "caller_number": call_info.caller_number,
@@ -269,6 +305,9 @@ class VoicePipeline:
             "direction": call_info.direction,
             "tenant_id": tenant_id,
         }
+        if self._llm_chain:
+            for _, provider, _ in self._llm_chain._providers:
+                provider.call_context = self.llm.call_context
         self.tts = _create_tts(language, voice_id or VOICE_ID, sample_rate=sample_rate,
                               raw_pcm=self._raw_pcm, tts_provider=tts_provider)
 
@@ -289,6 +328,7 @@ class VoicePipeline:
         self.language_router = LanguageRouter()
         self.turn_quality = TurnQualityAnalyzer()
         self.barge_in_tracker = BargeInTracker()
+        self.flow = ConversationFlowEngine()
 
         self._running = False
         self._stt_task = None
@@ -480,15 +520,13 @@ class VoicePipeline:
                 self._energy_calibrated = True
                 logger.debug(f"Barge-in threshold calibrated: {self._speech_energy_threshold:.0f} (ambient: {avg:.0f})")
 
-        if not self.state.is_agent_speaking:
-            await self.stt.send_audio(mulaw_bytes)
-        else:
-            await self.stt.send_audio(mulaw_bytes)
+        await self.stt.send_audio(mulaw_bytes)
 
-            if self._enable_barge_in and energy > self._speech_energy_threshold:
+        if self.state.is_agent_speaking and self._enable_barge_in:
+            if energy > self._speech_energy_threshold:
                 self._silence_chunks = 0
                 self._audio_chunk_count += 1
-                if self._audio_chunk_count >= 20:
+                if self._audio_chunk_count >= 8:
                     barge_detect_ts = time.perf_counter() * 1000
                     logger.info("Barge-in detected — stopping agent, listening")
                     self.state.barge_in = True
@@ -501,6 +539,11 @@ class VoicePipeline:
                     if self._pending_final_task and not self._pending_final_task.done():
                         self._pending_final_task.cancel()
                         self._pending_final_task = None
+                    fade_tail = self.audio_smoother.flush()
+                    if fade_tail:
+                        payload = base64.b64encode(fade_tail).decode("ascii")
+                        await self._telephony.send_audio(payload)
+                    self.audio_smoother.reset()
                     await self._telephony.clear_audio()
                     self.stt.flush_pending()
                     audio_stopped_ts = time.perf_counter() * 1000
@@ -513,7 +556,7 @@ class VoicePipeline:
                     )
             else:
                 self._silence_chunks += 1
-                if self._silence_chunks > 6:
+                if self._silence_chunks > 4:
                     self._audio_chunk_count = 0
 
     async def _process_transcripts(self):
@@ -584,13 +627,22 @@ class VoicePipeline:
         self._turn_number += 1
 
         cleaned = redacted.strip().lower()
-        noise_tokens = {"", "uh", "um", "hmm", "hm", "ah", "oh"}
+        noise_tokens = {"", "uh", "um", "hmm", "hm", "ah", "oh", "uh-huh", "mm"}
+        backchannel_tokens = {"yeah", "yes", "ok", "okay", "right", "sure", "haan",
+                              "accha", "theek", "ha", "hmm", "yep", "yup", "got it",
+                              "uh huh", "uh-huh", "mm-hmm", "go on", "continue"}
         words = cleaned.split()
         if not cleaned or (len(words) <= 1 and cleaned in noise_tokens):
             self._unclear_count += 1
-            if self._unclear_count >= 2:
+            if self._unclear_count >= 3:
                 await self._speak("I'm having trouble hearing you. Could you speak a little louder?")
                 self._unclear_count = 0
+            return
+        if cleaned in backchannel_tokens or (len(words) <= 2 and all(w in backchannel_tokens | noise_tokens for w in words)):
+            self._unclear_count = 0
+            if random.random() < 0.3:
+                ack = random.choice(["Mmhmm.", "Right.", "Got it.", "Sure."])
+                await self._speak(ack)
             return
 
         self._unclear_count = 0
@@ -610,6 +662,8 @@ class VoicePipeline:
 
         self.tracer.new_turn()
         eot_ts = time.perf_counter() * 1000
+
+        self.flow.advance(redacted)
 
         if self._enable_speculative:
             speculative = await self.speculative.on_final_transcript(redacted)
@@ -649,14 +703,19 @@ class VoicePipeline:
             eot_ts_orig = eot_ts
 
             if self._turn_number == 1:
-                disclosure = "Just so you know, this call is recorded."
+                disclosure = "Just so you know, I'm an AI assistant and this call is recorded."
                 await self._speak(disclosure)
                 self.llm.add_message("assistant", disclosure)
                 self.state.transcript.append(
                     {"role": "agent", "text": disclosure, "ts": time.time()}
                 )
 
+            flow_context = self.flow.get_stage_context()
+            stage_tools = self.flow.get_available_tools(self._tools or [])
+
             llm_input = user_text
+            if flow_context:
+                llm_input = f"[{flow_context}]\n\n{llm_input}"
             if self._enable_emotion and self.emotion_adapter.should_offer_human():
                 llm_input += "\n[Offer to transfer to a human agent.]"
 
@@ -674,9 +733,11 @@ class VoicePipeline:
             full_response = ""
             t_llm = self.tracer.start("llm_ttft")
             first_sentence = True
+            _sentence_count = 0
+            _MAX_SENTENCES = 3
 
             try:
-                async for sentence in self.llm.generate_stream(llm_input, tools=self._tools or None):
+                async for sentence in self.llm.generate_stream(llm_input, tools=stage_tools or None):
                     if first_sentence:
                         self.tracer.end(t_llm)
                         first_sentence = False
@@ -686,10 +747,15 @@ class VoicePipeline:
                         break
 
                     full_response += sentence + " "
+                    _sentence_count += 1
 
                     t_tts = self.tracer.start("tts_ttfb")
                     await self._speak(sentence)
                     self.tracer.end(t_tts)
+
+                    if _sentence_count >= _MAX_SENTENCES:
+                        logger.debug("Response length cap reached (%d sentences)", _sentence_count)
+                        break
 
                     if eot_ts and self._user_speech_end_ts and self._turn_first_byte_ts:
                         self.turn_quality.record_turn(TurnEvent(
@@ -704,8 +770,31 @@ class VoicePipeline:
                     if self.state.barge_in:
                         break
 
-            except Exception:
-                logger.exception("Generate-and-speak error")
+            except Exception as llm_err:
+                if self._llm_chain and not full_response:
+                    logger.warning(f"Primary LLM failed ({llm_err!r}), trying failover chain")
+                    try:
+                        for name, provider, cb in self._llm_chain._providers:
+                            if provider is self.llm:
+                                continue
+                            if not await cb.can_execute():
+                                continue
+                            try:
+                                provider.conversation_history = list(self.llm.conversation_history)
+                                async for sentence in provider.generate_stream(llm_input, tools=stage_tools or None):
+                                    if self.state.barge_in:
+                                        break
+                                    full_response += sentence + " "
+                                    await self._speak(sentence)
+                                await cb.record_success()
+                                break
+                            except Exception as chain_err:
+                                await cb.record_failure()
+                                logger.warning(f"Failover LLM [{name}] also failed: {chain_err!r}")
+                    except Exception:
+                        logger.exception("LLM failover chain error")
+                if not full_response:
+                    logger.exception("Generate-and-speak error (all LLMs failed)")
 
             if first_sentence:
                 self.tracer.end(t_llm)
@@ -782,7 +871,12 @@ class VoicePipeline:
 
             return full_response.strip()
 
-    async def _on_tool_call(self, tool_name: str):
+    async def _on_tool_call(self, tool_name: str, tool_args: dict | None = None):
+        self.flow.record_tool_called(tool_name)
+        if tool_name == "collect_info" and tool_args:
+            field = tool_args.get("field", "")
+            if field:
+                self.flow.record_field_collected(field)
         if not self._enable_filler:
             return
         filler_audio = self.filler.get_filler(tool_name)
@@ -811,8 +905,10 @@ class VoicePipeline:
             self._uses_flux = language in FLUX_LANGUAGES and settings.deepgram_api_key
             self.eot = None if self._uses_flux else SemanticEOTDetector(threshold=0.65)
 
+            current_voice = getattr(self.tts, 'voice_id', '') or getattr(self.tts, 'voice', '')
             await self.tts.close()
-            self.tts = _create_tts(language, "", sample_rate=self._sample_rate, raw_pcm=self._raw_pcm,
+            self.tts = _create_tts(language, current_voice,
+                                  sample_rate=self._sample_rate, raw_pcm=self._raw_pcm,
                                   tts_provider=self._tts_provider)
             await self.tts.connect()
 
@@ -915,6 +1011,13 @@ class VoicePipeline:
         await self.stt.close()
         await self.tts.close()
         await self.llm.close()
+        if self._llm_chain:
+            for _, provider, _ in self._llm_chain._providers:
+                if provider is not self.llm:
+                    try:
+                        await provider.close()
+                    except Exception:
+                        pass
         # Close failover TTS providers
         for _, provider, _ in self._tts_chain._providers:
             if provider is not self.tts:
@@ -942,6 +1045,7 @@ class VoicePipeline:
             "transcript": self.state.transcript,
             "turn_quality": turn_summary,
             "barge_in_quality": barge_summary,
+            "flow_summary": self.flow.get_summary(),
             "tenant_id": self.state.tenant_id,
             "agent_id": getattr(self, "agent_id", None),
         })

@@ -49,6 +49,8 @@ class GroqLLM:
         system_prompt: str = "",
         temperature: float = 0.7,
         max_tokens: int = 40,
+        api_key: str = "",
+        base_url: str = "https://api.groq.com/openai/v1/chat/completions",
     ):
         self.model = model
         self.fallback_model = fallback_model
@@ -58,6 +60,7 @@ class GroqLLM:
         self.conversation_history: list[dict] = []
         self.call_context: dict = {}
         self.on_tool_call = None
+        self._api_key_override = api_key
         self._client = httpx.AsyncClient(
             timeout=httpx.Timeout(connect=5.0, read=30.0, write=5.0, pool=5.0)
         )
@@ -67,15 +70,23 @@ class GroqLLM:
                 {"role": "system", "content": system_prompt}
             )
 
-        self._groq_url = "https://api.groq.com/openai/v1/chat/completions"
+        self._groq_url = base_url
 
     def add_message(self, role: str, content: str):
         self.conversation_history.append({"role": role, "content": content})
         total_chars = sum(len(m.get("content", "")) for m in self.conversation_history)
         max_chars = 12000
-        while total_chars > max_chars and len(self.conversation_history) > 2:
-            removed = self.conversation_history.pop(1)
-            total_chars -= len(removed.get("content", ""))
+        if total_chars > max_chars and len(self.conversation_history) > 4:
+            old_messages = []
+            while total_chars > max_chars and len(self.conversation_history) > 4:
+                removed = self.conversation_history.pop(1)
+                total_chars -= len(removed.get("content", ""))
+                c = removed.get("content", "")
+                if c and removed.get("role") in ("user", "assistant"):
+                    old_messages.append(f"{removed['role']}: {c[:80]}")
+            if old_messages:
+                summary = "[Earlier in this call: " + " | ".join(old_messages[-6:]) + "]"
+                self.conversation_history.insert(1, {"role": "system", "content": summary})
 
     async def prewarm(self):
         api_key = settings.groq_api_key
@@ -99,14 +110,27 @@ class GroqLLM:
         except Exception:
             logger.debug("LLM prewarm failed (non-fatal)", exc_info=True)
 
+    def _adaptive_max_tokens(self, user_text: str, tools: list | None) -> int:
+        if tools:
+            return max(self.max_tokens, 200)
+        words = len(user_text.split())
+        has_question = "?" in user_text
+        if words <= 3 and not has_question:
+            return min(self.max_tokens, 40)
+        if has_question or words >= 10:
+            return max(self.max_tokens, 120)
+        return self.max_tokens
+
     async def generate_stream(
         self, user_text: str, tools: list | None = None
     ) -> AsyncIterator[str]:
+        self._current_max_tokens = self._adaptive_max_tokens(user_text, tools)
         self.add_message("user", user_text)
 
+        api_key = self._api_key_override or settings.groq_api_key
         try:
             async for sentence in self._try_stream(
-                settings.groq_api_key,
+                api_key,
                 self.model,
                 tools,
                 depth=0,
@@ -120,7 +144,7 @@ class GroqLLM:
                 )
                 try:
                     async for sentence in self._try_stream(
-                        settings.groq_api_key,
+                        api_key,
                         self.fallback_model,
                         tools,
                         depth=0,
@@ -155,7 +179,7 @@ class GroqLLM:
             "messages": self.conversation_history,
             "stream": True,
             "temperature": self.temperature,
-            "max_tokens": max(self.max_tokens, 200) if tools else self.max_tokens,
+            "max_tokens": getattr(self, '_current_max_tokens', self.max_tokens),
         }
         if tools:
             body["tools"] = tools
@@ -265,13 +289,13 @@ class GroqLLM:
 
             for tc in tool_call_messages:
                 func_name = tc["function"]["name"]
-                if self.on_tool_call:
-                    await self.on_tool_call(func_name)
                 try:
                     func_args = json.loads(tc["function"]["arguments"])
                 except json.JSONDecodeError:
                     func_args = {}
                     logger.warning(f"Bad tool args for {func_name}, using empty dict")
+                if self.on_tool_call:
+                    await self.on_tool_call(func_name, func_args)
 
                 logger.info(f"Tool call: {func_name}({func_args})")
                 result = await execute_tool(func_name, func_args, self.call_context)
