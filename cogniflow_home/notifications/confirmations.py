@@ -141,8 +141,8 @@ async def on_call_completed_wa(event: str, data: dict[str, Any]):
     agents = await db.select("agents", {"id": agent_id}, limit=1)
     if not agents:
         return
-    raw = agents[0].get("bolna_raw_config") or "{}"
-    meta = json.loads(raw) if isinstance(raw, str) else (raw or {})
+    raw_meta = agents[0].get("metadata") or "{}"
+    meta = json.loads(raw_meta) if isinstance(raw_meta, str) else (raw_meta or {})
     ic = meta.get("integration_config", {})
     if not ic.get("enable_wa_post_call_followup"):
         return

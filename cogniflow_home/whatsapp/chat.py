@@ -71,8 +71,8 @@ class WhatsAppChatEngine:
             return holding
 
         # Parse agent config
-        raw = agent.get("bolna_raw_config") or "{}"
-        meta = json.loads(raw) if isinstance(raw, str) else (raw or {})
+        raw_meta = agent.get("metadata") or "{}"
+        meta = json.loads(raw_meta) if isinstance(raw_meta, str) else (raw_meta or {})
         ic = meta.get("integration_config", {})
 
         # Handle inbound media
@@ -83,9 +83,7 @@ class WhatsAppChatEngine:
             )
 
         # Build system prompt
-        system_prompt = (
-            agent.get("system_prompt") or agent.get("instructions") or ""
-        )
+        system_prompt = agent.get("instructions") or ""
         system_prompt += WA_SYSTEM_SUFFIX
 
         vars_prompt = build_variables_prompt(meta.get("variables", []))

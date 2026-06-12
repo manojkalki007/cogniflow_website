@@ -30,44 +30,37 @@ def _get_groq_client():
     return _groq_client
 
 
-_AGENT_DB_COLUMNS = {
-    "name", "voice_id", "language", "status",
-    "llm_model", "tenant_id", "description",
+_AGENT_COLUMNS = {
+    "name", "instructions", "greeting", "voice_id", "language", "llm_provider",
+    "llm_model", "tts_provider", "voice_gender", "emotion_profile", "stt_language",
+    "temperature", "max_tokens", "endpointing_ms", "smart_format",
+    "max_call_duration", "silence_timeout", "enable_recording", "enable_barge_in",
+    "enable_memory", "enable_prediction", "enable_emotion", "enable_language_switch",
+    "enable_rag", "enable_speculative", "enable_filler", "tools_enabled",
+    "webhook_url", "fallback_message", "max_retries", "concurrent_call_limit",
+    "is_active", "phone_numbers",
 }
 
-_FIELD_MAP = {
-    "instructions": "system_prompt",
-    "greeting": "welcome_message",
-}
-_FIELD_MAP_REVERSE = {v: k for k, v in _FIELD_MAP.items()}
-
-_AGENT_EXTRA_FIELDS = {
-    "emotion_profile", "voice_gender", "stt_language", "endpointing_ms", "smart_format",
-    "max_tokens", "silence_timeout", "enable_recording", "enable_barge_in",
-    "enable_speculative", "enable_filler", "webhook_url", "fallback_message",
-    "max_retries", "concurrent_call_limit", "integration_config", "variables",
-}
+_META_FIELDS = {"integration_config", "variables"}
 
 
 def _pack_agent_data(body: dict, tenant_id: str = "") -> dict:
     agent_data = {}
-    extras = {}
+    meta_extras = {}
     for k, v in body.items():
-        db_col = _FIELD_MAP.get(k, k)
-        if db_col in _AGENT_DB_COLUMNS:
-            agent_data[db_col] = v
-        elif k in ("instructions", "greeting"):
-            agent_data[_FIELD_MAP[k]] = v
-        elif k in _AGENT_EXTRA_FIELDS:
-            extras[k] = v
-    meta = agent_data.pop("metadata", None) or {}
-    if not isinstance(meta, dict):
-        meta = {}
-    meta.update(extras)
-    agent_data["bolna_raw_config"] = json.dumps(meta)
+        if k in _AGENT_COLUMNS:
+            agent_data[k] = v
+        elif k in _META_FIELDS:
+            meta_extras[k] = v
+    if meta_extras:
+        old_meta = agent_data.pop("metadata", None) or {}
+        if not isinstance(old_meta, dict):
+            old_meta = {}
+        old_meta.update(meta_extras)
+        agent_data["metadata"] = json.dumps(old_meta) if isinstance(old_meta, dict) else old_meta
     if tenant_id:
         agent_data["tenant_id"] = tenant_id
-    agent_data["status"] = body.get("status", "active")
+    agent_data.setdefault("is_active", True)
     return agent_data
 
 
@@ -75,9 +68,7 @@ def _unpack_agent(row: dict) -> dict:
     if not row:
         return row
     r = {**row}
-    r["instructions"] = r.pop("system_prompt", "") or ""
-    r["greeting"] = r.pop("welcome_message", "") or ""
-    raw = r.pop("bolna_raw_config", None)
+    raw = r.get("metadata")
     meta = {}
     if raw:
         if isinstance(raw, str):
@@ -88,7 +79,7 @@ def _unpack_agent(row: dict) -> dict:
         elif isinstance(raw, dict):
             meta = raw
     r["metadata"] = meta
-    for field in _AGENT_EXTRA_FIELDS:
+    for field in _META_FIELDS:
         if field in meta and field not in r:
             r[field] = meta[field]
     return r
@@ -147,32 +138,31 @@ async def api_create_agent(request: Request, auth: AuthContext = Depends(get_aut
 async def api_update_agent(agent_id: str, request: Request, auth: AuthContext = Depends(get_auth_context)):
     if not valid_uuid(agent_id):
         return {"error": "Invalid agent ID format"}
+    match = {"id": agent_id}
     if auth.tenant_id:
-        agents = await db.select("agents", {"id": agent_id, "tenant_id": auth.tenant_id})
-        if not agents:
-            return {"error": "Agent not found"}
+        match["tenant_id"] = auth.tenant_id
+    existing = await db.select("agents", match)
+    if not existing:
+        return {"error": "Agent not found"}
     body = await request.json()
     db_updates = {}
-    extras = {}
+    meta_extras = {}
     for k, v in body.items():
-        mapped = _FIELD_MAP.get(k, k)
-        if mapped in _AGENT_DB_COLUMNS:
-            db_updates[mapped] = v
-        elif k in ("instructions", "greeting"):
-            db_updates[_FIELD_MAP[k]] = v
-        elif k in _AGENT_EXTRA_FIELDS:
-            extras[k] = v
-    if not db_updates and not extras:
+        if k in _AGENT_COLUMNS:
+            db_updates[k] = v
+        elif k in _META_FIELDS:
+            meta_extras[k] = v
+    if meta_extras:
+        old_meta = existing[0].get("metadata") or {}
+        if isinstance(old_meta, str):
+            try:
+                old_meta = json.loads(old_meta)
+            except Exception:
+                old_meta = {}
+        old_meta.update(meta_extras)
+        db_updates["metadata"] = json.dumps(old_meta)
+    if not db_updates:
         return {"error": "No valid fields to update"}
-    if extras:
-        match = {"id": agent_id}
-        if auth.tenant_id:
-            match["tenant_id"] = auth.tenant_id
-        existing = await db.select("agents", match)
-        raw = (existing[0].get("bolna_raw_config") or "{}") if existing else "{}"
-        old_meta = json.loads(raw) if isinstance(raw, str) else (raw or {})
-        old_meta.update(extras)
-        db_updates["bolna_raw_config"] = json.dumps(old_meta)
     result = await update_agent(agent_id, db_updates, tenant_id=auth.tenant_id)
     return _unpack_agent(result) if result else {"error": "Agent not found"}
 
@@ -319,14 +309,17 @@ async def api_clone_agent(request: Request, auth: AuthContext = Depends(get_auth
         source = agents[0]
         if auth.tenant_id and source.get("tenant_id") != auth.tenant_id:
             return {"error": "Source agent not found"}
-        safe_cols = {"name", "description", "voice_id", "language", "status",
-                     "llm_model", "system_prompt", "welcome_message", "bolna_raw_config", "tenant_id"}
-        clone_fields = {k: v for k, v in source.items() if k in safe_cols}
+        skip_cols = {"id", "created_at", "updated_at"}
+        clone_fields = {k: v for k, v in source.items() if k not in skip_cols}
         clone_fields["name"] = agent_name
-        raw = clone_fields.get("bolna_raw_config") or "{}"
-        meta = json.loads(raw) if isinstance(raw, str) else (raw or {})
+        meta = clone_fields.get("metadata") or {}
+        if isinstance(meta, str):
+            try:
+                meta = json.loads(meta)
+            except Exception:
+                meta = {}
         meta["cloned_from"] = source_agent_id
-        clone_fields["bolna_raw_config"] = json.dumps(meta)
+        clone_fields["metadata"] = json.dumps(meta)
         if auth.tenant_id:
             clone_fields["tenant_id"] = auth.tenant_id
         result = await create_agent(clone_fields)
@@ -337,16 +330,15 @@ async def api_clone_agent(request: Request, auth: AuthContext = Depends(get_auth
     from cogniflow_home.cloning.cloner import AgentCloner
     cloner = AgentCloner()
     try:
-        system_prompt = await cloner.clone_from_recordings(recording_urls, agent_name)
+        instructions = await cloner.clone_from_recordings(recording_urls, agent_name)
         agent_data = _pack_agent_data({
             "name": agent_name,
-            "instructions": system_prompt,
-            "status": "active",
+            "instructions": instructions,
         }, auth.tenant_id)
-        meta = json.loads(agent_data.get("bolna_raw_config", "{}"))
-        meta["cloned"] = True
-        meta["source_recordings"] = len(recording_urls)
-        agent_data["bolna_raw_config"] = json.dumps(meta)
+        agent_data["metadata"] = json.dumps({
+            "cloned": True,
+            "source_recordings": len(recording_urls),
+        })
         result = await create_agent(agent_data)
         return result or {"error": "Failed to save cloned agent"}
     except Exception:

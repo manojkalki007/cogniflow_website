@@ -53,48 +53,32 @@ DEFAULT_AGENT = AgentConfig(
 
 
 def _agent_from_row(agent: dict) -> AgentConfig:
-    instructions = (
-        agent.get("instructions")
-        or agent.get("system_prompt")
-        or AGENT_INSTRUCTIONS
-    )
-    greeting = (
-        agent.get("greeting")
-        or agent.get("welcome_message")
-        or agent.get("metadata", {}).get("greeting")
-        or GREETING
-    )
-
-    raw = agent.get("bolna_raw_config")
-    meta = {}
-    if raw:
-        if isinstance(raw, str):
-            try:
-                meta = json.loads(raw)
-            except Exception:
-                meta = {}
-        elif isinstance(raw, dict):
-            meta = raw
+    meta = agent.get("metadata") or {}
+    if isinstance(meta, str):
+        try:
+            meta = json.loads(meta)
+        except Exception:
+            meta = {}
 
     return AgentConfig(
         id=agent["id"],
         name=agent["name"],
-        instructions=instructions,
-        greeting=greeting,
+        instructions=agent.get("instructions") or AGENT_INSTRUCTIONS,
+        greeting=agent.get("greeting") or GREETING,
         voice_id=agent.get("voice_id", VOICE_ID),
         language=agent.get("language", "en"),
-        tenant_id=agent.get("tenant_id", ""),
-        emotion_profile=meta.get("emotion_profile", agent.get("emotion_profile", "friendly")),
-        voice_gender=meta.get("voice_gender", agent.get("voice_gender", "female")),
+        tenant_id=agent.get("tenant_id") or "",
+        emotion_profile=agent.get("emotion_profile") or "friendly",
+        voice_gender=agent.get("voice_gender") or "female",
         tools_enabled=agent.get("tools_enabled"),
-        enable_memory=meta.get("enable_memory", agent.get("enable_memory", True)),
-        enable_prediction=meta.get("enable_prediction", agent.get("enable_prediction", True)),
-        enable_emotion=meta.get("enable_emotion", agent.get("enable_emotion", True)),
-        enable_language_switch=meta.get("enable_language_switch", agent.get("enable_language_switch", True)),
-        enable_rag=meta.get("enable_rag", agent.get("enable_rag", False)),
-        enable_barge_in=meta.get("enable_barge_in", agent.get("enable_barge_in", True)),
-        enable_speculative=meta.get("enable_speculative", agent.get("enable_speculative", True)),
-        enable_filler=meta.get("enable_filler", agent.get("enable_filler", True)),
+        enable_memory=agent.get("enable_memory", True),
+        enable_prediction=agent.get("enable_prediction", True),
+        enable_emotion=agent.get("enable_emotion", True),
+        enable_language_switch=agent.get("enable_language_switch", True),
+        enable_rag=agent.get("enable_rag", False),
+        enable_barge_in=agent.get("enable_barge_in", True),
+        enable_speculative=agent.get("enable_speculative", True),
+        enable_filler=agent.get("enable_filler", True),
         integration_config=meta.get("integration_config", {}),
         variables=meta.get("variables", []),
     )
