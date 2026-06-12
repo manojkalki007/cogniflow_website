@@ -47,9 +47,9 @@ class DeepgramFluxSTT:
         return (
             f"?encoding=mulaw&sample_rate={self.sample_rate}&channels=1"
             f"&model=nova-3&language={lang}"
-            f"&punctuate=true&interim_results=true&endpointing=200"
+            f"&punctuate=true&interim_results=true&endpointing=350"
             f"&smart_format=true&disfluencies=false"
-            f"&vad_events=true&utterance_end_ms=1000"
+            f"&vad_events=true&utterance_end_ms=1500"
         )
 
     async def connect(self):

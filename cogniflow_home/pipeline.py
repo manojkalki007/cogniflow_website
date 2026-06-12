@@ -321,7 +321,7 @@ class VoicePipeline:
         self.eot = None if self._uses_flux else SemanticEOTDetector(threshold=0.65)
         self.tracer = LatencyTracer(call_id)
         self.compliance = ComplianceEngine()
-        self.speculative = SpeculativeGenerator(eot_threshold=0.70, min_words=5)
+        self.speculative = SpeculativeGenerator(eot_threshold=0.85, min_words=6)
         self.filler = FillerAudioManager()
         self.audio_smoother = AudioSmoother(sample_rate=sample_rate, crossfade_ms=8)
         self.language_detector = LanguageDetector(primary_language=language)
@@ -562,6 +562,7 @@ class VoicePipeline:
     async def _process_transcripts(self):
         """Main transcript processing loop with deduplication and speech_final gating."""
         pending_final = ""
+        accumulated_speech = ""
 
         try:
             async for result in self.stt.results():
@@ -583,18 +584,22 @@ class VoicePipeline:
                 if result.speech_final:
                     if self._agent_speech_ended_at:
                         elapsed_ms = (time.perf_counter() - self._agent_speech_ended_at) * 1000
-                        if elapsed_ms < 400:
-                            await asyncio.sleep((400 - elapsed_ms) / 1000)
+                        if elapsed_ms < 600:
+                            await asyncio.sleep((600 - elapsed_ms) / 1000)
                     if self._pending_final_task and not self._pending_final_task.done():
                         self._pending_final_task.cancel()
                         self._pending_final_task = None
-                    combined = (pending_final + " " + result.transcript).strip() if pending_final else result.transcript
+                    new_text = (pending_final + " " + result.transcript).strip() if pending_final else result.transcript
                     pending_final = ""
-                    await self._handle_final_transcript(combined)
+                    accumulated_speech = (accumulated_speech + " " + new_text).strip() if accumulated_speech else new_text
+                    self._pending_final_task = asyncio.create_task(
+                        self._accumulate_then_process(accumulated_speech)
+                    )
                 else:
                     pending_final = (pending_final + " " + result.transcript).strip() if pending_final else result.transcript
                     if self._pending_final_task and not self._pending_final_task.done():
                         self._pending_final_task.cancel()
+                    accumulated_speech = ""
                     self._pending_final_task = asyncio.create_task(
                         self._flush_pending_final(pending_final)
                     )
@@ -605,9 +610,23 @@ class VoicePipeline:
             logger.exception("Transcript processing error")
 
     async def _flush_pending_final(self, text: str):
-        """Safety net: if speech_final never arrives, process after 1.5s."""
+        """Safety net: if speech_final never arrives, process after 2s."""
         try:
-            await asyncio.sleep(1.5)
+            await asyncio.sleep(2.0)
+            if self._running and text:
+                await self._handle_final_transcript(text)
+        except asyncio.CancelledError:
+            pass
+
+    async def _accumulate_then_process(self, text: str):
+        """Wait 500ms after speech_final for more speech before responding.
+
+        If a new speech_final arrives within the window, this task gets
+        cancelled and a new one starts with the combined text — so the
+        agent waits until the user is truly done.
+        """
+        try:
+            await asyncio.sleep(0.5)
             if self._running and text:
                 await self._handle_final_transcript(text)
         except asyncio.CancelledError:
