@@ -21,43 +21,34 @@ import {
 
 const LLM_MODELS = {
   groq: [
-    { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B", cost: 0.0012, latency: 120, tier: "best", tierLabel: "Best" },
-    { id: "llama-3.1-8b-instant", label: "Llama 3.1 8B", cost: 0.0003, latency: 60, tier: "fast", tierLabel: "Fast" },
-    { id: "mixtral-8x7b-32768", label: "Mixtral 8x7B", cost: 0.0008, latency: 90, tier: "balanced", tierLabel: "Balanced" },
+    { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B", latency: 120, tier: "best", tierLabel: "Best" },
+    { id: "llama-3.1-8b-instant", label: "Llama 3.1 8B", latency: 60, tier: "fast", tierLabel: "Fast" },
   ],
 };
 
 const TTS_VOICES = {
-  smallest: {
-    female: [
-      { id: "emily", label: "Emily", desc: "Clear & warm, natural American" },
-      { id: "jasmine", label: "Jasmine", desc: "Friendly & approachable" },
-      { id: "ananya", label: "Ananya", desc: "Professional Indian English" },
-      { id: "diya", label: "Diya", desc: "Calm & professional" },
-      { id: "nisha", label: "Nisha", desc: "Gentle & empathetic" },
-      { id: "pooja", label: "Pooja", desc: "Energetic & persuasive" },
-    ],
-    male: [
-      { id: "arman", label: "Arman", desc: "Confident & authoritative" },
-      { id: "james", label: "James", desc: "Professional American" },
-      { id: "raj", label: "Raj", desc: "Natural Indian English" },
-      { id: "george", label: "George", desc: "Warm & trustworthy" },
-      { id: "aravind", label: "Aravind", desc: "Casual & friendly" },
-      { id: "arnav", label: "Arnav", desc: "Energetic & dynamic" },
-    ],
-  },
-  sarvam: {
-    female: [
-      { id: "meera", label: "Meera", desc: "Warm Hindi, natural" },
-      { id: "kavya", label: "Kavya", desc: "Gentle & soothing" },
-      { id: "priya", label: "Priya", desc: "Friendly & engaging" },
-    ],
-    male: [
-      { id: "amit", label: "Amit", desc: "Confident & clear" },
-      { id: "manan", label: "Manan", desc: "Casual & relatable" },
-      { id: "aditya", label: "Aditya", desc: "Professional & composed" },
-    ],
-  },
+  female: [
+    { id: "emily", label: "Emily", desc: "Clear & warm, natural American", provider: "smallest" },
+    { id: "jasmine", label: "Jasmine", desc: "Friendly & approachable", provider: "smallest" },
+    { id: "ananya", label: "Ananya", desc: "Professional Indian English", provider: "smallest" },
+    { id: "diya", label: "Diya", desc: "Calm & professional", provider: "smallest" },
+    { id: "nisha", label: "Nisha", desc: "Gentle & empathetic", provider: "smallest" },
+    { id: "pooja", label: "Pooja", desc: "Energetic & persuasive", provider: "smallest" },
+    { id: "meera", label: "Meera", desc: "Warm Hindi, natural", provider: "sarvam" },
+    { id: "kavya", label: "Kavya", desc: "Gentle & soothing", provider: "sarvam" },
+    { id: "priya", label: "Priya", desc: "Friendly & engaging", provider: "sarvam" },
+  ],
+  male: [
+    { id: "arman", label: "Arman", desc: "Confident & authoritative", provider: "smallest" },
+    { id: "james", label: "James", desc: "Professional American", provider: "smallest" },
+    { id: "raj", label: "Raj", desc: "Natural Indian English", provider: "smallest" },
+    { id: "george", label: "George", desc: "Warm & trustworthy", provider: "smallest" },
+    { id: "aravind", label: "Aravind", desc: "Casual & friendly", provider: "smallest" },
+    { id: "arnav", label: "Arnav", desc: "Energetic & dynamic", provider: "smallest" },
+    { id: "amit", label: "Amit", desc: "Confident & clear", provider: "sarvam" },
+    { id: "manan", label: "Manan", desc: "Casual & relatable", provider: "sarvam" },
+    { id: "aditya", label: "Aditya", desc: "Professional & composed", provider: "sarvam" },
+  ],
 };
 
 const LANGUAGES = [
@@ -107,15 +98,15 @@ const FEATURE_TOGGLES = [
 
 const PROVIDER_COSTS = {
   stt: {
-    deepgram: { cost: 0.0043, latency: 80, label: "Deepgram Nova-3" },
-    sarvam: { cost: 0.0060, latency: 90, label: "Sarvam Saaras v3" },
+    deepgram: { latency: 80, label: "Deepgram Nova-3" },
+    sarvam: { latency: 90, label: "Sarvam Saaras v3" },
   },
   tts: {
-    smallest: { cost: 0.015, latency: 150, label: "Smallest AI" },
-    sarvam: { cost: 0.020, latency: 130, label: "Sarvam Bulbul v3" },
+    smallest: { latency: 150, label: "Smallest AI" },
+    sarvam: { latency: 130, label: "Sarvam Bulbul v3" },
   },
   llm: {
-    groq: { cost: 0.0012, latency: 120, label: "Groq" },
+    groq: { latency: 120, label: "Groq" },
   },
 };
 
@@ -413,7 +404,6 @@ function ProviderStack({ form }) {
   const stt = PROVIDER_COSTS.stt[sttKey];
   const llmModel = (LLM_MODELS[form.llm_provider] || []).find((m) => m.id === form.llm_model);
   const llm = {
-    cost: llmModel?.cost || PROVIDER_COSTS.llm.groq.cost,
     latency: llmModel?.latency || PROVIDER_COSTS.llm.groq.latency,
     label: llmModel ? `${llmModel.label} (Groq)` : PROVIDER_COSTS.llm.groq.label,
   };
@@ -425,7 +415,6 @@ function ProviderStack({ form }) {
     { key: "TTS", ...tts, color: "#3B82F6" },
   ];
 
-  const totalCost = providers.reduce((s, p) => s + p.cost, 0);
   const totalLatency = providers.reduce((s, p) => s + p.latency, 0);
   const latencyColor = totalLatency < 500 ? "#10B981" : totalLatency < 800 ? "#F59E0B" : "#EF4444";
 
@@ -457,17 +446,14 @@ function ProviderStack({ form }) {
             <div className="text-xs font-medium truncate" style={{ color: "var(--text-primary)" }}>
               {p.label}
             </div>
-            <div className="text-[10px] mt-0.5 font-mono" style={{ color: "var(--text-muted)" }}>
-              ${p.cost.toFixed(4)}/min
-            </div>
           </div>
         ))}
       </div>
 
-      {/* Cost bar */}
+      {/* Latency bar */}
       <div className="flex h-2 rounded-full overflow-hidden" style={{ background: "var(--bg-muted)" }}>
         {providers.map((p) => (
-          <Tooltip key={p.key} text={`${p.key}: $${p.cost.toFixed(4)}/min`}>
+          <Tooltip key={p.key} text={`${p.key}: ~${p.latency}ms`}>
             <div
               className="h-full transition-all duration-300"
               style={{
@@ -485,31 +471,19 @@ function ProviderStack({ form }) {
         <span>TTS</span>
       </div>
 
-      {/* Totals */}
+      {/* Total latency */}
       <div
-        className="p-3 rounded-xl border"
+        className="p-3 rounded-xl border text-center"
         style={{
           background: "var(--accent-subtle)",
           borderColor: `${latencyColor}25`,
         }}
       >
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-sm font-bold tabular-nums" style={{ color: "var(--text-primary)" }}>
-              ${totalCost.toFixed(4)}/min
-            </div>
-            <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>
-              Estimated cost
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="text-sm font-bold tabular-nums" style={{ color: latencyColor }}>
-              ~{totalLatency}ms
-            </div>
-            <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>
-              Turn latency
-            </div>
-          </div>
+        <div className="text-sm font-bold tabular-nums" style={{ color: latencyColor }}>
+          ~{totalLatency}ms
+        </div>
+        <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+          Estimated turn latency
         </div>
       </div>
     </div>
@@ -739,7 +713,7 @@ function ModelSection({ form, set }) {
       {/* Model picker */}
       <div>
         <SectionLabel className="mb-3">Model</SectionLabel>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           {models.map((m) => {
             const selected = form.llm_model === m.id;
             return (
@@ -762,9 +736,8 @@ function ModelSection({ form, set }) {
                   </span>
                   <TierBadge tier={m.tier} />
                 </div>
-                <div className="flex items-center gap-3 text-[10px] font-mono" style={{ color: "var(--text-muted)" }}>
-                  <span>${m.cost.toFixed(4)}/min</span>
-                  <span>~{m.latency}ms</span>
+                <div className="text-[10px] font-mono" style={{ color: "var(--text-muted)" }}>
+                  ~{m.latency}ms
                 </div>
               </button>
             );
@@ -831,7 +804,7 @@ function ModelSection({ form, set }) {
    ───────────────────────────────────────────── */
 
 function VoiceSection({ form, set }) {
-  const voices = TTS_VOICES[form.tts_provider]?.[form.voice_gender] || [];
+  const voices = TTS_VOICES[form.voice_gender] || [];
   const [previewingVoice, setPreviewingVoice] = useState(null);
 
   const playVoicePreview = async (voiceId, provider) => {
@@ -861,31 +834,14 @@ function VoiceSection({ form, set }) {
     }
   };
 
+  const selectVoice = (v) => {
+    set("voice_id", v.id);
+    set("tts_provider", v.provider);
+  };
+
   return (
     <div className="space-y-8">
-      <SectionTitle title="Voice" subtitle="Select a text-to-speech provider and voice for your agent." />
-
-      {/* TTS Provider */}
-      <div>
-        <SectionLabel className="mb-3">TTS Provider</SectionLabel>
-        <div className="flex gap-2">
-          {["smallest", "sarvam"].map((p) => (
-            <button
-              key={p}
-              onClick={() => set("tts_provider", p)}
-              className="px-5 py-2.5 rounded-xl border text-sm transition-all duration-200"
-              style={{
-                background: form.tts_provider === p ? "var(--accent-subtle)" : "var(--surface)",
-                borderColor: form.tts_provider === p ? "var(--accent)" : "var(--border)",
-                color: form.tts_provider === p ? "var(--accent)" : "var(--text-secondary)",
-                fontWeight: form.tts_provider === p ? 600 : 400,
-              }}
-            >
-              {p === "smallest" ? "Smallest AI" : "Sarvam AI"}
-            </button>
-          ))}
-        </div>
-      </div>
+      <SectionTitle title="Voice" subtitle="Choose a voice for your agent." />
 
       {/* Voice gender toggle */}
       <div>
@@ -911,7 +867,7 @@ function VoiceSection({ form, set }) {
         </div>
       </div>
 
-      {/* Voice grid */}
+      {/* Voice grid — unified across providers */}
       <div>
         <SectionLabel className="mb-3">
           Select Voice ({form.voice_gender === "female" ? "Female" : "Male"})
@@ -922,7 +878,7 @@ function VoiceSection({ form, set }) {
             return (
               <button
                 key={v.id}
-                onClick={() => set("voice_id", v.id)}
+                onClick={() => selectVoice(v)}
                 className="relative p-4 rounded-xl border text-left transition-all duration-200 group"
                 style={{
                   background: selected ? "var(--accent-subtle)" : "var(--surface)",
@@ -948,7 +904,7 @@ function VoiceSection({ form, set }) {
                     onClick={(e) => {
                       e.stopPropagation();
                       if (!previewingVoice) {
-                        playVoicePreview(v.id, form.tts_provider);
+                        playVoicePreview(v.id, v.provider);
                       }
                     }}
                   >
@@ -963,9 +919,18 @@ function VoiceSection({ form, set }) {
                     )}
                   </span>
                 </div>
-                <div className="text-[11px] mt-1.5" style={{ color: "var(--text-muted)" }}>
+                <div className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>
                   {v.desc}
                 </div>
+                <span
+                  className="inline-block mt-1.5 text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                  style={{
+                    background: v.provider === "smallest" ? "#6366F118" : "#F59E0B18",
+                    color: v.provider === "smallest" ? "#6366F1" : "#D97706",
+                  }}
+                >
+                  {v.provider === "smallest" ? "Smallest AI" : "Sarvam AI"}
+                </span>
                 {selected && (
                   <div
                     className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center"
@@ -980,7 +945,7 @@ function VoiceSection({ form, set }) {
         </div>
       </div>
 
-      {/* Speed — placeholder for future use */}
+      {/* Speed */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <SectionLabel>Voice Speed</SectionLabel>
