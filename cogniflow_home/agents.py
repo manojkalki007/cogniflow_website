@@ -53,6 +53,20 @@ DEFAULT_AGENT = AgentConfig(
 )
 
 
+_PROVIDER_MAP = {
+    "azuretts": "smallest",
+    "azure": "smallest",
+    "openai": "smallest",
+    "polly": "smallest",
+    "xtts": "smallest",
+}
+
+
+def _normalize_provider(raw: str) -> str:
+    p = raw.lower().strip()
+    return _PROVIDER_MAP.get(p, p)
+
+
 def _agent_from_row(agent: dict) -> AgentConfig:
     meta = agent.get("metadata") or {}
     if isinstance(meta, str):
@@ -66,12 +80,12 @@ def _agent_from_row(agent: dict) -> AgentConfig:
         name=agent["name"],
         instructions=agent.get("instructions") or AGENT_INSTRUCTIONS,
         greeting=agent.get("greeting") or GREETING,
-        voice_id=agent.get("voice_id", VOICE_ID),
+        voice_id=(agent.get("voice_id") or VOICE_ID).lower(),
         language=agent.get("language", "en"),
         tenant_id=agent.get("tenant_id") or "",
         emotion_profile=agent.get("emotion_profile") or "friendly",
         voice_gender=agent.get("voice_gender") or "female",
-        tts_provider=agent.get("tts_provider") or "smallest",
+        tts_provider=_normalize_provider(agent.get("tts_provider") or agent.get("voice_provider") or "smallest"),
         tools_enabled=agent.get("tools_enabled"),
         enable_memory=agent.get("enable_memory", True),
         enable_prediction=agent.get("enable_prediction", True),

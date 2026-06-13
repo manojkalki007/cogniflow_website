@@ -61,6 +61,12 @@ def _pack_agent_data(body: dict, tenant_id: str = "") -> dict:
     if tenant_id:
         agent_data["tenant_id"] = tenant_id
     agent_data.setdefault("is_active", True)
+    if "instructions" in agent_data:
+        agent_data["system_prompt"] = agent_data["instructions"]
+    if "greeting" in agent_data:
+        agent_data["welcome_message"] = agent_data["greeting"]
+    if "tts_provider" in agent_data:
+        agent_data["voice_provider"] = agent_data["tts_provider"]
     return agent_data
 
 
