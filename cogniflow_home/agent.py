@@ -23,6 +23,6 @@ CALLBACK HANDLING (MANDATORY — overrides all other goals):
 
 GREETING = "Hi, how can I help?"
 
-VOICE_ID = "79a125e8-cd45-4c13-8a67-188112f4dd22"
+VOICE_ID = "jessica"
 
 LANGUAGE = "en"

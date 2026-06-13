@@ -21,7 +21,7 @@ SARVAM_TTS_URL = "https://api.sarvam.ai/text-to-speech"
 
 VOICES = {
     "hi":    {"voice": "priya",   "language": "hi-IN"},
-    "ta":    {"voice": "priya",   "language": "ta-IN"},
+    "ta":    {"voice": "kavitha", "language": "ta-IN"},
     "te":    {"voice": "rahul",   "language": "te-IN"},
     "kn":    {"voice": "rahul",   "language": "kn-IN"},
     "ml":    {"voice": "priya",   "language": "ml-IN"},
@@ -36,13 +36,23 @@ VOICES = {
     "ur":    {"voice": "rahul",   "language": "ur-IN"},
 }
 
+VALID_SPEAKERS = {
+    "anushka", "abhilash", "manisha", "vidya", "arya", "karun", "hitesh",
+    "aditya", "ritu", "priya", "neha", "rahul", "pooja", "rohan", "simran",
+    "kavya", "amit", "dev", "ishita", "shreya", "ratan", "varun", "manan",
+    "sumit", "roopa", "kabir", "aayan", "shubh", "ashutosh", "advait",
+    "anand", "tanya", "tarun", "sunny", "mani", "gokul", "vijay", "shruti",
+    "suhani", "mohit", "kavitha", "rehan", "soham", "rupali",
+}
+
 
 class SarvamTTS:
     def __init__(self, language: str = "hi", sample_rate: int = 8000,
                  voice: str = "", temperature: float = 0.6, pace: float = 1.0,
                  raw_pcm: bool = False):
         voice_config = VOICES.get(language, VOICES["hi"])
-        self.voice = voice or voice_config["voice"]
+        requested = voice or voice_config["voice"]
+        self.voice = requested if requested in VALID_SPEAKERS else voice_config["voice"]
         self.language = voice_config["language"]
         self.sample_rate = sample_rate
         self.temperature = temperature
