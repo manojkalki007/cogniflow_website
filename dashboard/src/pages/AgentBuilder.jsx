@@ -41,7 +41,7 @@ const TTS_VOICES = {
     { id: "anika", label: "Anika", desc: "Professional Hindi", provider: "smallest", accent: "indian" },
     { id: "divya", label: "Divya", desc: "Energetic Hindi", provider: "smallest", accent: "indian" },
     { id: "priya", label: "Priya", desc: "Friendly & engaging", provider: "sarvam", accent: "indian" },
-    { id: "anushka", label: "Anushka", desc: "Energetic & bright", provider: "sarvam", accent: "indian" },
+    { id: "ishita", label: "Ishita", desc: "Energetic & bright", provider: "sarvam", accent: "indian" },
     { id: "neha", label: "Neha", desc: "Calm & professional", provider: "sarvam", accent: "indian" },
     { id: "simran", label: "Simran", desc: "Warm & relatable", provider: "sarvam", accent: "indian" },
   ],
