@@ -40,6 +40,10 @@ const TTS_VOICES = {
     { id: "kavya", label: "Kavya", desc: "Gentle & soothing Hindi", provider: "smallest", accent: "indian" },
     { id: "anika", label: "Anika", desc: "Professional Hindi", provider: "smallest", accent: "indian" },
     { id: "divya", label: "Divya", desc: "Energetic Hindi", provider: "smallest", accent: "indian" },
+    { id: "priya", label: "Priya", desc: "Friendly & engaging", provider: "sarvam", accent: "indian" },
+    { id: "anushka", label: "Anushka", desc: "Energetic & bright", provider: "sarvam", accent: "indian" },
+    { id: "neha", label: "Neha", desc: "Calm & professional", provider: "sarvam", accent: "indian" },
+    { id: "simran", label: "Simran", desc: "Warm & relatable", provider: "sarvam", accent: "indian" },
   ],
   male: [
     { id: "ethan", label: "Ethan", desc: "Friendly American", provider: "smallest", accent: "american" },
@@ -54,6 +58,10 @@ const TTS_VOICES = {
     { id: "kartik", label: "Kartik", desc: "Natural Hindi", provider: "smallest", accent: "indian" },
     { id: "devansh", label: "Devansh", desc: "Conversational Hindi", provider: "smallest", accent: "indian" },
     { id: "kunal", label: "Kunal", desc: "Energetic Hindi", provider: "smallest", accent: "indian" },
+    { id: "rahul", label: "Rahul", desc: "Professional & clear", provider: "sarvam", accent: "indian" },
+    { id: "amit", label: "Amit", desc: "Confident & composed", provider: "sarvam", accent: "indian" },
+    { id: "rohan", label: "Rohan", desc: "Energetic & dynamic", provider: "sarvam", accent: "indian" },
+    { id: "manan", label: "Manan", desc: "Casual & relatable", provider: "sarvam", accent: "indian" },
   ],
 };
 

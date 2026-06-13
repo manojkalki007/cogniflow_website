@@ -48,7 +48,7 @@ VALID_SPEAKERS = {
 
 class SarvamTTS:
     def __init__(self, language: str = "hi", sample_rate: int = 8000,
-                 voice: str = "", temperature: float = 0.6, pace: float = 1.0,
+                 voice: str = "", temperature: float = 0.75, pace: float = 1.15,
                  raw_pcm: bool = False):
         voice_config = VOICES.get(language, VOICES["hi"])
         requested = voice or voice_config["voice"]
@@ -56,7 +56,7 @@ class SarvamTTS:
         self.language = voice_config["language"]
         self.sample_rate = sample_rate
         self.temperature = temperature
-        self.pace = pace if pace != 1.0 else 0.92
+        self.pace = pace
         self._raw_pcm = raw_pcm
         self._client = httpx.AsyncClient(timeout=15.0)
         self._headers = {
