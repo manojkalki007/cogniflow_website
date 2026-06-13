@@ -810,19 +810,13 @@ function VoiceSection({ form, set }) {
   const playVoicePreview = async (voiceId, provider) => {
     setPreviewingVoice(voiceId);
     try {
-      const apiBase = (import.meta.env.VITE_API_URL || "https://api.cogniflowautomations.com").trim();
-      const res = await fetch(`${apiBase}/api/voice/preview`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          voice_id: voiceId,
-          provider: provider,
-          text: "Hi there! I'm your AI voice assistant. How can I help you today?",
-        }),
-      });
-      if (!res.ok) throw new Error("Preview failed");
-      const audioBlob = await res.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
+      const data = await api.voicePreview(voiceId, provider);
+      if (data.error || !data.audio) throw new Error(data.error || "No audio");
+      const raw = atob(data.audio);
+      const bytes = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+      const blob = new Blob([bytes], { type: "audio/wav" });
+      const audioUrl = URL.createObjectURL(blob);
       const audio = new Audio(audioUrl);
       audio.onended = () => {
         URL.revokeObjectURL(audioUrl);

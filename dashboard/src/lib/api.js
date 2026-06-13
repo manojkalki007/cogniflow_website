@@ -93,6 +93,17 @@ export const api = {
   updateAgent: (id, data) =>
     request(`/api/agents/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
 
+  // Voice preview
+  voicePreview: (voiceId, provider, text) =>
+    request("/api/voice/preview", {
+      method: "POST",
+      body: JSON.stringify({
+        voice_id: voiceId,
+        provider: provider,
+        text: text || "Hi there! I'm your AI voice assistant. How can I help you today?",
+      }),
+    }),
+
   // Campaigns
   getCampaigns: () => request("/api/campaigns"),
   getCampaign: (id) => request(`/api/campaigns/${id}`),

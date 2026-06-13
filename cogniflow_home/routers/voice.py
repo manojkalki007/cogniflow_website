@@ -89,7 +89,7 @@ async def voice_preview(body: VoicePreviewRequest, auth: AuthContext = Depends(g
             tts = SmallestTTS(voice_id=voice_id or "emily", language=language, sample_rate=sample_rate, raw_pcm=True)
         elif provider == "sarvam":
             from cogniflow_home.providers.sarvam_tts import SarvamTTS
-            tts = SarvamTTS(voice_id=voice_id, language=language)
+            tts = SarvamTTS(voice=voice_id, language=language, sample_rate=sample_rate, raw_pcm=True)
         elif provider == "elevenlabs":
             from cogniflow_home.providers.elevenlabs_tts import ElevenLabsTTS
             tts = ElevenLabsTTS(voice_id=voice_id or "pNInz6obpgDQGcFmaJgB", raw_pcm=True)
@@ -410,6 +410,7 @@ async def voice_ws(websocket: WebSocket, provider_name: str):
             enable_barge_in=agent_config.enable_barge_in,
             enable_speculative=agent_config.enable_speculative,
             enable_filler=agent_config.enable_filler,
+            tts_provider=agent_config.tts_provider,
             variables=agent_config.variables,
         )
         pipeline.agent_id = getattr(agent_config, "id", None)
@@ -512,6 +513,7 @@ async def browser_voice_test(websocket: WebSocket):
             enable_barge_in=agent_config.enable_barge_in,
             enable_speculative=agent_config.enable_speculative,
             enable_filler=agent_config.enable_filler,
+            tts_provider=agent_config.tts_provider,
             variables=agent_config.variables,
         )
 

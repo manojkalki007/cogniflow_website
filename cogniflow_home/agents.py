@@ -29,6 +29,7 @@ class AgentConfig:
     tenant_id: str = ""
     emotion_profile: str = "friendly"
     voice_gender: str = "female"
+    tts_provider: str = "smallest"
     tools_enabled: list[str] | None = None
     enable_memory: bool = True
     enable_prediction: bool = True
@@ -70,6 +71,7 @@ def _agent_from_row(agent: dict) -> AgentConfig:
         tenant_id=agent.get("tenant_id") or "",
         emotion_profile=agent.get("emotion_profile") or "friendly",
         voice_gender=agent.get("voice_gender") or "female",
+        tts_provider=agent.get("tts_provider") or "smallest",
         tools_enabled=agent.get("tools_enabled"),
         enable_memory=agent.get("enable_memory", True),
         enable_prediction=agent.get("enable_prediction", True),
