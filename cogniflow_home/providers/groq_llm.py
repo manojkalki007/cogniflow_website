@@ -257,7 +257,7 @@ class GroqLLM:
                         if sentence:
                             first_chunk_sent = True
                             yield sentence
-                    elif not first_chunk_sent and word_count >= 5:
+                    elif not first_chunk_sent and word_count >= 12:
                         text = buffer.strip()
                         buffer = ""
                         if text:

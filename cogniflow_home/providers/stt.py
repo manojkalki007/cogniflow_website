@@ -47,7 +47,7 @@ class DeepgramSTT:
         params = (
             f"?encoding=mulaw&sample_rate={self.sample_rate}&channels=1"
             f"&model=nova-3&language={self.language}"
-            f"&punctuate=true&interim_results=true&endpointing=350"
+            f"&punctuate=true&interim_results=true&endpointing=300"
             f"&vad_events=true&smart_format=true&utterance_end_ms=1500"
         )
         headers = {"Authorization": f"Token {settings.deepgram_api_key}"}
@@ -121,7 +121,7 @@ class DeepgramSTT:
                     params = (
                         f"?encoding=mulaw&sample_rate={self.sample_rate}&channels=1"
                         f"&model=nova-3&language={self.language}"
-                        f"&punctuate=true&interim_results=true&endpointing=350"
+                        f"&punctuate=true&interim_results=true&endpointing=300"
                         f"&vad_events=true&smart_format=true&utterance_end_ms=1500"
                     )
                     headers = {"Authorization": f"Token {settings.deepgram_api_key}"}

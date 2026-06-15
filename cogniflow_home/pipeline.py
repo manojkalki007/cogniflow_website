@@ -622,14 +622,14 @@ class VoicePipeline:
             pass
 
     async def _accumulate_then_process(self, text: str):
-        """Wait 500ms after speech_final for more speech before responding.
+        """Wait after speech_final for more speech before responding.
 
         If a new speech_final arrives within the window, this task gets
         cancelled and a new one starts with the combined text — so the
         agent waits until the user is truly done.
         """
         try:
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.45)
             if self._running and text:
                 await self._handle_final_transcript(text)
         except asyncio.CancelledError:
