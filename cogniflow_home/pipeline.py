@@ -21,7 +21,7 @@ import uuid
 from dataclasses import dataclass, field
 
 from cogniflow_home.agent import AGENT_INSTRUCTIONS, AGENT_NAME, GREETING, VOICE_ID
-from cogniflow_home.audio import compute_energy_mulaw, AudioSmoother
+from cogniflow_home.audio import compute_energy_mulaw, pcm16_to_mulaw, AudioSmoother
 from cogniflow_home.compliance.engine import ComplianceEngine
 from cogniflow_home.config import settings
 from cogniflow_home.events import bus
@@ -67,18 +67,16 @@ def _create_tts(language: str, voice_id: str, sample_rate: int = 8000, raw_pcm: 
     if tts_provider == "elevenlabs" and settings.elevenlabs_api_key:
         from cogniflow_home.providers.elevenlabs_tts import ElevenLabsTTS
         return ElevenLabsTTS(voice_id=voice_id, language=language, sample_rate=sample_rate, raw_pcm=raw_pcm)
-    if tts_provider == "smallest" and settings.smallest_ai_api_key:
-        from cogniflow_home.providers.smallest_tts import SmallestTTS
-        return SmallestTTS(voice_id=voice_id, language=language, sample_rate=sample_rate, raw_pcm=raw_pcm)
-    if language in SARVAM_TTS_LANGUAGES and settings.sarvam_api_key:
-        from cogniflow_home.providers.sarvam_tts import SarvamTTS
-        return SarvamTTS(voice=voice_id, language=language, sample_rate=sample_rate, raw_pcm=raw_pcm)
     if settings.smallest_ai_api_key:
         from cogniflow_home.providers.smallest_tts import SmallestTTS
         return SmallestTTS(voice_id=voice_id, language=language, sample_rate=sample_rate, raw_pcm=raw_pcm)
     if settings.elevenlabs_api_key:
         from cogniflow_home.providers.elevenlabs_tts import ElevenLabsTTS
         return ElevenLabsTTS(voice_id=voice_id, language=language, sample_rate=sample_rate, raw_pcm=raw_pcm)
+    if settings.sarvam_api_key:
+        from cogniflow_home.providers.sarvam_tts import SarvamTTS
+        return SarvamTTS(voice=voice_id, language=language if language in SARVAM_TTS_LANGUAGES else "en-in",
+                         sample_rate=sample_rate, raw_pcm=raw_pcm)
     from cogniflow_home.providers.sarvam_tts import SarvamTTS
     return SarvamTTS(voice=voice_id, language=language if language in SARVAM_TTS_LANGUAGES else "en-in",
                      sample_rate=sample_rate, raw_pcm=raw_pcm)
@@ -160,18 +158,13 @@ def _create_tts_chain(language: str, voice_id: str, sample_rate: int = 8000,
             providers.append(("smallest-tts", _smallest()))
         if settings.sarvam_api_key:
             providers.append(("sarvam-tts", _sarvam("en-in")))
-    elif language in SARVAM_TTS_LANGUAGES and settings.sarvam_api_key:
-        providers.append(("sarvam-tts", _sarvam()))
-        if settings.smallest_ai_api_key:
-            providers.append(("smallest-tts", _smallest()))
-        if settings.elevenlabs_api_key:
-            providers.append(("elevenlabs-tts", _elevenlabs()))
     elif settings.smallest_ai_api_key:
         providers.append(("smallest-tts", _smallest()))
         if settings.elevenlabs_api_key:
             providers.append(("elevenlabs-tts", _elevenlabs()))
         if settings.sarvam_api_key:
-            providers.append(("sarvam-tts", _sarvam("en-in")))
+            providers.append(("sarvam-tts", _sarvam(
+                language if language in SARVAM_TTS_LANGUAGES else "en-in")))
     elif settings.elevenlabs_api_key:
         providers.append(("elevenlabs-tts", _elevenlabs()))
         if settings.sarvam_api_key:
@@ -974,29 +967,31 @@ class VoicePipeline:
             if self.state.barge_in:
                 break
 
+            smoothed = self.audio_smoother.process(audio_chunk)
             if self._raw_pcm:
-                smoothed = self.audio_smoother.process(audio_chunk)
                 payload = base64.b64encode(smoothed).decode("ascii")
                 await self._telephony.send_audio(payload)
                 if not self._turn_first_byte_ts:
                     self._turn_first_byte_ts = time.perf_counter() * 1000
             else:
-                smoothed = self.audio_smoother.process(audio_chunk)
+                mulaw = pcm16_to_mulaw(smoothed)
                 chunk_size = self._sample_rate // 50
-                for i in range(0, len(smoothed), chunk_size):
+                for i in range(0, len(mulaw), chunk_size):
                     if self.state.barge_in:
                         break
-                    segment = smoothed[i : i + chunk_size]
+                    segment = mulaw[i : i + chunk_size]
                     payload = base64.b64encode(segment).decode("ascii")
                     await self._telephony.send_audio(payload)
                     if not self._turn_first_byte_ts:
                         self._turn_first_byte_ts = time.perf_counter() * 1000
                     await asyncio.sleep(0.018)
 
-        # Fade out final chunk
         tail = self.audio_smoother.flush()
         if tail and not self.state.barge_in:
-            payload = base64.b64encode(tail).decode("ascii")
+            if self._raw_pcm:
+                payload = base64.b64encode(tail).decode("ascii")
+            else:
+                payload = base64.b64encode(pcm16_to_mulaw(tail)).decode("ascii")
             await self._telephony.send_audio(payload)
         self.audio_smoother.reset()
 

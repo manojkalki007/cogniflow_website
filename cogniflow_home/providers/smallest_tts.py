@@ -9,7 +9,6 @@ from typing import AsyncIterator
 
 import httpx
 
-from cogniflow_home.audio import pcm16_to_mulaw
 from cogniflow_home.config import settings
 
 logger = logging.getLogger("cogniflow_home.tts.smallest")
@@ -22,10 +21,22 @@ LANGUAGE_CODES = {
 }
 
 
+VALID_VOICES = {
+    "jessica", "sophia", "natasha", "rachel", "olivia", "isla", "chloe",
+    "maya", "meera", "kavya", "anika", "divya", "sita", "priyanka", "aanya",
+    "ethan", "daniel", "ryan", "lucas", "jordan", "liam", "noah",
+    "arjun", "vikram", "kartik", "devansh", "kunal",
+}
+
+
 class SmallestTTS:
 
     def __init__(self, voice_id: str = "jessica", language: str = "en", sample_rate: int = 8000, raw_pcm: bool = False):
-        self.voice_id = voice_id or "jessica"
+        requested = (voice_id or "jessica").lower().strip()
+        if requested not in VALID_VOICES:
+            logger.warning("Voice '%s' not in Smallest AI catalog, falling back to 'jessica'", requested)
+            requested = "jessica"
+        self.voice_id = requested
         self.language = language if language in LANGUAGE_CODES else "en"
         self.sample_rate = sample_rate
         self.raw_pcm = raw_pcm
@@ -43,7 +54,7 @@ class SmallestTTS:
             "Authorization": f"Bearer {settings.smallest_ai_api_key}",
             "Content-Type": "application/json",
         }
-        effective_speed = max(0.5, min(2.0, speed)) if speed > 0 else 1.20
+        effective_speed = max(0.5, min(2.0, speed)) if speed > 0 else 1.0
         body = {
             "text": text,
             "voice_id": self.voice_id,
@@ -53,17 +64,30 @@ class SmallestTTS:
             "add_wav_header": False,
         }
 
-        chunk_bytes = 4096 if self.raw_pcm else 320
         async with self._client.stream("POST", API_URL, json=body, headers=headers) as resp:
+            if resp.status_code == 400 and self.voice_id != "jessica":
+                error = await resp.aread()
+                logger.warning("Voice '%s' rejected by API, retrying with 'jessica': %s",
+                               self.voice_id, error.decode()[:100])
+                self.voice_id = "jessica"
+                body["voice_id"] = "jessica"
+                async with self._client.stream("POST", API_URL, json=body, headers=headers) as retry:
+                    if retry.status_code != 200:
+                        err2 = await retry.aread()
+                        raise RuntimeError(f"Smallest AI TTS error {retry.status_code}: {err2.decode()[:200]}")
+                    async for chunk in retry.aiter_bytes(4096):
+                        if chunk:
+                            yield chunk
+                return
             if resp.status_code != 200:
                 error = await resp.aread()
                 raise RuntimeError(
                     f"Smallest AI TTS error {resp.status_code}: {error.decode()[:200]}"
                 )
 
-            async for chunk in resp.aiter_bytes(chunk_bytes):
+            async for chunk in resp.aiter_bytes(4096):
                 if chunk:
-                    yield chunk if self.raw_pcm else pcm16_to_mulaw(chunk)
+                    yield chunk
 
     async def close(self):
         await self._client.aclose()

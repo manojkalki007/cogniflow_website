@@ -74,16 +74,16 @@ class SarvamTTS:
         temperature = kwargs.get("temperature", self.temperature)
         pace = kwargs.get("pace", self.pace)
 
-        audio_format = "wav" if self._raw_pcm else "mulaw"
         body = {
             "inputs": [text],
             "target_language_code": self.language,
             "speaker": kwargs.get("voice", self.voice),
             "model": "bulbul:v3",
-            "audio_format": audio_format,
-            "sample_rate": self.sample_rate,
+            "audio_format": "wav",
+            "speech_sample_rate": self.sample_rate,
             "temperature": max(0.01, min(1.0, temperature)),
             "pace": max(0.5, min(2.0, pace)),
+            "enable_preprocessing": True,
         }
 
         try:
@@ -95,7 +95,7 @@ class SarvamTTS:
                 audios = result.get("audios", [])
                 for audio_b64 in audios:
                     audio_bytes = base64.b64decode(audio_b64)
-                    if self._raw_pcm and len(audio_bytes) > 44:
+                    if len(audio_bytes) > 44:
                         audio_bytes = audio_bytes[44:]
                     yield audio_bytes
             else:

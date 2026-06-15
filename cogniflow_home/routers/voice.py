@@ -86,7 +86,7 @@ async def voice_preview(body: VoicePreviewRequest, auth: AuthContext = Depends(g
     try:
         if provider == "smallest":
             from cogniflow_home.providers.smallest_tts import SmallestTTS
-            tts = SmallestTTS(voice_id=voice_id or "emily", language=language, sample_rate=sample_rate, raw_pcm=True)
+            tts = SmallestTTS(voice_id=voice_id or "jessica", language=language, sample_rate=sample_rate, raw_pcm=True)
         elif provider == "sarvam":
             from cogniflow_home.providers.sarvam_tts import SarvamTTS
             tts = SarvamTTS(voice=voice_id, language=language, sample_rate=sample_rate, raw_pcm=True)
