@@ -105,15 +105,36 @@ _CONTRACTIONS = [
 ]
 
 
+_SPEECH_ABBREVS = [
+    (re.compile(r'\bDr\.\s'), "Doctor "), (re.compile(r'\bMr\.\s'), "Mister "),
+    (re.compile(r'\bMrs\.\s'), "Missus "), (re.compile(r'\bMs\.\s'), "Miss "),
+    (re.compile(r'\bSt\.\s'), "Street "), (re.compile(r'\bApt\.\s'), "Apartment "),
+    (re.compile(r'\betc\b\.?'), "etcetera"), (re.compile(r'\bvs\.?\b'), "versus"),
+    (re.compile(r'\be\.g\.\s?'), "for example, "), (re.compile(r'\bi\.e\.\s?'), "that is, "),
+    (re.compile(r'\bw/\b'), "with"), (re.compile(r'\bw/o\b'), "without"),
+]
+
+_NUM_WORDS = {
+    "0": "zero", "1": "one", "2": "two", "3": "three", "4": "four",
+    "5": "five", "6": "six", "7": "seven", "8": "eight", "9": "nine",
+    "10": "ten", "11": "eleven", "12": "twelve",
+}
+
+
 def _humanize_for_speech(text: str) -> str:
     if not text or not text.strip():
         return text
     t = text
     for pattern, repl in _CONTRACTIONS:
         t = pattern.sub(repl, t)
+    for pattern, repl in _SPEECH_ABBREVS:
+        t = pattern.sub(repl, t)
+    t = re.sub(r'\b(\d{1,2})\b', lambda m: _NUM_WORDS.get(m.group(1), m.group(1)), t)
     t = re.sub(r'\*+', '', t)
     t = re.sub(r'#+\s*', '', t)
     t = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', t)
+    t = re.sub(r'\s*[;]\s*', ', ', t)
+    t = re.sub(r'\s*—\s*', ', ', t)
     t = re.sub(r'\s{2,}', ' ', t)
     t = _enforce_brevity(t.strip())
     return t
