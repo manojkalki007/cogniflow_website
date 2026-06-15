@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import {
-  BarChart3, TrendingUp, Clock, PhoneIncoming,
-  Bot, Activity, DollarSign,
+  BarChart3, TrendingUp, Clock, PhoneIncoming, PhoneOutgoing,
+  Bot, Activity, DollarSign, Gauge,
 } from "lucide-react";
 import {
   LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -46,6 +46,48 @@ function EmptyChart({ message }) {
   return (
     <div className="flex items-center justify-center py-12">
       <div className="h-32 w-full rounded-lg animate-pulse" style={{ background: 'var(--bg-muted)' }} />
+    </div>
+  );
+}
+
+function PeakHoursHeatmap({ calls }) {
+  const hourCounts = new Array(24).fill(0);
+  calls.forEach((c) => {
+    const d = new Date(c.created_at || c.started_at);
+    if (!isNaN(d)) hourCounts[d.getHours()]++;
+  });
+  const max = Math.max(...hourCounts, 1);
+
+  return (
+    <div>
+      <div className="grid grid-cols-12 gap-1">
+        {hourCounts.map((count, h) => {
+          const intensity = count / max;
+          return (
+            <div
+              key={h}
+              className="aspect-square rounded-md flex items-center justify-center text-[9px] font-mono transition-all"
+              style={{
+                background: intensity > 0
+                  ? `rgba(0,188,212,${0.08 + intensity * 0.5})`
+                  : "var(--bg-muted)",
+                color: intensity > 0.3 ? "var(--accent)" : "var(--text-muted)",
+                border: `1px solid ${intensity > 0.5 ? "rgba(0,188,212,0.3)" : "var(--border)"}`,
+              }}
+              title={`${h}:00 — ${count} calls`}
+            >
+              {count > 0 ? count : ""}
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex justify-between mt-2 text-[9px]" style={{ color: "var(--text-muted)" }}>
+        <span>12AM</span>
+        <span>6AM</span>
+        <span>12PM</span>
+        <span>6PM</span>
+        <span>11PM</span>
+      </div>
     </div>
   );
 }
@@ -251,6 +293,32 @@ export default function Analytics() {
                       <Tooltip {...tooltipStyle} />
                       <Line type="monotone" dataKey="conversion_rate" stroke="#00BCD4" strokeWidth={2.5} dot={false} name="Conversion %" />
                     </LineChart>
+                  </ResponsiveContainer>
+                ) : <EmptyChart />}
+              </ChartCard>
+
+              <ChartCard title="Peak Hours" className="lg:col-span-2">
+                {calls.length > 0 ? (
+                  <PeakHoursHeatmap calls={calls} />
+                ) : <EmptyChart />}
+              </ChartCard>
+
+              <ChartCard title="Cost Over Time">
+                {costTrends.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={250}>
+                    <AreaChart data={costTrends}>
+                      <defs>
+                        <linearGradient id="costGradFull" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#10b981" stopOpacity={0.2} />
+                          <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickFormatter={d => d.slice(5)} />
+                      <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickFormatter={v => `$${v}`} />
+                      <Tooltip {...tooltipStyle} />
+                      <Area type="monotone" dataKey="estimated_cost" stroke="#10b981" fill="url(#costGradFull)" strokeWidth={2} name="Est. Cost ($)" />
+                    </AreaChart>
                   </ResponsiveContainer>
                 ) : <EmptyChart />}
               </ChartCard>

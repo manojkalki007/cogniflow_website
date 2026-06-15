@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import {
@@ -368,6 +368,26 @@ export default function CallLog() {
   const [expandedId, setExpandedId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
 
+  const exportCsv = () => {
+    if (calls.length === 0) return;
+    const headers = ["Phone Number", "Status", "Duration (s)", "Date", "Agent"];
+    const rows = calls.map((c) => [
+      c.phone_number || "",
+      c.status || "",
+      c.duration_seconds || 0,
+      c.created_at || c.started_at || "",
+      c.agent_name || "",
+    ]);
+    const csv = [headers, ...rows].map((r) => r.map((v) => `"${v}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `cogniflow-calls-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const { data: stats } = useQuery({
     queryKey: ["stats"],
     queryFn: api.getStats,
@@ -449,6 +469,17 @@ export default function CallLog() {
               className="glass-input w-full pl-10 pr-4 py-2.5 rounded-xl text-sm"
             />
           </div>
+          <button
+            onClick={exportCsv}
+            disabled={calls.length === 0}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-medium transition-all shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}
+            onMouseEnter={(e) => calls.length > 0 && (e.currentTarget.style.borderColor = "var(--accent)")}
+            onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
+          >
+            <Download size={14} />
+            Export CSV
+          </button>
         </div>
 
         {/* Table */}
@@ -472,7 +503,11 @@ export default function CallLog() {
                 {calls.map((call) => {
                   const isExpanded = expandedId === call.id;
                   return (
-                    <tr key={call.id}>
+                    <React.Fragment key={call.id}>
+                    <tr
+                      className="cursor-pointer"
+                      onClick={() => setExpandedId(isExpanded ? null : call.id)}
+                    >
                       <td>
                         <div
                           className="w-7 h-7 rounded-lg flex items-center justify-center"
@@ -533,9 +568,10 @@ export default function CallLog() {
                       </td>
                       <td>
                         <button
-                          onClick={() =>
-                            setExpandedId(isExpanded ? null : call.id)
-                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedId(isExpanded ? null : call.id);
+                          }}
                           className="p-1.5 rounded-lg transition-all cursor-pointer"
                           style={{ color: "var(--text-muted)" }}
                           onMouseEnter={(e) =>
@@ -554,6 +590,38 @@ export default function CallLog() {
                         </button>
                       </td>
                     </tr>
+                    {isExpanded && (
+                      <tr>
+                        <td colSpan={7} style={{ padding: 0, border: "none" }}>
+                          <div className="px-4 py-4 animate-fade-in" style={{ background: "var(--bg-subtle)", borderBottom: "1px solid var(--border)" }}>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                              {/* Transcript */}
+                              <div>
+                                <div className="flex items-center gap-2 mb-3">
+                                  <MessageSquare size={14} style={{ color: "#8B5CF6" }} />
+                                  <h4 className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>Transcript</h4>
+                                </div>
+                                <TranscriptView transcript={call.transcript} />
+                              </div>
+                              {/* Right side: recording + latency + cost */}
+                              <div className="space-y-4">
+                                {call.recording_url && (
+                                  <div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Play size={14} style={{ color: "var(--accent)" }} />
+                                      <h4 className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>Recording</h4>
+                                    </div>
+                                    <AudioPlayer url={call.recording_url} />
+                                  </div>
+                                )}
+                                <LatencyWaterfall call={call} />
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                   );
                 })}
 
@@ -595,108 +663,6 @@ export default function CallLog() {
             </table>
           </div>
         </div>
-
-        {/* Expanded Call Detail */}
-        {expandedId && (() => {
-          const expandedCall = calls.find((c) => c.id === expandedId);
-          return (
-            <div className="mt-3 glass-card rounded-2xl p-5 animate-fade-in">
-              {/* Call detail header with cost summary */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className="w-8 h-8 rounded-xl flex items-center justify-center"
-                    style={{
-                      background: "rgba(139,92,246,0.08)",
-                      border: "1px solid rgba(139,92,246,0.1)",
-                    }}
-                  >
-                    <MessageSquare size={14} style={{ color: "#8B5CF6" }} />
-                  </div>
-                  <h3
-                    className="text-sm font-semibold"
-                    style={{ color: "var(--text-primary)" }}
-                  >
-                    Call Detail
-                  </h3>
-                </div>
-                {expandedCall?.recording_url && (
-                  <div className="flex items-center gap-2">
-                    <AudioPlayer url={expandedCall.recording_url} />
-                    <a
-                      href={expandedCall.recording_url}
-                      download={`recording-${expandedCall.id || "call"}.wav`}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors"
-                      style={{ background: "var(--accent-subtle)", color: "var(--accent)" }}
-                      title="Download recording"
-                    >
-                      <Download size={13} />
-                    </a>
-                  </div>
-                )}
-              </div>
-
-              {/* Transcript */}
-              <TranscriptView transcript={expandedCall?.transcript} />
-
-              {/* Latency Waterfall */}
-              <LatencyWaterfall call={expandedCall || {}} />
-
-              {/* Cost Detail in expanded view */}
-              {expandedCall?.duration_seconds > 0 && (
-                <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <div
-                      className="w-7 h-7 rounded-lg flex items-center justify-center"
-                      style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.1)" }}
-                    >
-                      <DollarSign size={13} style={{ color: "var(--success)" }} />
-                    </div>
-                    <h4 className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>
-                      Cost Summary
-                    </h4>
-                  </div>
-                  {(() => {
-                    const cost = estimateCallCost(
-                      expandedCall.duration_seconds,
-                      expandedCall.cost_breakdown || (expandedCall.cost != null ? { total: expandedCall.cost } : null)
-                    );
-                    return (
-                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                        {[
-                          { label: "STT", value: cost.stt },
-                          { label: "LLM", value: cost.llm },
-                          { label: "TTS", value: cost.tts },
-                          { label: "Telephony", value: cost.telephony },
-                          { label: "Total", value: cost.total, highlight: true },
-                        ].map((item) => (
-                          <div
-                            key={item.label}
-                            className="rounded-lg px-3 py-2 text-center"
-                            style={{
-                              background: item.highlight ? "rgba(16,185,129,0.08)" : "var(--bg-muted)",
-                              border: item.highlight ? "1px solid rgba(16,185,129,0.15)" : "1px solid var(--border)",
-                            }}
-                          >
-                            <p className="text-[9px] uppercase tracking-wider font-medium" style={{ color: "var(--text-muted)" }}>{item.label}</p>
-                            <p className="text-xs font-mono font-bold mt-0.5" style={{ color: item.highlight ? "var(--success)" : "var(--text-primary)" }}>
-                              ${item.value?.toFixed(4)}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })()}
-                  {!expandedCall.cost && !expandedCall.cost_breakdown && (
-                    <p className="text-[10px] mt-2" style={{ color: "var(--text-muted)" }}>
-                      * Estimated based on duration at standard rates
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })()}
 
         {/* Footer count */}
         <div className="flex items-center justify-between mt-4">

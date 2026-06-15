@@ -5,16 +5,18 @@ import {
   Phone, PhoneOutgoing, Users, BarChart3, Bot,
   LayoutTemplate, Megaphone, Settings, Target,
   UserCircle, ShieldAlert, Cable, MessageSquare,
-  Mail, Plug, Calendar,
+  Mail, Plug, Calendar, LayoutDashboard,
   PanelLeftClose, PanelLeftOpen, Search, Bell,
   ChevronRight, Command, LogOut, Menu, X, Hash,
 } from "lucide-react";
+import CommandPalette from "./CommandPalette";
 
 const SidebarContext = createContext();
 export const useSidebar = () => useContext(SidebarContext);
 
 const NAV_CORE = [
-  { to: "/home", label: "Call Log", icon: Phone, end: true },
+  { to: "/home", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/home/calls", label: "Call Log", icon: Phone },
   { to: "/home/phone-numbers", label: "Phone Numbers", icon: Hash },
   { to: "/home/contacts", label: "Contacts", icon: Users },
   { to: "/home/analytics", label: "Analytics", icon: BarChart3 },
@@ -38,7 +40,9 @@ const NAV_ACCOUNT = [
 ];
 
 const PAGE_TITLES = {
-  "/home": "Call Log",
+  "/home": "Dashboard",
+  "/home/dashboard": "Dashboard",
+  "/home/calls": "Call Log",
   "/home/phone-numbers": "Phone Numbers",
   "/home/contacts": "Contacts",
   "/home/analytics": "Analytics",
@@ -94,6 +98,7 @@ export default function Layout() {
     () => localStorage.getItem("sidebar_collapsed") === "true",
   );
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [cmdkOpen, setCmdkOpen] = useState(false);
   const location = useLocation();
   const userEmail = user?.email || "";
   const userInitials = userEmail ? userEmail.substring(0, 2).toUpperCase() : "C";
@@ -110,6 +115,18 @@ export default function Layout() {
   useEffect(() => {
     setMobileOpen(false);
   }, [location.pathname]);
+
+  // Cmd+K shortcut
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setCmdkOpen((o) => !o);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // Prevent body scroll when mobile sidebar is open
   useEffect(() => {
@@ -335,32 +352,30 @@ export default function Layout() {
 
             {/* Right: Search + Actions */}
             <div className="flex items-center gap-3">
-              <div className="relative hidden md:block">
-                <Search
-                  size={14}
-                  className="absolute left-3 top-1/2 -translate-y-1/2"
-                  style={{ color: "var(--text-muted)" }}
-                />
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  className="header-search pl-9 pr-14 py-1.5 rounded-lg text-xs w-48 focus:w-64 transition-all duration-200"
-                />
-                <div
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5"
+              <button
+                onClick={() => setCmdkOpen(true)}
+                className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all duration-200 cursor-pointer"
+                style={{
+                  background: "var(--bg-muted)",
+                  color: "var(--text-muted)",
+                  border: "1px solid transparent",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
+                onMouseLeave={(e) => (e.currentTarget.style.borderColor = "transparent")}
+              >
+                <Search size={14} />
+                <span className="w-32 text-left">Search...</span>
+                <kbd
+                  className="text-[9px] px-1.5 py-0.5 rounded font-mono flex items-center gap-0.5"
+                  style={{
+                    background: "var(--bg-subtle)",
+                    color: "var(--text-muted)",
+                    border: "1px solid var(--border)",
+                  }}
                 >
-                  <kbd
-                    className="text-[9px] px-1.5 py-0.5 rounded font-mono flex items-center gap-0.5"
-                    style={{
-                      background: "var(--bg-muted)",
-                      color: "var(--text-muted)",
-                      border: "1px solid var(--border)",
-                    }}
-                  >
-                    <Command size={9} />K
-                  </kbd>
-                </div>
-              </div>
+                  <Command size={9} />K
+                </kbd>
+              </button>
 
               <button
                 className="relative p-2 rounded-lg transition-all duration-200 cursor-pointer"
@@ -405,6 +420,7 @@ export default function Layout() {
           </main>
         </div>
       </div>
+      <CommandPalette open={cmdkOpen} onClose={() => setCmdkOpen(false)} />
     </SidebarContext.Provider>
   );
 }
