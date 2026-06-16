@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
@@ -50,7 +50,7 @@ export default function CommandPalette({ open, onClose }) {
   const agents = agentsData?.agents || [];
   const contacts = contactsData?.contacts || [];
 
-  const results = useCallback(() => {
+  const items = useMemo(() => {
     const q = query.toLowerCase().trim();
     const items = [];
 
@@ -89,8 +89,6 @@ export default function CommandPalette({ open, onClose }) {
 
     return items;
   }, [query, agents, contacts]);
-
-  const items = results();
 
   useEffect(() => {
     if (open) {

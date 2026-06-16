@@ -39,25 +39,6 @@ function MetricCard({ icon: Icon, label, value, sub, trend, color = "blue" }) {
   );
 }
 
-function MiniSparkline({ data }) {
-  if (!data || data.length === 0) return null;
-  return (
-    <div className="h-12 w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#00BCD4" stopOpacity={0.3} />
-              <stop offset="100%" stopColor="#00BCD4" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <Area type="monotone" dataKey="value" stroke="#00BCD4" strokeWidth={1.5} fill="url(#sparkGrad)" />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
 function UsageMeter({ used, limit }) {
   const pct = Math.min((used / Math.max(limit, 1)) * 100, 100);
   const remaining = Math.max(0, limit - used);
@@ -198,9 +179,9 @@ export default function Dashboard() {
   const calls = callsData?.calls || [];
   const agents = agentsData?.agents || [];
 
-  const trendData = (trends?.daily_calls || []).map((d) => ({
+  const trendData = (trends?.trends || []).map((d) => ({
     date: d.date,
-    value: d.count || 0,
+    value: d.total || 0,
   }));
 
   const avgDuration = calls.length > 0
