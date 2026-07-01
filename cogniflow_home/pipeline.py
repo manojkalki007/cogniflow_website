@@ -971,8 +971,8 @@ class VoicePipeline:
                 synth_kwargs = self._get_emotion_tts_kwargs()
             else:
                 synth_kwargs = {}
-            if self._voice_speed != 1.0:
-                synth_kwargs["speed"] = self._voice_speed
+            base_speed = synth_kwargs.get("speed", 1.0)
+            synth_kwargs["speed"] = max(0.5, min(2.0, base_speed * self._voice_speed))
 
             try:
                 await self._stream_tts_audio(self.tts.synthesize(text, **synth_kwargs))
