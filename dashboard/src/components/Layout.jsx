@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext } from "react";
+import { useState, useEffect, useRef, createContext, useContext } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -99,6 +99,10 @@ export default function Layout() {
   );
   const [mobileOpen, setMobileOpen] = useState(false);
   const [cmdkOpen, setCmdkOpen] = useState(false);
+  const [bellOpen, setBellOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const bellRef = useRef(null);
+  const profileRef = useRef(null);
   const location = useLocation();
   const userEmail = user?.email || "";
   const userInitials = userEmail ? userEmail.substring(0, 2).toUpperCase() : "C";
@@ -115,6 +119,15 @@ export default function Layout() {
   useEffect(() => {
     setMobileOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (bellRef.current && !bellRef.current.contains(e.target)) setBellOpen(false);
+      if (profileRef.current && !profileRef.current.contains(e.target)) setProfileOpen(false);
+    }
+    if (bellOpen || profileOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [bellOpen, profileOpen]);
 
   // Cmd+K shortcut
   useEffect(() => {
@@ -377,37 +390,158 @@ export default function Layout() {
                 </kbd>
               </button>
 
-              <button
-                className="relative p-2 rounded-lg transition-all duration-200 cursor-pointer"
-                style={{ color: "var(--text-muted)" }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = "var(--bg-muted)")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = "transparent")
-                }
-                title="Notifications"
-              >
-                <Bell size={16} />
-                <span
-                  className="absolute top-1 right-1 w-2 h-2 rounded-full"
+              <div className="relative" ref={bellRef}>
+                <button
+                  onClick={() => { setBellOpen(!bellOpen); setProfileOpen(false); }}
+                  className="relative p-2 rounded-lg transition-all duration-200 cursor-pointer"
                   style={{
-                    background: "var(--accent)",
-                    boxShadow: "0 0 6px var(--accent-glow)",
+                    color: "var(--text-muted)",
+                    background: bellOpen ? "var(--bg-muted)" : "transparent",
                   }}
-                />
-              </button>
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-muted)")}
+                  onMouseLeave={(e) => { if (!bellOpen) e.currentTarget.style.background = "transparent"; }}
+                  title="Notifications"
+                >
+                  <Bell size={16} />
+                  <span
+                    className="absolute top-1 right-1 w-2 h-2 rounded-full"
+                    style={{
+                      background: "var(--accent)",
+                      boxShadow: "0 0 6px var(--accent-glow)",
+                    }}
+                  />
+                </button>
 
-              <div
-                className="w-8 h-8 rounded-xl flex items-center justify-center text-[11px] font-bold text-white cursor-pointer transition-all duration-200 hover:scale-105"
-                style={{
-                  background: "linear-gradient(135deg, rgba(0,188,212,0.9), rgba(0,151,167,0.9))",
-                  border: "1px solid rgba(34,211,238,0.15)",
-                  boxShadow: "0 2px 8px rgba(0,188,212,0.2)",
-                }}
-                title={userEmail || "Profile"}
-              >
-                {userInitials}
+                {bellOpen && (
+                  <div
+                    className="absolute right-0 top-full mt-2 w-80 rounded-xl shadow-2xl overflow-hidden"
+                    style={{
+                      background: "var(--bg-card)",
+                      border: "1px solid var(--border)",
+                      boxShadow: "0 16px 48px rgba(0,0,0,0.15)",
+                      zIndex: 100,
+                    }}
+                  >
+                    <div
+                      className="flex items-center justify-between px-4 py-3"
+                      style={{ borderBottom: "1px solid var(--border)" }}
+                    >
+                      <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                        Notifications
+                      </span>
+                    </div>
+                    <div className="flex flex-col items-center justify-center py-10 px-4">
+                      <Bell size={28} style={{ color: "var(--text-muted)", opacity: 0.4 }} />
+                      <p className="text-sm mt-3" style={{ color: "var(--text-muted)" }}>
+                        No notifications yet
+                      </p>
+                      <p className="text-xs mt-1" style={{ color: "var(--text-muted)", opacity: 0.6 }}>
+                        You're all caught up
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="relative" ref={profileRef}>
+                <button
+                  onClick={() => { setProfileOpen(!profileOpen); setBellOpen(false); }}
+                  className="w-8 h-8 rounded-xl flex items-center justify-center text-[11px] font-bold text-white cursor-pointer transition-all duration-200 hover:scale-105"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(0,188,212,0.9), rgba(0,151,167,0.9))",
+                    border: profileOpen ? "2px solid var(--accent)" : "1px solid rgba(34,211,238,0.15)",
+                    boxShadow: profileOpen ? "0 0 12px rgba(0,188,212,0.4)" : "0 2px 8px rgba(0,188,212,0.2)",
+                  }}
+                  title={userEmail || "Profile"}
+                >
+                  {userInitials}
+                </button>
+
+                {profileOpen && (
+                  <div
+                    className="absolute right-0 top-full mt-2 w-64 rounded-xl shadow-2xl overflow-hidden"
+                    style={{
+                      background: "var(--bg-card)",
+                      border: "1px solid var(--border)",
+                      boxShadow: "0 16px 48px rgba(0,0,0,0.15)",
+                      zIndex: 100,
+                    }}
+                  >
+                    <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold text-white shrink-0"
+                          style={{
+                            background: "linear-gradient(135deg, rgba(0,188,212,0.9), rgba(0,151,167,0.9))",
+                          }}
+                        >
+                          {userInitials}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>
+                            {user?.user_metadata?.full_name || "User"}
+                          </p>
+                          <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
+                            {userEmail}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="py-1">
+                      <NavLink
+                        to="/home/tenant"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors"
+                        style={{ color: "var(--text-muted)" }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = "var(--bg-muted)";
+                          e.currentTarget.style.color = "var(--text-primary)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = "transparent";
+                          e.currentTarget.style.color = "var(--text-muted)";
+                        }}
+                      >
+                        <UserCircle size={16} />
+                        <span>My Account</span>
+                      </NavLink>
+                      <NavLink
+                        to="/home/settings"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors"
+                        style={{ color: "var(--text-muted)" }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = "var(--bg-muted)";
+                          e.currentTarget.style.color = "var(--text-primary)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = "transparent";
+                          e.currentTarget.style.color = "var(--text-muted)";
+                        }}
+                      >
+                        <Settings size={16} />
+                        <span>Settings</span>
+                      </NavLink>
+                      <button
+                        onClick={() => { setProfileOpen(false); signOut(); }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors"
+                        style={{ color: "var(--text-muted)" }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = "rgba(239,68,68,0.08)";
+                          e.currentTarget.style.color = "#ef4444";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = "transparent";
+                          e.currentTarget.style.color = "var(--text-muted)";
+                        }}
+                      >
+                        <LogOut size={16} />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </header>
