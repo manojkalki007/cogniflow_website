@@ -85,7 +85,7 @@ class SmallestTTS:
                     f"Smallest AI TTS error {resp.status_code}: {error.decode()[:200]}"
                 )
 
-            async for chunk in resp.aiter_bytes(4096):
+            async for chunk in resp.aiter_bytes(8192):
                 if chunk:
                     yield chunk
 

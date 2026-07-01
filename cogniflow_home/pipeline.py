@@ -141,7 +141,7 @@ def _humanize_for_speech(text: str) -> str:
 
 
 def _enforce_brevity(text: str) -> str:
-    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+    sentences = re.split(r'(?<=[.!?])(?<!\b(?:Dr|Mr|Mrs|Ms|St|Rs|vs|etc|Jr|Sr|Prof|Inc|Ltd|Corp|Ave|Blvd|Dept|Est|approx|govt|tel|vol|no|amt)\.)(?<!\b[A-Z]\.)\s+', text.strip())
     if len(sentences) > 2:
         return ' '.join(sentences[:2])
     return text
@@ -326,7 +326,7 @@ class VoicePipeline:
         self.compliance = ComplianceEngine()
         self.speculative = SpeculativeGenerator(eot_threshold=0.85, min_words=6)
         self.filler = FillerAudioManager()
-        self.audio_smoother = AudioSmoother(sample_rate=sample_rate, crossfade_ms=8)
+        self.audio_smoother = AudioSmoother(sample_rate=sample_rate, crossfade_ms=12)
         self.language_detector = LanguageDetector(primary_language=language)
         self.language_router = LanguageRouter()
         self.turn_quality = TurnQualityAnalyzer()
@@ -984,6 +984,11 @@ class VoicePipeline:
 
     async def _stream_tts_audio(self, audio_gen):
         """Send audio chunks from a TTS async generator to telephony."""
+        chunk_size = self._sample_rate // 50  # 20ms frames
+        chunk_duration = chunk_size / self._sample_rate  # seconds per frame
+        mulaw_buffer = bytearray()
+        send_ts = 0.0
+
         async for audio_chunk in audio_gen:
             if self.state.barge_in:
                 break
@@ -995,17 +1000,27 @@ class VoicePipeline:
                 if not self._turn_first_byte_ts:
                     self._turn_first_byte_ts = time.perf_counter() * 1000
             else:
-                mulaw = pcm16_to_mulaw(smoothed)
-                chunk_size = self._sample_rate // 50
-                for i in range(0, len(mulaw), chunk_size):
+                mulaw_buffer.extend(pcm16_to_mulaw(smoothed))
+                while len(mulaw_buffer) >= chunk_size:
                     if self.state.barge_in:
                         break
-                    segment = mulaw[i : i + chunk_size]
+                    segment = bytes(mulaw_buffer[:chunk_size])
+                    del mulaw_buffer[:chunk_size]
+                    now = time.perf_counter()
+                    if send_ts:
+                        wait = send_ts - now
+                        if wait > 0.001:
+                            await asyncio.sleep(wait)
                     payload = base64.b64encode(segment).decode("ascii")
                     await self._telephony.send_audio(payload)
+                    send_ts = time.perf_counter() + chunk_duration
                     if not self._turn_first_byte_ts:
                         self._turn_first_byte_ts = time.perf_counter() * 1000
-                    await asyncio.sleep(0.018)
+
+        # Flush remaining mulaw buffer
+        if mulaw_buffer and not self.state.barge_in:
+            payload = base64.b64encode(bytes(mulaw_buffer)).decode("ascii")
+            await self._telephony.send_audio(payload)
 
         tail = self.audio_smoother.flush()
         if tail and not self.state.barge_in:

@@ -114,12 +114,12 @@ class ElevenLabsTTS:
 
             if self.raw_pcm:
                 # Stream raw PCM chunks directly
-                async for chunk in resp.aiter_bytes(4096):
+                async for chunk in resp.aiter_bytes(8192):
                     if chunk:
                         yield chunk
             else:
                 # Already ulaw 8kHz from ElevenLabs — stream directly
-                async for chunk in resp.aiter_bytes(4096):
+                async for chunk in resp.aiter_bytes(8192):
                     if chunk:
                         yield chunk
 

@@ -95,7 +95,7 @@ def compute_energy_pcm16(pcm_bytes: bytes) -> float:
 class AudioSmoother:
     """Crossfades consecutive TTS audio chunks to eliminate clicks and pops."""
 
-    def __init__(self, sample_rate: int = 8000, crossfade_ms: int = 3):
+    def __init__(self, sample_rate: int = 8000, crossfade_ms: int = 12):
         self.sample_rate = sample_rate
         self.crossfade_samples = max(1, int(sample_rate * crossfade_ms / 1000))
         self._previous_tail = None
