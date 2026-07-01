@@ -984,11 +984,6 @@ class VoicePipeline:
 
     async def _stream_tts_audio(self, audio_gen):
         """Send audio chunks from a TTS async generator to telephony."""
-        chunk_size = self._sample_rate // 50  # 20ms frames
-        chunk_duration = chunk_size / self._sample_rate  # seconds per frame
-        mulaw_buffer = bytearray()
-        send_ts = 0.0
-
         async for audio_chunk in audio_gen:
             if self.state.barge_in:
                 break
@@ -1000,27 +995,17 @@ class VoicePipeline:
                 if not self._turn_first_byte_ts:
                     self._turn_first_byte_ts = time.perf_counter() * 1000
             else:
-                mulaw_buffer.extend(pcm16_to_mulaw(smoothed))
-                while len(mulaw_buffer) >= chunk_size:
+                mulaw = pcm16_to_mulaw(smoothed)
+                chunk_size = self._sample_rate // 50
+                for i in range(0, len(mulaw), chunk_size):
                     if self.state.barge_in:
                         break
-                    segment = bytes(mulaw_buffer[:chunk_size])
-                    del mulaw_buffer[:chunk_size]
-                    now = time.perf_counter()
-                    if send_ts:
-                        wait = send_ts - now
-                        if wait > 0.001:
-                            await asyncio.sleep(wait)
+                    segment = mulaw[i : i + chunk_size]
                     payload = base64.b64encode(segment).decode("ascii")
                     await self._telephony.send_audio(payload)
-                    send_ts = time.perf_counter() + chunk_duration
                     if not self._turn_first_byte_ts:
                         self._turn_first_byte_ts = time.perf_counter() * 1000
-
-        # Flush remaining mulaw buffer
-        if mulaw_buffer and not self.state.barge_in:
-            payload = base64.b64encode(bytes(mulaw_buffer)).decode("ascii")
-            await self._telephony.send_audio(payload)
+                    await asyncio.sleep(0.018)
 
         tail = self.audio_smoother.flush()
         if tail and not self.state.barge_in:
