@@ -140,8 +140,12 @@ def _humanize_for_speech(text: str) -> str:
     return t
 
 
+_ABBREV_PATTERN = re.compile(r'\b(?:Dr|Mr|Mrs|Ms|St|Rs|vs|etc|Jr|Sr|Prof|Inc|Ltd|No|Apt)\.\s')
+
 def _enforce_brevity(text: str) -> str:
-    sentences = re.split(r'(?<=[.!?])(?<!\b(?:Dr|Mr|Mrs|Ms|St|Rs|vs|etc|Jr|Sr|Prof|Inc|Ltd|Corp|Ave|Blvd|Dept|Est|approx|govt|tel|vol|no|amt)\.)(?<!\b[A-Z]\.)\s+', text.strip())
+    protected = _ABBREV_PATTERN.sub(lambda m: m.group().replace('. ', '.\x00'), text.strip())
+    sentences = re.split(r'(?<=[.!?])\s+', protected)
+    sentences = [s.replace('\x00', ' ') for s in sentences]
     if len(sentences) > 2:
         return ' '.join(sentences[:2])
     return text
