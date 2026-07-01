@@ -91,7 +91,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <main className="ml-0 md:ml-[240px] min-h-screen transition-all duration-300">
         {/* Top bar */}
         <header
-          className="sticky top-0 z-30 h-14 flex items-center justify-between px-4 md:px-8 border-b backdrop-blur-xl"
+          className="sticky top-0 z-50 h-14 flex items-center justify-between px-4 md:px-8 border-b backdrop-blur-xl"
           style={{
             background: "rgba(6, 7, 11, 0.8)",
             borderColor: "var(--d-border)",
