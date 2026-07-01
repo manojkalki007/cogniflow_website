@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, getTenantId } from "../lib/api";
-import { Plus, Trash2, Upload, Shield, Webhook, Building2, UserPlus, Crown, User } from "lucide-react";
+import supabase from "../lib/supabase";
+import { Plus, Trash2, Upload, Shield, Webhook, Building2, UserPlus, Crown, User, Lock, Eye, EyeOff, Check } from "lucide-react";
 import { Button } from "../components/ui/button";
 import PageHeader from "../components/PageHeader";
 
@@ -315,12 +316,113 @@ function OrganizationSection() {
   );
 }
 
+function ChangePasswordSection() {
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [status, setStatus] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const isValid = newPassword.length >= 8 && newPassword === confirmPassword;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!isValid) return;
+    setLoading(true);
+    setStatus(null);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setLoading(false);
+    if (error) {
+      setStatus({ type: "error", message: error.message });
+    } else {
+      setStatus({ type: "success", message: "Password updated successfully" });
+      setNewPassword("");
+      setConfirmPassword("");
+    }
+  };
+
+  return (
+    <div className="rounded-xl border p-6" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+      <div className="flex items-center gap-2.5 mb-4">
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--accent-subtle)' }}>
+          <Lock size={15} style={{ color: 'var(--accent)' }} />
+        </div>
+        <div>
+          <h3 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Change Password</h3>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Must be at least 8 characters</p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <div className="relative">
+          <input
+            type={showNew ? "text" : "password"}
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            placeholder="New password"
+            className="w-full rounded-xl px-4 py-2.5 text-sm outline-none pr-10"
+            style={{ background: 'var(--bg-muted)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+          />
+          <button
+            type="button"
+            onClick={() => setShowNew(!showNew)}
+            className="absolute right-3 top-1/2 -translate-y-1/2"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            {showNew ? <EyeOff size={14} /> : <Eye size={14} />}
+          </button>
+        </div>
+
+        <div className="relative">
+          <input
+            type={showConfirm ? "text" : "password"}
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="Confirm new password"
+            className="w-full rounded-xl px-4 py-2.5 text-sm outline-none pr-10"
+            style={{ background: 'var(--bg-muted)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+          />
+          <button
+            type="button"
+            onClick={() => setShowConfirm(!showConfirm)}
+            className="absolute right-3 top-1/2 -translate-y-1/2"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            {showConfirm ? <EyeOff size={14} /> : <Eye size={14} />}
+          </button>
+        </div>
+
+        {confirmPassword && newPassword !== confirmPassword && (
+          <p className="text-xs text-red-400">Passwords do not match</p>
+        )}
+
+        {status && (
+          <p className={`text-sm px-3 py-2 rounded-lg border ${
+            status.type === "success"
+              ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+              : "text-red-400 bg-red-500/10 border-red-500/20"
+          }`}>
+            {status.type === "success" && <Check size={14} className="inline mr-1.5 -mt-0.5" />}
+            {status.message}
+          </p>
+        )}
+
+        <Button size="sm" type="submit" disabled={!isValid || loading}>
+          {loading ? "Updating..." : "Update Password"}
+        </Button>
+      </form>
+    </div>
+  );
+}
+
 export default function Settings() {
   return (
     <div>
       <PageHeader title="Settings" description="Configure your account and preferences" />
       <div className="px-8 py-6">
         <div className="max-w-2xl space-y-5">
+          <ChangePasswordSection />
           <OrganizationSection />
           <WebhookSection />
           <DNCSection />
