@@ -39,6 +39,7 @@ class AgentConfig:
     enable_barge_in: bool = True
     enable_speculative: bool = True
     enable_filler: bool = True
+    voice_speed: float = 1.0
     integration_config: dict = field(default_factory=dict)
     variables: list = field(default_factory=list)
 
@@ -95,6 +96,7 @@ def _agent_from_row(agent: dict) -> AgentConfig:
         enable_barge_in=agent.get("enable_barge_in", True),
         enable_speculative=agent.get("enable_speculative", True),
         enable_filler=agent.get("enable_filler", True),
+        voice_speed=float(agent.get("voice_speed", 1.0)),
         integration_config=meta.get("integration_config", {}),
         variables=meta.get("variables", []),
     )

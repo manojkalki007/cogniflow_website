@@ -412,6 +412,7 @@ async def voice_ws(websocket: WebSocket, provider_name: str):
             enable_filler=agent_config.enable_filler,
             tts_provider=agent_config.tts_provider,
             variables=agent_config.variables,
+            voice_speed=agent_config.voice_speed,
         )
         pipeline.agent_id = getattr(agent_config, "id", None)
         pipeline.llm.call_context["integration_config"] = agent_config.integration_config
@@ -515,6 +516,7 @@ async def browser_voice_test(websocket: WebSocket):
             enable_filler=agent_config.enable_filler,
             tts_provider=agent_config.tts_provider,
             variables=agent_config.variables,
+            voice_speed=agent_config.voice_speed,
         )
 
         async def _send_transcript(role: str, text: str):

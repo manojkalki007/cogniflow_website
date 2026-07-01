@@ -270,10 +270,12 @@ class VoicePipeline:
                  enable_emotion: bool = True, enable_language_switch: bool = True,
                  enable_rag: bool = False, enable_barge_in: bool = True,
                  enable_speculative: bool = True, enable_filler: bool = True,
-                 tts_provider: str = "", variables: list | None = None):
+                 tts_provider: str = "", variables: list | None = None,
+                 voice_speed: float = 1.0):
         call_id = call_info.call_sid or str(uuid.uuid4())
         self._sample_rate = sample_rate
         self._tts_provider = tts_provider
+        self._voice_speed = max(0.5, min(2.0, voice_speed))
         self.state = CallState(
             call_sid=call_id,
             caller_number=call_info.caller_number,
@@ -969,6 +971,8 @@ class VoicePipeline:
                 synth_kwargs = self._get_emotion_tts_kwargs()
             else:
                 synth_kwargs = {}
+            if self._voice_speed != 1.0:
+                synth_kwargs["speed"] = self._voice_speed
 
             try:
                 await self._stream_tts_audio(self.tts.synthesize(text, **synth_kwargs))

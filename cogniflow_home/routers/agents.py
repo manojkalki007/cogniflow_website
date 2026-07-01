@@ -38,7 +38,7 @@ _AGENT_COLUMNS = {
     "enable_memory", "enable_prediction", "enable_emotion", "enable_language_switch",
     "enable_rag", "enable_speculative", "enable_filler", "tools_enabled",
     "webhook_url", "fallback_message", "max_retries", "concurrent_call_limit",
-    "is_active", "phone_numbers",
+    "is_active", "phone_numbers", "voice_speed",
 }
 
 _META_FIELDS = {"integration_config", "variables"}

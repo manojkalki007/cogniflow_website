@@ -148,6 +148,7 @@ const defaultForm = {
   llm_provider: "groq",
   llm_model: "llama-3.3-70b-versatile",
   tts_provider: "smallest",
+  voice_speed: 1.0,
   stt_language: "en",
   endpointing_ms: 300,
   smart_format: true,
@@ -958,11 +959,13 @@ function VoiceSection({ form, set }) {
         <div className="flex items-center justify-between mb-3">
           <SectionLabel>Voice Speed</SectionLabel>
           <span className="text-sm font-mono tabular-nums" style={{ color: "var(--text-primary)" }}>
-            1.0x
+            {form.voice_speed.toFixed(1)}x
           </span>
         </div>
         <input
-          type="range" min="0.5" max="2.0" step="0.1" defaultValue="1.0"
+          type="range" min="0.5" max="2.0" step="0.1"
+          value={form.voice_speed}
+          onChange={(e) => set("voice_speed", parseFloat(e.target.value))}
           className="w-full h-2 rounded-full appearance-none cursor-pointer"
           style={{ background: "var(--bg-muted)" }}
         />
@@ -2019,6 +2022,7 @@ export default function AgentBuilder() {
         llm_provider: agentData.llm_provider || "groq",
         llm_model: agentData.llm_model || "llama-3.3-70b-versatile",
         tts_provider: agentData.tts_provider || "smallest",
+        voice_speed: agentData.voice_speed ?? 1.0,
         stt_language: agentData.stt_language || agentData.language || "en",
         endpointing_ms: agentData.endpointing_ms ?? 300,
         smart_format: agentData.smart_format ?? true,
