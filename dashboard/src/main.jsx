@@ -29,6 +29,7 @@ import AgentBuilder from "./pages/AgentBuilder";
 import AiSdr from "./pages/AiSdr";
 import Scheduling from "./pages/Scheduling";
 import PhoneNumbers from "./pages/PhoneNumbers";
+import KnowledgeBase from "./pages/KnowledgeBase";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 10_000, retry: 1 } },
@@ -61,6 +62,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                 <Route path="/home/email" element={<EmailAutomation />} />
                 <Route path="/home/ai-sdr" element={<AiSdr />} />
                 <Route path="/home/scheduling" element={<Scheduling />} />
+                <Route path="/home/knowledge" element={<KnowledgeBase />} />
                 <Route path="/home/integrations" element={<Integrations />} />
                 <Route path="/home/tenant" element={<TenantDashboard />} />
                 <Route path="/home/admin" element={<AdminDashboard />} />

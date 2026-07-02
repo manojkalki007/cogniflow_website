@@ -354,6 +354,24 @@ async def api_clone_agent(request: Request, auth: AuthContext = Depends(get_auth
 
 # ─── Knowledge Base ───
 
+@router.get("/api/agents/{agent_id}/knowledge")
+async def list_knowledge(agent_id: str, auth: AuthContext = Depends(get_auth_context)):
+    if not valid_uuid(agent_id):
+        return {"error": "Invalid agent ID format"}
+    if auth.tenant_id:
+        agents = await db.select("agents", {"id": agent_id})
+        if not agents or agents[0].get("tenant_id") != auth.tenant_id:
+            return {"error": "Agent not found"}
+    rows = await db.select("knowledge_chunks", {"agent_id": agent_id})
+    sources = {}
+    for r in (rows or []):
+        src = r.get("source", "unknown")
+        if src not in sources:
+            sources[src] = {"source": src, "chunks": 0, "created_at": r.get("created_at")}
+        sources[src]["chunks"] += 1
+    return {"sources": list(sources.values())}
+
+
 @router.post("/api/agents/{agent_id}/knowledge")
 async def upload_knowledge(agent_id: str, request: Request, auth: AuthContext = Depends(get_auth_context)):
     if not valid_uuid(agent_id):

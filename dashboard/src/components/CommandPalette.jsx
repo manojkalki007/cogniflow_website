@@ -5,7 +5,7 @@ import { api } from "../lib/api";
 import {
   Search, Phone, Bot, Users, BarChart3, Megaphone,
   MessageSquare, Mail, Settings, Hash, LayoutTemplate,
-  Target, Plug, Cable, Calendar, ArrowRight,
+  Target, Plug, Cable, Calendar, ArrowRight, BookOpen,
 } from "lucide-react";
 
 const STATIC_PAGES = [
@@ -21,6 +21,7 @@ const STATIC_PAGES = [
   { id: "email", label: "Email", icon: Mail, path: "/home/email" },
   { id: "scheduling", label: "Scheduling", icon: Calendar, path: "/home/scheduling" },
   { id: "ai-sdr", label: "AI SDR", icon: Target, path: "/home/ai-sdr" },
+  { id: "knowledge", label: "Knowledge Base", icon: BookOpen, path: "/home/knowledge" },
   { id: "integrations", label: "Integrations", icon: Plug, path: "/home/integrations" },
   { id: "api-hub", label: "API Hub", icon: Cable, path: "/home/api-hub" },
   { id: "settings", label: "Settings", icon: Settings, path: "/home/settings" },

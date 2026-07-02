@@ -5,7 +5,7 @@ import {
   Phone, PhoneOutgoing, Users, BarChart3, Bot,
   LayoutTemplate, Megaphone, Settings, Target,
   UserCircle, ShieldAlert, Cable, MessageSquare,
-  Mail, Plug, Calendar, LayoutDashboard,
+  Mail, Plug, Calendar, LayoutDashboard, BookOpen,
   PanelLeftClose, PanelLeftOpen, Search, Bell,
   ChevronRight, Command, LogOut, Menu, X, Hash,
 } from "lucide-react";
@@ -23,6 +23,7 @@ const NAV_CORE = [
   { to: "/home/agents", label: "Agents", icon: Bot },
   { to: "/home/templates", label: "Templates", icon: LayoutTemplate },
   { to: "/home/campaigns", label: "Campaigns", icon: Megaphone },
+  { to: "/home/knowledge", label: "Knowledge Base", icon: BookOpen },
 ];
 
 const NAV_CHANNELS = [
@@ -49,6 +50,7 @@ const PAGE_TITLES = {
   "/home/agents": "Agents",
   "/home/templates": "Templates",
   "/home/campaigns": "Campaigns",
+  "/home/knowledge": "Knowledge Base",
   "/home/whatsapp": "WhatsApp",
   "/home/email": "Email",
   "/home/ai-sdr": "AI SDR",

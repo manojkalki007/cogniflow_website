@@ -275,6 +275,33 @@ export const api = {
       body: JSON.stringify({ to_number: toNumber, agent_id: agentId || undefined }),
     }),
 
+  // Knowledge Base
+  getKnowledgeSources: (agentId) => request(`/api/agents/${agentId}/knowledge`),
+  uploadKnowledge: async (agentId, file) => {
+    const headers = {};
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) headers["Authorization"] = `Bearer ${session.access_token}`;
+    } catch {}
+    if (API_KEY) headers["X-Api-Key"] = API_KEY;
+    if (_tenantId) headers["X-Tenant-Id"] = _tenantId;
+    const form = new FormData();
+    form.append("file", file);
+    try {
+      const res = await fetch(`${BASE}/api/agents/${agentId}/knowledge`, { method: "POST", headers, body: form });
+      return await res.json();
+    } catch (err) {
+      return { error: err.message };
+    }
+  },
+  queryKnowledge: (agentId, question) =>
+    request(`/api/agents/${agentId}/knowledge/query`, {
+      method: "POST",
+      body: JSON.stringify({ question }),
+    }),
+  deleteKnowledge: (agentId, source) =>
+    request(`/api/agents/${agentId}/knowledge/${encodeURIComponent(source)}`, { method: "DELETE" }),
+
   // API Hub
   getProviders: () => request("/api/providers"),
 
